@@ -19,7 +19,10 @@ public:
 	uint num_threads = 1;
 	uint duration = 1000;
 	uint num_objects = 1000;
-	string trace_path = "/gisdata/chicago/traces";
+	string trace_path = "default.tr";              //"/gisdata/chicago/traces"
+    uint cur_duration = 0;
+
+    uint file_size = 3600;                             // data in x seconds is put into file
 
 	// for query only
 	uint start_time = 0;
@@ -34,7 +37,7 @@ public:
 	bool unroll = true;
 	uint schema_update_delay = 1; //
 	uint min_meet_time = 10;
-	double reach_distance = 2;
+	double reach_distance = 2;          //2
 	double x_buffer = 0;
 	double y_buffer = 0;
 	bool gpu = false;
@@ -96,8 +99,9 @@ inline configuration get_parameters(int argc, char **argv){
 		("num_buckets,b", po::value<size_t>(&config.num_meeting_buckets), "number of meeting buckets")
 
 		("duration,d", po::value<uint>(&config.duration), "duration of the trace")
-		("min_meet_time,m", po::value<uint>(&config.min_meet_time), "minimum meeting time")
+        ("file_size,f", po::value<uint>(&config.file_size), "seconds of data in file")
 
+		("min_meet_time,m", po::value<uint>(&config.min_meet_time), "minimum meeting time")
 		("start_time,s", po::value<uint>(&config.start_time), "the start time of the duration")
 
 		("reachable_distance,r", po::value<double>(&config.reach_distance), "reachable distance (in meters)")
@@ -187,16 +191,42 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
 	po::options_description desc("generator usage");
 	desc.add_options()
 		("help,h", "produce help message")
-		("threads,n", po::value<uint>(&config.num_threads), "number of threads")
-		("objects,o", po::value<uint>(&config.num_objects), "number of objects")
-		("duration,d", po::value<uint>(&config.duration), "duration of the trace")
+		//("threads,n", po::value<uint>(&config.num_threads), "number of threads")
+		//("objects,o", po::value<uint>(&config.num_objects), "number of objects")
+		//("duration,d", po::value<uint>(&config.duration), "duration of the trace")
 		("map_path", po::value<string>(&config.map_path), "path to the map file")
-		("trace_path", po::value<string>(&config.trace_path), "path to the trace file")
+		//("trace_path", po::value<string>(&config.trace_path), "path to the trace file")
 		("meta_path", po::value<string>(&config.meta_path), "path to the metadata file")
 		("walk_rate", po::value<double>(&config.walk_rate), "percent of walk")
 		("walk_speed", po::value<double>(&config.walk_speed), "the speed of walk (meters/second)")
 		("drive_rate", po::value<double>(&config.drive_rate), "percent of drive")
 		("drive_speed", po::value<double>(&config.drive_speed), "the speed of drive (meters/second)")
+
+        ("gpu,g", "use gpu for processing")
+        ("profile,p", "profile the memory usage")
+        ("disable_phased_filter", "disable phased filter")
+        ("disable_unroll,u", "disable unroll the refinement")
+        ("disable_dynamic_schema", "the schema is not dynamically updated")
+
+        ("analyze_reach", "analyze the reaches statistics")
+        ("analyze_grid", "analyze the grid statistics")
+        ("threads,n", po::value<uint>(&config.num_threads), "number of threads")
+        ("specific_gpu", po::value<uint>(&config.specific_gpu), "use which gpu")
+        ("grid_capacity", po::value<uint>(&config.grid_capacity), "maximum number of objects per grid ")
+        ("grid_amplify", po::value<double>(&config.grid_amplify), "amplify the grid size to avoid overflow")
+        ("zone_capacity", po::value<uint>(&config.zone_capacity), "maximum number of objects per zone buffer")
+        ("refine_size", po::value<uint>(&config.refine_size), "number of refine list entries per object")
+        ("objects,o", po::value<uint>(&config.num_objects), "number of objects")
+        ("num_buckets,b", po::value<size_t>(&config.num_meeting_buckets), "number of meeting buckets")
+
+        ("duration,d", po::value<uint>(&config.duration), "duration of the trace")
+        ("file_size,f", po::value<uint>(&config.file_size), "seconds of data in file")
+        ("min_meet_time,m", po::value<uint>(&config.min_meet_time), "minimum meeting time")
+
+        ("start_time,s", po::value<uint>(&config.start_time), "the start time of the duration")
+
+        ("reachable_distance,r", po::value<double>(&config.reach_distance), "reachable distance (in meters)")
+        ("trace_path,t", po::value<string>(&config.trace_path), "path to the trace file")
 		;
 	po::variables_map vm;
 	po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -205,6 +235,40 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
 		exit(0);
 	}
 	po::notify(vm);
+
+
+    if(vm.count("gpu")){
+        config.gpu = true;
+    }
+    if(vm.count("analyze_reach")){
+        config.analyze_reach = true;
+    }
+    if(vm.count("analyze_grid")){
+        config.analyze_grid = true;
+    }
+    if(vm.count("profile")){
+        config.profile = true;
+    }
+
+    if(!vm.count("zone_capacity")||!vm.count("gpu")){
+        config.zone_capacity = config.grid_capacity;
+    }
+    if(!vm.count("num_buckets")){
+        config.num_meeting_buckets = 2*config.num_objects;
+    }
+    if(vm.count("disable_phased_filter")){
+        config.phased_lookup = false;
+    }
+    if(vm.count("disable_unroll")){
+        config.unroll = false;
+        config.zone_capacity = config.grid_capacity;
+    }else if(!vm.count("zone_capacity")){
+        config.zone_capacity = config.grid_capacity/2;
+    }
+
+    if(vm.count("disable_dynamic_schema")){
+        config.dynamic_schema = false;
+    }
 
 	assert(config.walk_rate+config.drive_rate<=1);
 	config.print();

@@ -22,7 +22,6 @@ using namespace std;
 
 class tracer{
 	// the statistic for the data set
-	Point *trace = NULL;
 	bool owned_trace = false;
 	// for query
 	configuration *config = NULL;
@@ -33,6 +32,7 @@ class tracer{
 	workbench *d_bench = NULL;
 #endif
 public:
+    Point *trace = NULL;
 	box mbr;
 	tracer(configuration *conf, box &b, Point *t);
 	tracer(configuration *conf);
@@ -47,7 +47,7 @@ public:
 		return trace;
 	}
 
-	void process();
+	void process(int st);
 
 };
 

@@ -47,7 +47,7 @@ workbench *partitioner::build_schema(Point *points, size_t num_objects){
 	}
 	logt("building QTree",start);
 
-	// set the ids and other stuff
+	// set the ids and other stuffle
 	qtree->finalize();
 //	qtree->print();
 //	vector<QTNode *> leafs;
@@ -134,7 +134,7 @@ void lookup_rec(QTSchema *schema, Point *p, uint curnode, vector<uint> &nodes, d
 	}
 }
 
-void lookup_stack(QTSchema *schema, Point *p, uint curnode, vector<uint> &nodes, double max_dist, bool query_all){
+void lookup_stack(QTSchema *schema, Point *p, uint curnode, vector<uint> &nodes, double max_dist, bool query_all){          //这个就没被调用过啊
 	uint stk[20];
 	uint stk_idx = 0;
 	stk[stk_idx++] = curnode;

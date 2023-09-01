@@ -28,19 +28,19 @@ int get_num_cores(cudaDeviceProp devProp)
      case 6: // Pascal
       if ((devProp.minor == 1) || (devProp.minor == 2)) cores = mp * 128;
       else if (devProp.minor == 0) cores = mp * 64;
-      else printf("Unknown device type\n");
+      else fprintf(stderr,"Unknown device type\n");
       break;
      case 7: // Volta and Turing
       if ((devProp.minor == 0) || (devProp.minor == 5)) cores = mp * 64;
-      else printf("Unknown device type\n");
+      else fprintf(stderr,"Unknown device type\n");
       break;
      case 8: // Ampere
       if (devProp.minor == 0) cores = mp * 64;
       else if (devProp.minor == 6) cores = mp * 128;
-      else printf("Unknown device type\n");
+      else fprintf(stderr,"Unknown device type\n");
       break;
      default:
-      printf("Unknown device type\n");
+      fprintf(stderr,"Unknown device type\n");
       break;
       }
     return cores;

@@ -46,22 +46,54 @@ typedef struct checking_unit{
 }checking_unit;
 
 typedef struct meeting_unit{
-	size_t key;
-	unsigned short start;
-	unsigned short end;
-	bool isEmpty(){
-		return key == ULL_MAX;
-	}
-	void reset(){
-		key = ULL_MAX;
-	}
-	uint get_pid1(){
-		return ::InverseCantorPairing1(key).first;
-	}
-	uint get_pid2(){
-		return ::InverseCantorPairing1(key).second;
-	}
+    size_t key;
+    unsigned short start;
+    unsigned short end;
+    //Point midpoint;            //2023.7.17
+    box mbr;                     //7.24 7.26
+    bool isEmpty(){
+        return key == ULL_MAX;
+    }
+    void reset(){
+        key = ULL_MAX;
+    }
+    uint get_pid1(){
+        return ::InverseCantorPairing1(key).first;
+    }
+    uint get_pid2(){
+        return ::InverseCantorPairing1(key).second;
+    }
 }meeting_unit;
+
+//typedef struct graph_node{
+//    size_t Id;
+//    unsigned short Label;
+//    double x;
+//    double y;
+//}graph_node;
+
+//class graph_node{
+//public:
+//    int Id;             //size_t???
+//    unsigned short Label;
+//    double x;
+//    double y;
+//
+////    bool operator<(const graph_node  &g)
+////    {
+////        graph_node gn;
+////        if(gn.Id<g.Id)
+////            return true;
+////        else return false;
+////    }
+//
+////    bool operator<(const graph_node g1,const graph_node g2){
+//////        bool ret=false;
+//////        if(g1.Id<g2.Id)
+//////
+////        return g1.Id<g2.Id;
+////    }
+//};
 
 typedef struct reach_unit{
 	uint pid1;

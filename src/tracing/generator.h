@@ -8,6 +8,8 @@
 #ifndef SRC_TRACING_GENERATOR_H_
 #define SRC_TRACING_GENERATOR_H_
 
+#include <cstddef>
+#include <climits>
 #include "../geometry/Map.h"
 #include "../util/query_context.h"
 
@@ -71,6 +73,53 @@ public:
 	void resize(int max_duration);
 };
 
+class Queue {
+public:
+    Point data[600];
+    uint head = 0;
+    uint tail = 0;
+    uint size = 600;
+    inline Queue();
+    inline ~Queue();
+    void push(Point val);
+    void pop();
+    inline bool isEmpty();
+    inline bool isFull();
+    inline int count();
+};
+
+
+//// dynamic
+//inline Queue::Queue(std::size_t sz)
+//        : data(new int[sz + 1]), head(0), tail(0), size(sz) { }
+
+inline Queue::Queue(){}
+
+inline Queue::~Queue() {
+    //delete[] data;
+}
+
+
+inline bool Queue::isEmpty() {
+    return head == tail;
+}
+
+inline bool Queue::isFull() {                     //never full
+    return head == (tail + 1) % (size);
+}
+
+inline int Queue::count(){
+    if(head<tail)
+        return (tail-head);
+    if(head==tail)
+        return 0;
+    if(head>tail)
+        return (size - head + tail);
+    return 0;
+}
+
+
+
 class trace_generator{
 	Point *tweets = NULL;
 	uint *tweets_assign = NULL;
@@ -78,7 +127,7 @@ class trace_generator{
 	uint tweet_count = 0;
 	uint core_count = 0;
 public:
-
+    Queue * producer = NULL;
     Map *map = NULL;
     generator_configuration *config = NULL;
 
@@ -91,9 +140,8 @@ public:
 	//void analyze_trips(const char *path, int limit = 2147483647);
 	Point *generate_trace();
 	// generate a trace with given duration
-	vector<Point *> get_trace(Map *mymap = NULL);
+	void get_trace(Map *mymap = NULL, int obj= 0);              //default argument missing for parameter 2 of ‘void trace_generator::get_trace(Map*, int)
 	int get_core(int seed=-1);
-
 };
 
 

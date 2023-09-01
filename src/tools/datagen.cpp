@@ -19,7 +19,7 @@ int main(int argc, char **argv){
 
 	generator_configuration config = get_generator_parameters(argc, argv);
 	Map *m = new Map(config.map_path);
-	m->print_region();
+    m->print_region();
 	trace_generator *gen = new trace_generator(&config,m);
 	Point *traces = gen->generate_trace();
 //

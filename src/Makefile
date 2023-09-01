@@ -34,10 +34,12 @@ endif
 %.o:	%.cpp
 	$(CXX) -c $(CPPFLAGS) $(INCLUDES) -o $@ $<	
 
-all:	datagen trace
+all:	datagen trace pipeline
 
 
 # for macro queries
+pipeline:		tools/pipeline.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
+	$(CXX) -o ../build/$@ $^ $(LIBS)
 
 datagen:	tools/datagen.o $(GEOMETRY_OBJS) $(TRACING_OBJS) 
 	$(CXX) -o ../build/$@ $^ $(LIBS) 
