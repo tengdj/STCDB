@@ -21,8 +21,9 @@ int main(int argc, char **argv){
 	Map *m = new Map(config.map_path);
     m->print_region();
 	trace_generator *gen = new trace_generator(&config,m);
-	Point *traces = gen->generate_trace();
+	//Point *traces = gen->generate_trace();
 //
+    Point *traces;
 	tracer *t = new tracer(&config,*m->getMBR(),traces);
 	t->dumpTo(config.trace_path.c_str());
 //	t->print();

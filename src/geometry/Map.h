@@ -104,7 +104,28 @@ public:
 	}
 };
 
+enum TripType{
+    NOT_YET = 0,
+    DRIVE = 1,
+    WALK = 2,
+    REST = 3
+};
 
+class Trace_Meta{
+public:
+    TripType type;
+    Point loc;
+    //int last_time;
+
+    int core = -2;
+    Point end;
+
+    double speed;
+    vector<Node *> trajectory;
+
+//    Trace_Meta();
+//    ~Trace_Meta();
+};
 
 class Map {
 	vector<Node *> nodes;
@@ -127,9 +148,11 @@ public:
 	box *getMBR();
 	Street * nearest(Point *target);
 	int navigate(vector<Point *> &result, Point *origin, Point *dest, double speed);
+    int navigate(vector<Point *> &positions, Trace_Meta & meta, int duration);
 	void print_region(box *region = NULL);
 	// clone the map for multiple thread support
 	Map *clone();
 };
+
 
 #endif /* DATAGEN_MAP_H_ */

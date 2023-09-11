@@ -479,6 +479,111 @@ int Map::navigate(vector<Point *> &positions, Point *origin, Point *dest, double
 	return positions.size();
 }
 
+int Map::navigate(vector<Point *> &positions, Trace_Meta & meta, int duration){
+
+//    assert(origin);
+//    assert(dest);
+//    assert(speed>0);
+
+    if(meta.trajectory.empty()){
+        // get the closest points streets to the source and destination points
+        vector<Street *> ret;
+        Street *o = nearest(&meta.loc);
+        Street *d = nearest(&meta.end);
+
+        //conduct a breadth first query to get a list of streets
+        for(Street *s:streets) {
+            s->father_from_origin = NULL;
+        }
+        Street *s = o->breadthFirst(d);
+        assert(s && s==d);
+        do{
+            ret.push_back(s);
+            s = s->father_from_origin;
+        }while(s!=NULL);
+        reverse(ret.begin(),ret.end());
+
+        // convert the street sequence to node sequences
+        Node *originnode = new Node(meta.loc.x, meta.loc.y);
+        Node *destnode = new Node(meta.end.x, meta.end.y);
+        meta.trajectory.push_back(originnode);
+        Node *cur;
+        if(ret.size()==1){
+            cur = ret[0]->start;
+        }else{
+            cur = ret[0]->close(ret[1]);
+            // swap to other end
+            if(ret[0]->start==cur){
+                cur = ret[0]->end;
+            }else{
+                cur = ret[0]->start;
+            }
+        }
+
+        for(int i=0;i<ret.size();i++){
+            Node * temp = new Node(cur->x,cur->y);
+            meta.trajectory.push_back(temp);
+            if(ret[i]->start==cur){
+                cur = ret[i]->end;
+            }else{
+                cur = ret[i]->start;
+            }
+        }
+        Node * temp = new Node(cur->x,cur->y);
+        meta.trajectory.push_back(temp);
+        meta.trajectory.push_back(destnode);
+        ret.clear();
+    }
+
+
+    // quantify the street sequence to generate a list of
+    // points with fixed gap
+    double dist_from_origin = 0;
+    int point_index = 0;
+    bool finish = true;
+    while(meta.trajectory.size()>1){
+        Node *cur_start = meta.trajectory[0];
+        Node *cur_end = meta.trajectory[1];
+        double length = cur_start->distance(*cur_end, true);
+        double cur_dis = (point_index+1)*meta.speed-dist_from_origin;
+        while(cur_dis<length) {
+            //have other position can be reported in this street
+            double cur_portion = cur_dis/length;
+            //now get the longitude and latitude and timestamp for current event and add to return list
+            Point *p = new Point(cur_start->x+(cur_end->x-cur_start->x)*cur_portion,
+                                 cur_start->y+(cur_end->y-cur_start->y)*cur_portion);
+            positions.push_back(p);
+            // move to next point
+            cur_dis += meta.speed;
+            point_index++;
+            if(positions.size()==duration&&meta.trajectory.size()>2){
+                finish = false;
+                break;
+            }
+        }
+        if(!finish){
+            meta.loc = Point(positions.back());
+            Node * new_originnode = new Node(meta.loc.x, meta.loc.y);
+            meta.trajectory[0] = new_originnode;
+            break;
+        }
+        delete meta.trajectory[0];
+        meta.trajectory.erase(meta.trajectory.begin());
+        //move to next street
+        dist_from_origin += length;
+    }
+    if(finish){
+        //cout<<"meta.trajectory.size() "<<meta.trajectory.size()<<endl;
+        assert(meta.trajectory.size()==1);
+        delete meta.trajectory[0];
+        meta.trajectory.clear();
+        meta.loc = meta.end;
+    }
+    //meta.trajectory.clear();
+//    delete originnode;
+//    delete destnode;
+    return positions.size();
+}
 
 void Map::print_region(box *region){
 	if(region==NULL){

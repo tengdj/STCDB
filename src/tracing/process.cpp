@@ -235,7 +235,7 @@ void tracer::process(int st){
 //            }
         }
     }
-    delete meeting_temp;
+    delete []meeting_temp;
     bench->mbr = mbr;
 #ifdef USE_GPU
     if(config->gpu){
@@ -297,7 +297,7 @@ void tracer::process(int st){
 
 
 //        if ((t + st) != 0 && bench->meeting_counter > 0) {
-//            fprintf(stderr, "time=%d meeting_counter=%d\n", st + t, bench->meeting_counter);           // st+t+1
+//            fprintf(stdout, "time=%d meeting_counter=%d\n", st + t, bench->meeting_counter);           // st+t+1
 //            for (int i = 0; i < bench->meeting_counter; i++) {
 //                //fprintf(stdout,"(%d,%d) %d-%d (%f,%f); ",bench->meetings[i].get_pid1(),bench->meetings[i].get_pid2(),bench->meetings[i].start,bench->meetings[i].end,bench->meetings[i].midpoint.x,bench->meetings[i].midpoint.y);
 //                fprintf(stdout, "%zu (%f,%f)(%f,%f)|%d-%d;", bench->meetings[i].key,
@@ -308,9 +308,9 @@ void tracer::process(int st){
 //            fprintf(stdout, "\n");
 //        }
 
-//        if (t % 100== 10 && bench->meeting_counter > 0) {
+//        if (t % 100== 10) {
 //            fprintf(stdout, "time=%d meeting_counter=%d\n", st + t, bench->meeting_counter);           // st+t+1
-//            print_trace(55555);
+//            print_trace(222);
 //            fprintf(stdout, "\n");
 //        }
     }

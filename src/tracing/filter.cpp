@@ -267,6 +267,7 @@ void *filter_unit(void *arg){
 		bench->batch_check(cubuffer, buffer_index);
 		buffer_index = 0;
 	}
+    delete []cubuffer;
 	return NULL;
 }
 
