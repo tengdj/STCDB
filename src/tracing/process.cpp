@@ -225,6 +225,13 @@ void tracer::process(int st){
 //                fprintf(stderr,"copy out right\n");
 //            }
         }
+        bench->clear();
+        delete bench;
+#ifdef USE_GPU
+        if(config->gpu){
+            gpu->clear();
+        }
+#endif
     }
     bench = part->build_schema(trace, config->num_objects);
     if(st != config->start_time){
@@ -308,11 +315,12 @@ void tracer::process(int st){
 //            fprintf(stdout, "\n");
 //        }
 
+//        //fprintf(stdout, "time=%d meeting_counter=%d\n", st + t, bench->meeting_counter);           // st+t+1
 //        if (t % 100== 10) {
-//            fprintf(stdout, "time=%d meeting_counter=%d\n", st + t, bench->meeting_counter);           // st+t+1
 //            print_trace(222);
 //            fprintf(stdout, "\n");
 //        }
-    }
 
+
+    }
 }

@@ -75,6 +75,54 @@ void *update_meetings_unit(void *arg){
     return NULL;
 }
 
+//void *update_meetings_unit(void *arg){
+//
+//    query_context *ctx = (query_context *)arg;
+//    workbench *bench = (workbench *)ctx->target[0];
+//
+//    meeting_unit *meetings = new meeting_unit[200];
+//    uint meeting_index = 0;
+//
+//    size_t start = 0;
+//    size_t end = 0;
+//
+//    uint active_count = 0;
+//    uint taken_count = 0;
+//
+//    while(ctx->next_batch(start,end)){
+//        for(size_t bid=start;bid<end;bid++){
+//            if(bench->meeting_buckets[bid].isEmpty()){
+//                continue;
+//            }
+//            // still active
+//
+//            if(bench->meeting_buckets[bid].end<bench->cur_time){
+//                taken_count++;
+//                bench->meeting_buckets[bid].reset();
+//                continue;
+//            }
+//
+//            //log("%d %d",bench->cur_time,bench->meeting_buckets[bid].start);
+//            if(bench->cur_time-bench->meeting_buckets[bid].start>=bench->config->min_meet_time){
+//                active_count++;
+//                meetings[meeting_index++] = bench->meeting_buckets[bid];
+//                if(meeting_index==200){
+//                    bench->batch_meet(meetings, 200);
+//                    meeting_index = 0;
+//                }
+//            }
+//
+//        }
+//    }
+//    bench->batch_meet(meetings, meeting_index);
+//    delete []meetings;
+//    bench->lock();
+//    bench->num_active_meetings += active_count;
+//    bench->num_taken_buckets += taken_count;
+//    bench->unlock();
+//    return NULL;
+//}
+
 void workbench::update_meetings(){
     struct timeval start = get_cur_time();
 
