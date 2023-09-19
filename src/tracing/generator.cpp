@@ -262,7 +262,7 @@ vector<Point *> trace_generator::fill_trace(Map *mymap, int obj){
             mymap->navigate(ret, meta_data[obj], config->cur_duration);
         }else if(meta_data[obj].type == WALK){
             const double step = config->walk_speed/meta_data[obj].end.distance(meta_data[obj].loc, true);
-            for(double portion = 0;portion<1&&ret.size()<config->cur_duration;){
+            for(double portion = step;portion<(1+step)&&ret.size()<config->cur_duration;){
                 double px = meta_data[obj].loc.x+portion*(meta_data[obj].end.x - meta_data[obj].loc.x);
                 double py = meta_data[obj].loc.y+portion*(meta_data[obj].end.y - meta_data[obj].loc.y);
                 ret.push_back(new Point(px,py));
