@@ -47,8 +47,10 @@ typedef struct checking_unit{
 
 typedef struct meeting_unit{
     size_t key;
-    unsigned short start;
-    unsigned short end;
+//    unsigned short start;       //2023.9.21
+//    unsigned short end;
+    unsigned start;       //2023.9.21
+    unsigned end;
     //Point midpoint;            //2023.7.17
     box mbr;                     //7.24 7.26
     bool isEmpty(){
