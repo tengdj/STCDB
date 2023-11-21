@@ -828,7 +828,7 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
 
     cuda_init_grids_stack<<<bench->grids_stack_capacity/1024, 1024>>>(d_bench);
     cuda_init_schema_stack<<<bench->schema_stack_capacity/1024, 1024>>>(d_bench);
-    cuda_clean_buckets<<<bench->config->num_meeting_buckets/1024+1,1024>>>(d_bench);
+    //cuda_clean_buckets<<<bench->config->num_meeting_buckets/1024+1,1024>>>(d_bench);
 
     logt("GPU allocating space %ld MB", start,gpu->size_allocated()/1024/1024);
 
@@ -988,9 +988,10 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu, int t
         logt("copy out grid, schema,  data", start);
     }
     if(t==bench->config->cur_duration-1){
-        CUDA_SAFE_CALL(cudaMemcpy(bench->meeting_buckets, h_bench.meeting_buckets,
-                                  bench->config->num_meeting_buckets*sizeof(meeting_unit), cudaMemcpyDeviceToHost));        //only t==cur_duration-1 is useful
-        logt("copy out %d meeting_buckets data", start,bench->config->num_meeting_buckets);
+//        CUDA_SAFE_CALL(cudaMemcpy(bench->meeting_buckets, h_bench.meeting_buckets,
+//                                  bench->config->num_meeting_buckets*sizeof(meeting_unit), cudaMemcpyDeviceToHost));        //only t==cur_duration-1 is useful
+//        logt("copy out %d meeting_buckets data", start,bench->config->num_meeting_buckets);
+        bench->meeting_buckets = h_bench.meeting_buckets;
     }
 
     /* 5. update the index */

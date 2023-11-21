@@ -216,15 +216,16 @@ void tracer::process(int st){
 
     //loadData(config->trace_path.c_str(),st,cur_duration);
     start = get_cur_time();
-    meeting_unit * meeting_temp = new meeting_unit[config->num_meeting_buckets];
+    meeting_unit * meeting_temp;
     //fprintf(stderr,"%ld\n",config->num_meeting_buckets);
     if(st != config->start_time){               // if bench
-        for(int i=0;i<config->num_meeting_buckets;i++){
-            meeting_temp[i] = bench->meeting_buckets[i];
-//            if(!meeting_temp[i].isEmpty()){
-//                fprintf(stderr,"copy out right\n");
-//            }
-        }
+        meeting_temp = bench->meeting_buckets;
+//        for(int i=0;i<config->num_meeting_buckets;i++){
+//            meeting_temp[i] = bench->meeting_buckets[i];
+////            if(!meeting_temp[i].isEmpty()){
+////                fprintf(stderr,"copy out right\n");
+////            }
+//        }
         bench->clear();
         delete bench;
 #ifdef USE_GPU
@@ -235,12 +236,12 @@ void tracer::process(int st){
     }
     bench = part->build_schema(trace, config->num_objects);
     if(st != config->start_time){
-        for(int i=0;i<config->num_meeting_buckets;i++){
-            bench->meeting_buckets[i] = meeting_temp[i];
-//            if(!meeting_temp[i].isEmpty()){
-//                fprintf(stderr,"copy back right\n");
-//            }
-        }
+//        for(int i=0;i<config->num_meeting_buckets;i++){
+//            bench->meeting_buckets[i] = meeting_temp[i];
+////            if(!meeting_temp[i].isEmpty()){
+////                fprintf(stderr,"copy back right\n");
+////            }
+//        }
     }
     delete []meeting_temp;
     bench->mbr = mbr;
@@ -303,17 +304,17 @@ void tracer::process(int st){
         outFile.close();
 
 
-//        if ((t + st) != 0 && bench->meeting_counter > 0) {
-//            fprintf(stdout, "time=%d meeting_counter=%d\n", st + t, bench->meeting_counter);           // st+t+1
-//            for (int i = 0; i < bench->meeting_counter; i++) {
-//                //fprintf(stdout,"(%d,%d) %d-%d (%f,%f); ",bench->meetings[i].get_pid1(),bench->meetings[i].get_pid2(),bench->meetings[i].start,bench->meetings[i].end,bench->meetings[i].midpoint.x,bench->meetings[i].midpoint.y);
-//                fprintf(stdout, "%zu (%f,%f)(%f,%f)|%d-%d;", bench->meetings[i].key,
-//                        bench->meetings[i].mbr.low[0], bench->meetings[i].mbr.low[1], bench->meetings[i].mbr.high[0],
-//                        bench->meetings[i].mbr.high[1],
-//                        bench->meetings[i].start, bench->meetings[i].end);
-//            }
-//            fprintf(stdout, "\n");
-//        }
+        if ((t + st) != 0 && bench->meeting_counter > 0) {
+            fprintf(stdout, "time=%d meeting_counter=%d\n", st + t, bench->meeting_counter);           // st+t+1
+            for (int i = 0; i < bench->meeting_counter; i++) {
+                //fprintf(stdout,"(%d,%d) %d-%d (%f,%f); ",bench->meetings[i].get_pid1(),bench->meetings[i].get_pid2(),bench->meetings[i].start,bench->meetings[i].end,bench->meetings[i].midpoint.x,bench->meetings[i].midpoint.y);
+                fprintf(stdout, "%zu (%f,%f)(%f,%f)|%d-%d;", bench->meetings[i].key,
+                        bench->meetings[i].mbr.low[0], bench->meetings[i].mbr.low[1], bench->meetings[i].mbr.high[0],
+                        bench->meetings[i].mbr.high[1],
+                        bench->meetings[i].start, bench->meetings[i].end);
+            }
+            fprintf(stdout, "\n");
+        }
 
 //        //fprintf(stdout, "time=%d meeting_counter=%d\n", st + t, bench->meeting_counter);           // st+t+1
 //        if (t % 100== 10) {
@@ -323,4 +324,5 @@ void tracer::process(int st){
 
 
     }
+    bench->print_profile();
 }

@@ -47,3 +47,4 @@ src/err.txt
 src/meeting.txt
 *.txt
 meetings
+cmake-build-debug
