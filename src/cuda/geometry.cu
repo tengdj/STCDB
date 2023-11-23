@@ -761,7 +761,6 @@ void cuda_merge_qtree(workbench *bench, uint gap){
 }
 
 workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
-    log("GPU memory:");
     struct timeval start = get_cur_time();
     gpu->clear();
     // use h_bench as a container to copy in and out GPU
@@ -802,7 +801,11 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
     h_bench.split_list = h_bench.tmp_space+bench->tmp_space_capacity/2;
     log("\t%.2f MB\ttemporary space",1.0*size/1024/1024);
 
-    h_bench.meeting_buckets = (meeting_unit *)gpu->allocate(bench->config->num_meeting_buckets*sizeof(meeting_unit));
+    if(!h_bench.meeting_buckets){
+        cudaMalloc((void **)&h_bench.meeting_buckets, bench->config->num_meeting_buckets*sizeof(meeting_unit));         //no date[i], can't be clean
+    }
+
+//    h_bench.meeting_buckets = (meeting_unit *)gpu->allocate(bench->config->num_meeting_buckets*sizeof(meeting_unit));
     size = bench->config->num_meeting_buckets*sizeof(meeting_unit);
     log("\t%.2f MB\thash table",1.0*size/1024/1024);
 
@@ -812,8 +815,6 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
 
     h_bench.part_counter = (uint *)gpu->allocate(one_dim*one_dim*sizeof(uint));
     h_bench.schema_assigned = (uint *)gpu->allocate(one_dim*one_dim*sizeof(uint));
-
-
 
     // space for the configuration
     h_bench.config = (configuration *)gpu->allocate(sizeof(configuration));
@@ -856,12 +857,8 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu, int t
     h_bench.cur_time = bench->cur_time;
     CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));
     CUDA_SAFE_CALL(cudaMemcpy(h_bench.points, bench->points, bench->config->num_objects*sizeof(Point), cudaMemcpyHostToDevice));
-    if(t==0){
-        CUDA_SAFE_CALL(cudaMemcpy(h_bench.meeting_buckets, bench->meeting_buckets,bench->config->num_meeting_buckets*sizeof(meeting_unit), cudaMemcpyHostToDevice));
-    }
     bench->pro.copy_time += get_time_elapsed(start,false);
     logt("copy in data", start);
-
 
     if(!bench->config->dynamic_schema){
         struct timeval newstart = get_cur_time();
@@ -986,12 +983,6 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu, int t
         bench->schema_stack_index = h_bench.schema_stack_index;
         bench->grids_stack_index = h_bench.grids_stack_index;
         logt("copy out grid, schema,  data", start);
-    }
-    if(t==bench->config->cur_duration-1){
-//        CUDA_SAFE_CALL(cudaMemcpy(bench->meeting_buckets, h_bench.meeting_buckets,
-//                                  bench->config->num_meeting_buckets*sizeof(meeting_unit), cudaMemcpyDeviceToHost));        //only t==cur_duration-1 is useful
-//        logt("copy out %d meeting_buckets data", start,bench->config->num_meeting_buckets);
-        bench->meeting_buckets = h_bench.meeting_buckets;
     }
 
     /* 5. update the index */
