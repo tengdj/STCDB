@@ -33,7 +33,7 @@ workbench::workbench(configuration *conf){
 
 	grid_check_capacity = config->refine_size*config->num_objects;
 
-	meeting_capacity = config->num_objects/4;
+	//meeting_capacity = config->num_objects/4;
 	//meeting_capacity = 100;
 
 	insert_lk = new pthread_mutex_t[MAX_LOCK_NUM];
@@ -107,13 +107,36 @@ void workbench::claim_space(){
 	meeting_buckets = (meeting_unit *)allocate(size);
 	log("\t%.2f MB\tmeeting bucket space",size/1024.0/1024.0);
 
-	size = meeting_capacity*sizeof(meeting_unit);
-	meetings = (meeting_unit *)allocate(size);
-	log("\t%.2f MB\tmeeting space",size/1024.0/1024.0);
+//	size = meeting_capacity*sizeof(meeting_unit);
+//	meetings = (meeting_unit *)allocate(size);
+//	log("\t%.2f MB\tmeeting space",size/1024.0/1024.0);
+//
+//#pragma omp parallel for
+//	for(size_t i=0;i<config->num_meeting_buckets;i++){
+//		meeting_buckets[i].key = ULL_MAX;
+//	}
 
-#pragma omp parallel for
-	for(size_t i=0;i<config->num_meeting_buckets;i++){
-		meeting_buckets[i].key = ULL_MAX;
-	}
+    size = MemTable_capacity*sizeof(__uint128_t *);
+    h_keys = (__uint128_t **)allocate(size);
+    //log("\t%.2f MB\tmeeting bucket space",size/1024.0/1024.0);
 
+    size = MemTable_capacity*sizeof(uint *);
+    h_values = (uint **)allocate(size);
+
+    size = MemTable_capacity*sizeof(box *);
+    h_box_block = (box **)allocate(size);
+
+    for(int i=0;i<MemTable_capacity;i++){
+        size = kv_capacity*sizeof(__uint128_t);
+        h_keys[i] = (__uint128_t *)allocate(size);
+        log("\t%.2f MB\ta element of h_keys",size/1024.0/1024.0);
+
+        size = kv_capacity*sizeof(uint);
+        h_values[i] = (uint *)allocate(size);
+        log("\t%.2f MB\ta element of h_values",size/1024.0/1024.0);
+
+        size = kv_capacity*sizeof(box);
+        h_box_block[i] = (box *)allocate(size);
+        log("\t%.2f MB\ta element of h_values",size/1024.0/1024.0);
+    }
 }

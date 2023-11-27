@@ -13,6 +13,7 @@
 #include "partitioner.h"
 #include "workbench.h"
 #include <map>
+#include "../tracing/generator.h"
 
 #ifdef USE_GPU
 #include "../cuda/mygpu.h"
@@ -22,19 +23,20 @@ using namespace std;
 
 class tracer{
 	// the statistic for the data set
+	Point *trace = NULL;
 	bool owned_trace = false;
 	// for query
 	configuration *config = NULL;
 	partitioner *part = NULL;
 	workbench *bench = NULL;
+    trace_generator *generator = NULL;
 #ifdef USE_GPU
 	gpu_info *gpu = NULL;
 	workbench *d_bench = NULL;
 #endif
 public:
-    Point *trace = NULL;
 	box mbr;
-	tracer(configuration *conf, box &b, Point *t);
+	tracer(configuration *conf, box &b, Point *t, trace_generator *gen);
 	tracer(configuration *conf);
 	~tracer();
 	void dumpTo(const char *path);
@@ -47,7 +49,7 @@ public:
 		return trace;
 	}
 
-	void process(int st);
+	void process();
 
 };
 

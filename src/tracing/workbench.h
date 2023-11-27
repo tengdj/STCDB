@@ -36,6 +36,8 @@ typedef struct profiler{
 	vector<double> grid_deviation_list;
 	size_t num_pairs = 0;
 	size_t num_meetings = 0;
+
+    double cuda_sort_time = 0;
 }profiler;
 
 typedef struct checking_unit{
@@ -66,36 +68,6 @@ typedef struct meeting_unit{
         return ::InverseCantorPairing1(key).second;
     }
 }meeting_unit;
-
-//typedef struct graph_node{
-//    size_t Id;
-//    unsigned short Label;
-//    double x;
-//    double y;
-//}graph_node;
-
-//class graph_node{
-//public:
-//    int Id;             //size_t???
-//    unsigned short Label;
-//    double x;
-//    double y;
-//
-////    bool operator<(const graph_node  &g)
-////    {
-////        graph_node gn;
-////        if(gn.Id<g.Id)
-////            return true;
-////        else return false;
-////    }
-//
-////    bool operator<(const graph_node g1,const graph_node g2){
-//////        bool ret=false;
-//////        if(g1.Id<g2.Id)
-//////
-////        return g1.Id<g2.Id;
-////    }
-//};
 
 typedef struct reach_unit{
 	uint pid1;
@@ -157,10 +129,25 @@ public:
 	size_t num_taken_buckets = 0;
 	size_t num_active_meetings = 0;
 
-	// the space for the valid meeting information now
-	meeting_unit *meetings = NULL;
-	uint meeting_capacity = 0;
-	uint meeting_counter = 0;
+//	// the space for the valid meeting information now
+//	meeting_unit *meetings = NULL;
+//	uint meeting_capacity = 0;
+//	uint meeting_counter = 0;
+
+    //for space for cuda sort
+    __uint128_t *d_keys = NULL;
+    uint *d_values = NULL;
+    box *d_box_block = NULL;
+    uint kv_capacity = 45000000;
+    uint kv_2G = 44739243;
+    uint kv_count = 0;
+
+    //space for MemTable
+    __uint128_t **h_keys = NULL;
+    uint **h_values = NULL;
+    box **h_box_block = NULL;
+    uint MemTable_capacity = 5;
+    uint MemTable_count = 0;
 
 	// the temporary space
 	uint *tmp_space = NULL;
@@ -219,7 +206,6 @@ public:
 		return grids + gid*grid_capacity;
 	}
 
-	void sort_meeting();
 	void update_meetings();
 
 	void analyze_grids();

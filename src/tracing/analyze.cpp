@@ -226,7 +226,7 @@ void workbench::print_profile(){
 										   ,pro.filter_time/pro.rounds
 										   ,pro.refine_time/pro.rounds
 										   ,pro.meeting_identify_time/pro.rounds
-                                               ,pro.index_update_time/pro.rounds);
+										   ,pro.index_update_time/pro.rounds);
 
 	printf("%.2f\t%ld\t%.4f\t%.2f\t%.4f\n",2.0*(pro.num_pairs/pro.rounds)/config->num_objects
 							  ,pro.num_meetings/pro.rounds

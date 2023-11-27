@@ -28,19 +28,19 @@ int get_num_cores(cudaDeviceProp devProp)
      case 6: // Pascal
       if ((devProp.minor == 1) || (devProp.minor == 2)) cores = mp * 128;
       else if (devProp.minor == 0) cores = mp * 64;
-      else fprintf(stderr,"Unknown device type\n");
+      else printf("Unknown device type\n");
       break;
      case 7: // Volta and Turing
       if ((devProp.minor == 0) || (devProp.minor == 5)) cores = mp * 64;
-      else fprintf(stderr,"Unknown device type\n");
+      else printf("Unknown device type\n");
       break;
      case 8: // Ampere
       if (devProp.minor == 0) cores = mp * 64;
       else if (devProp.minor == 6) cores = mp * 128;
-      else fprintf(stderr,"Unknown device type\n");
+      else printf("Unknown device type\n");
       break;
      default:
-      fprintf(stderr,"Unknown device type\n");
+      printf("Unknown device type\n");
       break;
       }
     return cores;
@@ -51,7 +51,7 @@ vector<gpu_info *> get_gpus(){
 	cudaGetDeviceCount(&num_gpus);
 	for (int i = 0; i < num_gpus; i++) {
 		cudaDeviceProp prop;
-		cudaGetDeviceProperties(&prop, i);
+		//cudaGetDeviceProperties(&prop, i);
 		gpu_info *info = new gpu_info();
 		strcpy(info->name, prop.name);
 		info->busy = false;

@@ -49,4 +49,22 @@ inline double distance(const double x1, const double y1, const double x2, const 
 	return sqrt(dx*dx+dy*dy);
 }
 
+__device__
+inline uint getpid1(size_t z){
+    size_t w = floor((sqrt(8.0 * z + 1) - 1)/2);
+    size_t t = (w*w + w) / 2;
+    uint y = (uint)(z - t);
+    uint x = (uint)(w - y);
+    return x;
+}
+
+__device__
+inline uint getpid2(size_t z){
+size_t w = floor((sqrt(8.0 * z + 1) - 1)/2);
+size_t t = (w*w + w) / 2;
+uint y = (uint)(z - t);
+//uint x = (uint)(w - y);
+return y;
+}
+
 #endif /* CUDA_UTIL_H_ */
