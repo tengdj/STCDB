@@ -283,7 +283,6 @@ vector<Point *> trace_generator::fill_trace(Map *mymap, int obj){
 }
 
 void *gentrace_unit(void *arg){
-    cout<<"into gentrace_unit"<<endl;
     query_context *ctx = (query_context *)arg;
     trace_generator *gen = (trace_generator *)ctx->target[0];
     Point *result = (Point *)ctx->target[1];
@@ -297,7 +296,6 @@ void *gentrace_unit(void *arg){
         }
         for(int obj=start;obj<end;obj++){
             //log("%d",obj);
-            cout<<"into the for"<<endl;
             vector<Point *> trace = gen->fill_trace(mymap, obj);
             // copy to target
             for(int i=0;i<gen->config->cur_duration;i++){

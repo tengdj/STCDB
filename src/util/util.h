@@ -20,6 +20,7 @@
 #include <sstream>
 #include <math.h>
 #include <limits.h>
+#include <algorithm>
 
 using namespace std;
 typedef unsigned int uint;
@@ -378,5 +379,38 @@ inline bool double_equal(double d1, double d2){
 	return fabs(d1-d2)<min_equal;
 }
 
+    inline void print_128(__uint128_t x){
+        if(x>9)
+            print_128(x/10);
+        putchar(x%10+'0');
+    }
+
+    inline string tostring128(__uint128_t x){
+        char ccc[40];
+        int i=0;
+        while(x>9){
+            ccc[i] = x%10 + '0';
+            i++;
+            x/=10;
+        }
+        ccc[i] = x + '0';
+        i++;                        //real length
+        string sss = ccc;
+        sss.resize(i);
+        reverse(sss.begin(),sss.end());             //#include <algorithm>
+        return sss;
+    }
+
+    inline __uint128_t stringto128(string sss){
+        __uint128_t x=0;
+        //char ccc[sss.size()] =sss.data();
+        for(int i=0;i<sss.size();i++){
+            x=x*10+sss[i]-'0';
+        }
+        return x;
+    }
+
 }
 #endif
+
+

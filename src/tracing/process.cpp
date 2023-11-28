@@ -189,7 +189,8 @@ void process_with_gpu(workbench *bench,workbench *d_bench, gpu_info *gpu);
 void tracer::process(){
 	struct timeval start = get_cur_time();
 	for(int st=config->start_time;st<config->start_time+config->duration;st+=100){
-		int cur_duration = min((config->start_time+config->duration-st),(uint)100);
+		//int cur_duration = min((config->start_time+config->duration-st),(uint)100);
+        config->cur_duration = min((config->start_time+config->duration-st),(uint)100);
         generator->generate_trace(trace);
 		start = get_cur_time();
 		if(!bench){
@@ -201,7 +202,7 @@ void tracer::process(){
 			}
 #endif
 		}
-		for(int t=0;t<cur_duration;t++){
+		for(int t=0;t<config->cur_duration;t++){
 			log("");
 			bench->reset();
 			bench->points = trace+t*config->num_objects;
@@ -220,9 +221,9 @@ void tracer::process(){
 				process_with_gpu(bench,d_bench,gpu);
 	#endif
 			}
-
             if(bench->MemTable_count==bench->MemTable_capacity){
                 //merge sort
+
                 ofstream SSTable;
                 SSTable.open("../store/SSTable"+to_string(t), ios::out | ios::trunc);           //config.DBPath
                 uint *key_index = new uint[bench->MemTable_capacity]{0};
@@ -246,14 +247,18 @@ void tracer::process(){
                             bench->h_keys[i][key_index[i]] = 0;                 //init
                         }
                     }
-                    key_index[take_id]++;
-                    SSTable.write((char *)&temp_key, sizeof(__uint128_t));
-                    SSTable.write((char *) temp_box, sizeof(box));
+                    if(finish<bench->MemTable_capacity){
+                        key_index[take_id]++;
+                        print_128(temp_key);
+                        cout<< ": "<< temp_box->low[0] << endl;
+                        SSTable.write((char *)&temp_key, sizeof(__uint128_t));
+                        SSTable.write((char *) temp_box, sizeof(box));
+                    }
                 }
 
                 time2 = clock();
                 double this_time = (double)(time2-time1)/CLOCKS_PER_SEC;
-                cout<<"merge sort t: "<<t<<" time: "<< this_time <<std::endl;
+                cout<<"merge sort t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
 
                 SSTable.flush();
                 SSTable.close();
@@ -265,6 +270,17 @@ void tracer::process(){
                         bench->h_keys[i][j] = 0;
                     }
                 }
+
+//                ifstream read_f;
+//                read_f.open("SSTable377");
+//                for(int i=0;i<100;i++){
+//                    __uint128_t first_key;
+//                    box first_box;
+//                    read_f.read((char *)&first_key, sizeof(__uint128_t));
+//                    read_f.read((char *)&first_box, sizeof(box));
+//                    print_128(first_key);
+//                    cout<< ": "<< first_box.low[0] << endl;
+//                }
             }
 
 			if(config->analyze_grid||config->profile){

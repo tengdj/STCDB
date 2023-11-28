@@ -48,4 +48,5 @@ src/meeting.txt
 *.txt
 meetings
 cmake-build-debug
-without_sort_src
+oldsrc
+store

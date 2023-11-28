@@ -443,6 +443,4 @@ inline void print_points(Point *trajectory, size_t num_objects, uint max_num = I
 	fprintf(stderr,")\n");
 }
 
-
-
 #endif /* DATAGEN_GEOMETRY_H_ */
