@@ -138,8 +138,8 @@ public:
     __uint128_t *d_keys = NULL;
     uint *d_values = NULL;
     box *d_box_block = NULL;
-    uint kv_capacity = 6000;            //45000000
-    uint kv_2G = 5000;                  //44739243
+    uint kv_capacity = 450000;            //45000000
+    uint kv_2G = 400000;                  //44739243
     uint kv_count = 0;
 
     //space for MemTable

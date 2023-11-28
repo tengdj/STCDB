@@ -358,7 +358,7 @@ void cuda_refinement(workbench *bench){
 //        Point *p2 = &bench->points[target_pid];
         Point *p1 = bench->points+pid;
         Point *p2 = bench->points+target_pid;
-        double dist = distance(bench->points[pid].x, bench->points[pid].y, bench->points[1].x, bench->points[target_pid].y);
+        double dist = distance(bench->points[pid].x, bench->points[pid].y, bench->points[target_pid].x, bench->points[target_pid].y);
         if(dist<=bench->config->reach_distance){
             uint pid1 = min(pid,target_pid);
             uint pid2 = max(target_pid,pid);
@@ -505,10 +505,10 @@ void cuda_identify_meetings(workbench *bench) {
                 bench->d_box_block[meeting_idx].high[0] = bench->meeting_buckets[bid].mbr.high[0];
                 bench->d_box_block[meeting_idx].high[1] = bench->meeting_buckets[bid].mbr.high[1];
             }
-            // reset the bucket
-            bench->meeting_buckets[bid].key = ULL_MAX;
         }
     }
+    // reset the bucket
+    bench->meeting_buckets[bid].key = ULL_MAX;
 }
 
 /*
@@ -888,7 +888,6 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 	bench->pro.copy_time += get_time_elapsed(start,false);
 	logt("copy in data", start);
 
-
 	if(!bench->config->dynamic_schema){
 		struct timeval newstart = get_cur_time();
 		cuda_clean_cells<<<one_dim*one_dim/1024+1,1024>>>(d_bench);
@@ -991,11 +990,10 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 	check_execution();
 	cudaDeviceSynchronize();
 	CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-    bench->pro.refine_time += get_time_elapsed(start,false);
+    bench->pro.meeting_identify_time += get_time_elapsed(start,false);
     int kv_increase = h_bench.kv_count-before_kv;
     printf("second %d finished meetings : %d\n",bench->cur_time , kv_increase);
-    logt("meeting identify: %dmeetings", start, kv_increase);
-	bench->pro.meeting_identify_time += get_time_elapsed(start,false);
+    logt("meeting identify: %d meetings", start, kv_increase);
 	bench->num_active_meetings = h_bench.num_active_meetings;
 	bench->num_taken_buckets = h_bench.num_taken_buckets;
     //bench->kv_count = h_bench.kv_count;
@@ -1006,6 +1004,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         // wrap raw pointer with a device_ptr
         thrust::device_ptr<__uint128_t> d_vector_keys = thrust::device_pointer_cast(h_bench.d_keys);
         thrust::device_ptr<uint> d_vector_values = thrust::device_pointer_cast(h_bench.d_values);
+        logt("pointer_cast: ",start);
         // use device_ptr in Thrust algorithms
         thrust::sort_by_key(d_vector_keys, d_vector_keys + h_bench.kv_count, d_vector_values);
         // access device memory transparently through device_ptr
@@ -1018,19 +1017,17 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         cudaMemcpy(bench->h_box_block[bench->MemTable_count], h_bench.d_box_block, bench->kv_capacity*sizeof(box), cudaMemcpyDeviceToHost);
         cudaMemcpy(bench->h_keys[bench->MemTable_count], h_bench.d_keys, bench->kv_capacity*sizeof(__uint128_t), cudaMemcpyDeviceToHost);
         cudaMemcpy(bench->h_values[bench->MemTable_count], h_bench.d_values, bench->kv_capacity*sizeof(uint), cudaMemcpyDeviceToHost);
-        logt("cudaMemcpy right",start);
-        printf("cudaMemcpy right\n");
-        print_128(bench->h_keys[bench->MemTable_count][10]);
-        printf("\n");
-        print_128(bench->h_keys[bench->MemTable_count][11]);
-        printf("\n");
-        print_128(bench->h_keys[bench->MemTable_count][12]);
-        printf("\n");
+        logt("cudaMemcpy kv",start);
+//        printf("cudaMemcpy kv right\n");
+//        print_128(bench->h_keys[bench->MemTable_count][10]);
+//        printf("\n");
+//        print_128(bench->h_keys[bench->MemTable_count][11]);
+//        printf("\n");
+//        print_128(bench->h_keys[bench->MemTable_count][12]);
+//        printf("\n");
 
-        //thrust::copy(d_vector_keys, d_vector_keys+bench->kv_count, bench->h_keys[bench->MemTable_count]);
-        //logt("copy1 right",start);
+        //thrust::copy(d_vector_keys, d_vector_keys+bench->kv_count, bench->h_keys[bench->MemTable_count]);     //wrong
         //::copy(d_vector_values, d_vector_values+bench->kv_count, bench->h_values[bench->MemTable_count]);
-        //logt("copy2 right",start);
         bench->MemTable_count++;
 
         //init
