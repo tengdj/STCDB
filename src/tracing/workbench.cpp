@@ -116,7 +116,7 @@ void workbench::claim_space(){
 //		meeting_buckets[i].key = ULL_MAX;
 //	}
 
-    size = MemTable_capacity*sizeof(__uint128_t *);
+    size = MemTable_capacity*sizeof(__uint128_t *);                 //sort
     h_keys = (__uint128_t **)allocate(size);
     //log("\t%.2f MB\tmeeting bucket space",size/1024.0/1024.0);
 
@@ -139,4 +139,7 @@ void workbench::claim_space(){
         h_box_block[i] = (box *)allocate(size);
         log("\t%.2f MB\ta element of h_values",size/1024.0/1024.0);
     }
+
+    size = config->search_list_capacity*sizeof(search_info_unit);
+    search_list = (search_info_unit *)allocate(size);
 }

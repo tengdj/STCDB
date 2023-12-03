@@ -208,6 +208,16 @@ void tracer::process(){
 			bench->points = trace+t*config->num_objects;
 			bench->cur_time = st+t;
 			// process the coordinate in this time point
+
+            bench->search_kv = true;                            //cuda search
+            bench->search_count = 100;
+            for(int i=0;i<bench->search_count;i++){
+                bench->search_list[i].pid = 10000+i;
+                bench->search_list[i].target = 0;
+                bench->search_list[i].start = 0;
+                bench->search_list[i].end = 0;
+            }
+
 			if(!config->gpu){
 				struct timeval ct = get_cur_time();
 				bench->filter();
@@ -221,8 +231,13 @@ void tracer::process(){
 				process_with_gpu(bench,d_bench,gpu);
 	#endif
 			}
+            for(int i=0;i<bench->search_count;i++){
+                if(bench->search_list[i].target>0)
+                cout<< bench->search_list[i].pid<<"-"<<bench->search_list[i].target<<"-"<<bench->search_list[i].start<<"-"<<bench->search_list[i].end<<endl;
+            }
+
             if(bench->MemTable_count==bench->MemTable_capacity){
-                //merge sort
+                //merge sort can be optimized, since they are always kv_2G now.
 
                 ofstream SSTable;
                 SSTable.open("../store/SSTable"+to_string(t), ios::out | ios::trunc);           //config.DBPath
@@ -259,13 +274,17 @@ void tracer::process(){
                 time2 = clock();
                 double this_time = (double)(time2-time1)/CLOCKS_PER_SEC;
                 cout<<"merge sort t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
+                for(int i=0;i<bench->MemTable_capacity;i++){
+                    cout<<"key_index"<<key_index[i]<<endl;
+                }
+                delete[] key_index;
 
                 SSTable.flush();
                 SSTable.close();
 
                 //init
                 bench->MemTable_count = 0;
-                for(uint i=0;i<bench->MemTable_capacity;i++){
+                for(uint i=0;i<bench->MemTable_capacity;i++){                   //useless
                     for(uint j=bench->kv_2G; j<bench->kv_capacity ;j++){
                         bench->h_keys[i][j] = 0;
                     }
@@ -314,12 +333,7 @@ void tracer::process(){
 //                fprintf(stdout, "\n");
 //            }
 
-
-
-
 		}
-
 	}
-
 	//bench->print_profile();
 }

@@ -29,6 +29,7 @@ public:
     uint grid_capacity = 100;
     uint zone_capacity = 100;
     size_t num_meeting_buckets = 100000;
+    uint search_list_capacity =  100;
 
     double grid_amplify = 2;
     uint refine_size = 3;

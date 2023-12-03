@@ -51,8 +51,8 @@ typedef struct meeting_unit{
     size_t key;
 //    unsigned short start;       //2023.9.21
 //    unsigned short end;
-    unsigned start;       //2023.9.21
-    unsigned end;
+    uint start;       //2023.9.21
+    uint end;
     //Point midpoint;            //2023.7.17
     box mbr;                     //7.24 7.26
     bool isEmpty(){
@@ -68,6 +68,15 @@ typedef struct meeting_unit{
         return ::InverseCantorPairing1(key).second;
     }
 }meeting_unit;
+
+typedef struct search_info_unit{
+    uint pid;
+    uint target;
+    uint start;
+    uint end;
+    box mbr;
+}search_info_unit;
+
 
 typedef struct reach_unit{
 	uint pid1;
@@ -138,8 +147,8 @@ public:
     __uint128_t *d_keys = NULL;
     uint *d_values = NULL;
     box *d_box_block = NULL;
-    uint kv_capacity = 450000;            //45000000
-    uint kv_2G = 400000;                  //44739243
+    uint kv_capacity = 45000000;            //45000000
+    uint kv_2G = 44739243;                  //44739243
     uint kv_count = 0;
 
     //space for MemTable
@@ -148,6 +157,11 @@ public:
     box **h_box_block = NULL;
     uint MemTable_capacity = 5;
     uint MemTable_count = 0;
+
+    //space for search list
+    bool search_kv = true;
+    search_info_unit * search_list = NULL;
+    uint search_count = 0;
 
 	// the temporary space
 	uint *tmp_space = NULL;
