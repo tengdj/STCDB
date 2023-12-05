@@ -58,8 +58,12 @@ workbench *partitioner::build_schema(Point *points, size_t num_objects){
 
 	// create and initialize the workbench
 	workbench *bench = new workbench(config);
+    bench->dwMaxItems = bench->kv_capacity*5;
+    CalcBloomFilterParam(bench->dwMaxItems, bench->dProbFalse, &bench->dwFilterBits, &bench->dwHashFuncs);
+    bench->dwFilterSize = bench->dwFilterBits / 8;          //BYTE_BITS == 8
+
 	bench->claim_space();
-	logt("claim %.3f MB memory space",start,bench->space_claimed()/1024.0/1024.0);
+	logt("claim %.3f MB memory space",start, bench->space_claimed()/1024.0/1024.0);
 
 
 	// pop the top grids and schema nodes
@@ -70,6 +74,7 @@ workbench *partitioner::build_schema(Point *points, size_t num_objects){
 	// construct the schema with the QTree
 	uint offset = 0;
 	qtree->create_schema(bench->schema, offset);
+
 	delete qtree;
 	logt("partitioning schema is with %d grids %d nodes",start,bench->grids_stack_index,bench->schema_stack_index);
 	return bench;

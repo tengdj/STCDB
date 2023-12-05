@@ -531,6 +531,24 @@ void cuda_search_kv(workbench *bench){
     }
 }
 
+__global__
+void BloomFilter_Add(workbench *bench){
+    uint kid = blockIdx.x*blockDim.x+threadIdx.x;
+    if(kid>=bench->kv_2G){
+        return;
+    }
+
+    uint pdwHashPos;
+    uint64_t hash1, hash2;
+    uint key = bench->d_keys[kid]/100000000 / 100000000 / 100000000;
+    for(int i=0;i<(int)bench->dwHashFuncs; ++i){
+        hash1 = d_MurmurHash2_x64((const void *)&key, sizeof(uint), bench->dwSeed);            // 双重散列封装，k个函数函数, 比如要20个
+        hash2 = d_MurmurHash2_x64((const void *)&key, sizeof(uint), MIX_UINT64(hash1));
+        pdwHashPos = (hash1 + i*hash2) % bench->dwFilterBits;
+        bench->d_pstFilter[pdwHashPos/8] |= 1<<(pdwHashPos%8);
+    }
+}
+
 /*
  * kernel functions for index update
  *
@@ -854,15 +872,27 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
 
     //cuda sort
     h_bench.d_keys = (__uint128_t *)gpu->allocate(bench->kv_capacity*sizeof(__uint128_t));
+    size = bench->kv_capacity*sizeof(__uint128_t);
+    log("\t%.2f MB\td_keys",1.0*size/1024/1024);
     h_bench.d_values = (uint *)gpu->allocate(bench->kv_capacity*sizeof(uint));
+    size = bench->kv_capacity*sizeof(uint);
+    log("\t%.2f MB\td_values",1.0*size/1024/1024);
     h_bench.d_box_block = (box *)gpu->allocate(bench->kv_capacity*sizeof(box));
+    size = bench->kv_capacity*sizeof(box);
+    log("\t%.2f MB\td_box_block",1.0*size/1024/1024);
     thrust::device_ptr<uint> d_vector_values = thrust::device_pointer_cast(h_bench.d_values);
     thrust::sequence(d_vector_values,d_vector_values+bench->kv_capacity);                                           //init 0 1 2 ...
-    CUDA_SAFE_CALL(cudaMemcpy(h_bench.schema, bench->schema, bench->schema_stack_capacity*sizeof(QTSchema), cudaMemcpyHostToDevice));
-    CUDA_SAFE_CALL(cudaMemcpy(h_bench.schema, bench->schema, bench->schema_stack_capacity*sizeof(QTSchema), cudaMemcpyHostToDevice));
 
     //cuda search
     h_bench.search_list = (search_info_unit *)gpu->allocate(bench->config->search_list_capacity*sizeof(search_info_unit));
+    size = bench->config->search_list_capacity*sizeof(search_info_unit);
+    log("\t%.2f MB\tsearch_list",1.0*size/1024/1024);
+
+    //bloom filter
+    h_bench.d_pstFilter = (unsigned char *)gpu->allocate(bench->dwFilterSize);
+    size = bench->dwFilterSize;
+    log("\t%.2f MB\td_pstFilter",1.0*size/1024/1024);
+    cudaMemset(h_bench.d_pstFilter, 0, bench->dwFilterSize);
 
 	h_bench.part_counter = (uint *)gpu->allocate(one_dim*one_dim*sizeof(uint));
 	h_bench.schema_assigned = (uint *)gpu->allocate(one_dim*one_dim*sizeof(uint));
@@ -1050,6 +1080,14 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 
         //thrust::copy(d_vector_keys, d_vector_keys+bench->kv_count, bench->h_keys[bench->MemTable_count]);     //wrong
         //::copy(d_vector_values, d_vector_values+bench->kv_count, bench->h_values[bench->MemTable_count]);
+
+        //bloom filter
+        BloomFilter_Add<<<bench->kv_2G/1024+1,1024>>>(d_bench);
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        logt("bloom filter ", start);
+        CUDA_SAFE_CALL(cudaMemcpy(bench->pstFilter[bench->MemTable_count], h_bench.d_pstFilter, bench->dwFilterSize, cudaMemcpyDeviceToHost));
         bench->MemTable_count++;
 
         //init
@@ -1059,6 +1097,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         cudaMemcpy(h_bench.d_box_block, h_bench.d_box_block + bench->kv_2G, overflow*sizeof(box), cudaMemcpyHostToHost);
         h_bench.kv_count = overflow;
         cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice);                       //update kv_count, other effect ???
+        cudaMemset(h_bench.d_pstFilter, 0, bench->dwFilterSize);
     }
 
 	// todo do the data analyzes, for test only, should not copy out so much stuff
@@ -1102,15 +1141,15 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 	}
 
     /* 6. search kv info */
-    if(bench->search_kv){
-        CUDA_SAFE_CALL(cudaMemcpy(h_bench.search_list, bench->search_list, bench->search_count*sizeof(search_info_unit), cudaMemcpyHostToDevice));
-        cuda_search_kv<<<h_bench.kv_count/1024+1,1024>>>(d_bench);
-        check_execution();
-        cudaDeviceSynchronize();
-        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-        logt("search_kv ", start);
-        CUDA_SAFE_CALL(cudaMemcpy(bench->search_list, h_bench.search_list, bench->search_count*sizeof(search_info_unit), cudaMemcpyDeviceToHost));
-    }
+//    if(bench->search_kv){
+//        CUDA_SAFE_CALL(cudaMemcpy(h_bench.search_list, bench->search_list, bench->search_count*sizeof(search_info_unit), cudaMemcpyHostToDevice));
+//        cuda_search_kv<<<h_bench.kv_count/1024+1,1024>>>(d_bench);
+//        check_execution();
+//        cudaDeviceSynchronize();
+//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+//        logt("search_kv ", start);
+//        CUDA_SAFE_CALL(cudaMemcpy(bench->search_list, h_bench.search_list, bench->search_count*sizeof(search_info_unit), cudaMemcpyDeviceToHost));
+//    }
 
 	/* 6. post-process, copy out data*/
 //	if(h_bench.meeting_counter>0){

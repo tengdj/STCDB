@@ -158,6 +158,19 @@ public:
     uint MemTable_capacity = 5;
     uint MemTable_count = 0;
 
+    //Bloom filter
+    unsigned char **pstFilter = NULL;
+    //uint32_t *dwCount = NULL;             // Add()
+    //uint8_t cInitFlag = 0;            //
+    uint dwMaxItems = 0;          //n
+    double dProbFalse = 0.0000002;      //p, false positive rate
+    uint dwFilterBits = 0;         //m = ceil((n * log(p)) / log(1.0 / (pow(2.0, log(2.0))))); - BloomFilter       m < uint32_t
+    uint dwHashFuncs = 0;         // k = round(log(2.0) * m / n); -
+    uint dwSeed = 0;              // seed of MurmurHash
+    uint dwFilterSize = 0;        // dwFilterBits / BYTE_BITS, while BYTE_BITS==8
+
+    unsigned char * d_pstFilter = NULL;
+
     //space for search list
     bool search_kv = true;
     search_info_unit * search_list = NULL;

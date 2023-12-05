@@ -217,7 +217,6 @@ void tracer::process(){
                 bench->search_list[i].start = 0;
                 bench->search_list[i].end = 0;
             }
-
 			if(!config->gpu){
 				struct timeval ct = get_cur_time();
 				bench->filter();
@@ -227,9 +226,9 @@ void tracer::process(){
 				//bench->update_meetings();
 				bench->pro.meeting_identify_time += get_time_elapsed(ct,true);
 			}else{
-	#ifdef USE_GPU
-				process_with_gpu(bench,d_bench,gpu);
-	#endif
+#ifdef USE_GPU
+                process_with_gpu(bench,d_bench,gpu);
+#endif
 			}
             for(int i=0;i<bench->search_count;i++){
                 if(bench->search_list[i].target>0)
@@ -238,6 +237,10 @@ void tracer::process(){
 
             if(bench->MemTable_count==bench->MemTable_capacity){
                 //merge sort can be optimized, since they are always kv_2G now.
+
+                for(int i=0;i<bench->dwFilterSize;i++){
+                    printBits(bench->pstFilter[0][i]);
+                }
 
                 ofstream SSTable;
                 SSTable.open("../store/SSTable"+to_string(t), ios::out | ios::trunc);           //config.DBPath
@@ -319,7 +322,6 @@ void tracer::process(){
 			bench->pro.max_filter_size = max(bench->pro.max_filter_size, bench->filter_list_index);
 			bench->pro.max_bucket_num = max(bench->pro.max_bucket_num, bench->num_taken_buckets);
 			bench->pro.num_pairs += bench->num_active_meetings;
-
 
 //			bench->pro.num_meetings += bench->meeting_counter;
 //            if (t != 0 && bench->meeting_counter > 0) {

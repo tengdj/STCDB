@@ -142,4 +142,15 @@ void workbench::claim_space(){
 
     size = config->search_list_capacity*sizeof(search_info_unit);
     search_list = (search_info_unit *)allocate(size);
+
+    size = MemTable_capacity*sizeof(unsigned char *);       //search
+    pstFilter = (unsigned char **)allocate(size);
+
+    for(int i=0;i<MemTable_capacity;i++){
+        size = dwFilterSize;
+        pstFilter[i] = (unsigned char *)allocate(size);
+        log("\t%.2f MB\ta pstFilter",size/1024.0/1024.0);
+        memset(pstFilter[i], 0, dwFilterSize);
+    }
+
 }
