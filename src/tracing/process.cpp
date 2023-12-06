@@ -164,7 +164,7 @@ void tracer::print(){
 }
 void tracer::print_trace(int oid){
 	vector<Point *> points;
-	for(int i=0;i<config->duration;i++){
+	for(int i=0;i<config->cur_duration;i++){
 		points.push_back(trace+i*config->num_objects+oid);
 	}
 	print_points(points);
@@ -339,3 +339,61 @@ void tracer::process(){
 	}
 	//bench->print_profile();
 }
+
+//void tracer::process(){
+//    struct timeval start = get_cur_time();
+//    for(int st=config->start_time;st<config->start_time+config->duration;st+=100){
+//        int cur_duration = min((config->start_time+config->duration-st),(uint)100);
+//        loadData(config->trace_path.c_str(),st,cur_duration);
+//        start = get_cur_time();
+//        if(!bench){
+//            bench = part->build_schema(trace, config->num_objects);
+//            bench->mbr = mbr;
+//#ifdef USE_GPU
+//            if(config->gpu){
+//				d_bench = cuda_create_device_bench(bench, gpu);
+//			}
+//#endif
+//        }
+//        for(int t=0;t<cur_duration;t++) {
+//            log("");
+//            bench->reset();
+//            bench->points = trace + t * config->num_objects;
+//            bench->cur_time = st + t;
+//            // process the coordinate in this time point
+//            if (!config->gpu) {
+//                struct timeval ct = get_cur_time();
+//                bench->filter();
+//                bench->pro.filter_time += get_time_elapsed(ct, true);
+//                bench->reachability();
+//                bench->pro.refine_time += get_time_elapsed(ct, true);
+////                bench->update_meetings();
+////                bench->pro.meeting_identify_time += get_time_elapsed(ct, true);
+//            } else {
+//#ifdef USE_GPU
+//                process_with_gpu(bench,d_bench,gpu);
+//#endif
+//            }
+//
+//            if (config->analyze_grid || config->profile) {
+//                bench->analyze_grids();
+//            }
+//            if (config->analyze_reach) {
+//                bench->analyze_reaches();
+//            }
+//            if (config->dynamic_schema && !config->gpu) {
+//                struct timeval ct = get_cur_time();
+//                bench->update_schema();
+//                bench->pro.index_update_time += get_time_elapsed(ct, true);
+//            }
+//            logt("round %d", start, st + t + 1);
+//            bench->pro.rounds++;
+//            bench->pro.max_refine_size = max(bench->pro.max_refine_size, bench->grid_check_counter);
+//            bench->pro.max_filter_size = max(bench->pro.max_filter_size, bench->filter_list_index);
+//            bench->pro.max_bucket_num = max(bench->pro.max_bucket_num, bench->num_taken_buckets);
+//            bench->pro.num_pairs += bench->num_active_meetings;
+//
+//        }
+//    }
+//    //bench->print_profile();
+//}

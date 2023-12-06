@@ -85,7 +85,7 @@ public:
     //void analyze_trips(const char *path, int limit = 2147483647);
     void generate_trace(Point * traces);
     // generate a trace with given duration
-    vector<Point *> fill_trace(Map *mymap = NULL, int obj = 0);
+    void fill_trace(Point * ret, Map *mymap, int obj);
     int get_core(int seed=-1);
 
 };

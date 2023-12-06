@@ -225,7 +225,7 @@ int trace_generator::get_core(int seed){
     return next_seed;
 }
 
-vector<Point *> trace_generator::fill_trace(Map *mymap, int obj){
+void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){                 //return --- result
     // use the default map for single thread mode
     if(!mymap){
         mymap = map;
@@ -238,8 +238,8 @@ vector<Point *> trace_generator::fill_trace(Map *mymap, int obj){
     }
     //bool exactly_finish = false;
     bool rested = false;
-    vector<Point *> ret;
-    while(ret.size()<config->cur_duration){
+    int count = 0;
+    while(count<config->cur_duration){
         if(meta_data[obj].type==NOT_YET){
             meta_data[obj].end = get_random_location(meta_data[obj].core);
             if(tryluck(config->drive_rate)){
@@ -259,27 +259,29 @@ vector<Point *> trace_generator::fill_trace(Map *mymap, int obj){
                 meta_data[obj].end = get_random_location(meta_data[obj].core);
             }
             meta_data[obj].speed = config->drive_speed;
-            mymap->navigate(ret, meta_data[obj], config->cur_duration);
+            mymap->navigate(ret, meta_data[obj], config->cur_duration, count, config->num_objects, obj);
         }else if(meta_data[obj].type == WALK){
             const double step = config->walk_speed/meta_data[obj].end.distance(meta_data[obj].loc, true);
-            for(double portion = step;portion<(1+step)&&ret.size()<config->cur_duration;){
-                double px = meta_data[obj].loc.x+portion*(meta_data[obj].end.x - meta_data[obj].loc.x);
-                double py = meta_data[obj].loc.y+portion*(meta_data[obj].end.y - meta_data[obj].loc.y);
-                ret.push_back(new Point(px,py));
+            for(double portion = step;portion<(1+step)&&count<config->cur_duration;){
+                ret[count*config->num_objects+obj].x = meta_data[obj].loc.x+portion*(meta_data[obj].end.x - meta_data[obj].loc.x);
+                ret[count*config->num_objects+obj].y = meta_data[obj].loc.y+portion*(meta_data[obj].end.y - meta_data[obj].loc.y);
+                count++;
                 portion += step;
             }
-            meta_data[obj].loc = Point(ret[ret.size()-1]);
+            meta_data[obj].loc = ret[(count-1)*config->num_objects+obj];
         }else if(meta_data[obj].type == REST){
             int dur = config->max_rest_time*get_rand_double();
-            for(int i=0;i<dur&&ret.size()<config->cur_duration;i++){
-                ret.push_back(new Point(&meta_data[obj].loc));
+            for(int i=0;i<dur&&count<config->cur_duration;i++){
+//                ret[count].x = meta_data[obj].loc.x;
+//                ret[count].y = meta_data[obj].loc.y;
+                ret[count*config->num_objects+obj] = meta_data[obj].loc;
+                count++;
             }
         }
-        if(ret.size()<config->cur_duration){                //last trip must be finished
+        if(count<config->cur_duration){                //last trip must be finished
             meta_data[obj].type = NOT_YET;
         }
     }
-    return ret;
 }
 
 void *gentrace_unit(void *arg){
@@ -295,15 +297,9 @@ void *gentrace_unit(void *arg){
             break;
         }
         for(int obj=start;obj<end;obj++){
-            //log("%d",obj);
-            vector<Point *> trace = gen->fill_trace(mymap, obj);
-            // copy to target
-            for(int i=0;i<gen->config->cur_duration;i++){
-                result[i*gen->config->num_objects+obj] = *trace[i];
-                delete trace[i];
-            }
-            trace.clear();
+            gen->fill_trace(result, mymap, obj);
         }
+
     }
     delete mymap;
     return NULL;

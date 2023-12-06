@@ -1065,7 +1065,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         cudaDeviceSynchronize();
         cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost);
         bench->pro.cuda_sort_time = get_time_elapsed(start,false);
-        logt("cuda_sort_timecuda_sort_time: ",start);
+        logt("cuda_sort_time: ",start);
         cudaMemcpy(bench->h_box_block[bench->MemTable_count], h_bench.d_box_block, bench->kv_2G*sizeof(box), cudaMemcpyDeviceToHost);       //can be cpy before sort
         cudaMemcpy(bench->h_keys[bench->MemTable_count], h_bench.d_keys, bench->kv_2G*sizeof(__uint128_t), cudaMemcpyDeviceToHost);
         cudaMemcpy(bench->h_values[bench->MemTable_count], h_bench.d_values, bench->kv_2G*sizeof(uint), cudaMemcpyDeviceToHost);
@@ -1089,6 +1089,9 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         logt("bloom filter ", start);
         CUDA_SAFE_CALL(cudaMemcpy(bench->pstFilter[bench->MemTable_count], h_bench.d_pstFilter, bench->dwFilterSize, cudaMemcpyDeviceToHost));
         bench->MemTable_count++;
+        for(int i=0;i<bench->dwFilterSize;i++){
+            printBits(bench->pstFilter[0][i]);
+        }
 
         //init
         thrust::sequence(d_vector_values,d_vector_values+bench->kv_capacity);                   //to kv_count is enough

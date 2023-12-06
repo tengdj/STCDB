@@ -396,95 +396,94 @@ Street *Map::nearest(Point *target){
  * that the taxi may appear at a given time
  *
  * */
-int Map::navigate(vector<Point *> &positions, Point *origin, Point *dest, double speed){
+//int Map::navigate(vector<Point *> &positions, Point *origin, Point *dest, double speed){
+//
+//    assert(origin);
+//    assert(dest);
+//    assert(speed>0);
+//
+//    // get the closest points streets to the source and destination points
+//    vector<Street *> ret;
+//    Street *o = nearest(origin);
+//    Street *d = nearest(dest);
+//
+//    //conduct a breadth first query to get a list of streets
+//    for(Street *s:streets) {
+//        s->father_from_origin = NULL;
+//    }
+//    Street *s = o->breadthFirst(d);
+//    assert(s && s==d);
+//    do{
+//        ret.push_back(s);
+//        s = s->father_from_origin;
+//    }while(s!=NULL);
+//    reverse(ret.begin(),ret.end());
+//
+//    // convert the street sequence to point sequences
+//    vector<Node *> trajectory;
+//    Node *originnode = new Node(origin->x, origin->y);
+//    Node *destnode = new Node(dest->x, dest->y);
+//    trajectory.push_back(originnode);
+//    Node *cur;
+//    if(ret.size()==1){
+//        cur = ret[0]->start;
+//    }else{
+//        cur = ret[0]->close(ret[1]);
+//        // swap to other end
+//        if(ret[0]->start==cur){
+//            cur = ret[0]->end;
+//        }else{
+//            cur = ret[0]->start;
+//        }
+//    }
+//
+//    for(int i=0;i<ret.size();i++){
+//        trajectory.push_back(cur);
+//        if(ret[i]->start==cur){
+//            cur = ret[i]->end;
+//        }else{
+//            cur = ret[i]->start;
+//        }
+//    }
+//    trajectory.push_back(cur);
+//    trajectory.push_back(destnode);
+//
+//    // quantify the street sequence to generate a list of
+//    // points with fixed gap
+//    double dist_from_origin = 0;
+//    int point_index = 0;
+//    for(int i=0;i<trajectory.size()-1;i++) {
+//        Node *cur_start = trajectory[i];
+//        Node *cur_end = trajectory[i+1];
+//        double length = cur_start->distance(*cur_end, true);
+//        double cur_dis = (point_index+1)*speed-dist_from_origin;
+//        while(cur_dis<length) {
+//            //have other position can be reported in this street
+//            double cur_portion = cur_dis/length;
+//            //now get the longitude and latitude and timestamp for current event and add to return list
+//            Point *p = new Point(cur_start->x+(cur_end->x-cur_start->x)*cur_portion,
+//                                 cur_start->y+(cur_end->y-cur_start->y)*cur_portion);
+//            positions.push_back(p);
+//            // move to next point
+//            point_index++;
+//            cur_dis += speed;
+//        }
+//        //move to next street
+//        dist_from_origin += length;
+//    }
+//
+//    trajectory.clear();
+//    ret.clear();
+//    delete originnode;
+//    delete destnode;
+//    return positions.size();
+//}
 
-    assert(origin);
-    assert(dest);
-    assert(speed>0);
-
-    // get the closest points streets to the source and destination points
-    vector<Street *> ret;
-    Street *o = nearest(origin);
-    Street *d = nearest(dest);
-
-    //conduct a breadth first query to get a list of streets
-    for(Street *s:streets) {
-        s->father_from_origin = NULL;
-    }
-    Street *s = o->breadthFirst(d);
-    assert(s && s==d);
-    do{
-        ret.push_back(s);
-        s = s->father_from_origin;
-    }while(s!=NULL);
-    reverse(ret.begin(),ret.end());
-
-    // convert the street sequence to point sequences
-    vector<Node *> trajectory;
-    Node *originnode = new Node(origin->x, origin->y);
-    Node *destnode = new Node(dest->x, dest->y);
-    trajectory.push_back(originnode);
-    Node *cur;
-    if(ret.size()==1){
-        cur = ret[0]->start;
-    }else{
-        cur = ret[0]->close(ret[1]);
-        // swap to other end
-        if(ret[0]->start==cur){
-            cur = ret[0]->end;
-        }else{
-            cur = ret[0]->start;
-        }
-    }
-
-    for(int i=0;i<ret.size();i++){
-        trajectory.push_back(cur);
-        if(ret[i]->start==cur){
-            cur = ret[i]->end;
-        }else{
-            cur = ret[i]->start;
-        }
-    }
-    trajectory.push_back(cur);
-    trajectory.push_back(destnode);
-
-    // quantify the street sequence to generate a list of
-    // points with fixed gap
-    double dist_from_origin = 0;
-    int point_index = 0;
-    for(int i=0;i<trajectory.size()-1;i++) {
-        Node *cur_start = trajectory[i];
-        Node *cur_end = trajectory[i+1];
-        double length = cur_start->distance(*cur_end, true);
-        double cur_dis = (point_index+1)*speed-dist_from_origin;
-        while(cur_dis<length) {
-            //have other position can be reported in this street
-            double cur_portion = cur_dis/length;
-            //now get the longitude and latitude and timestamp for current event and add to return list
-            Point *p = new Point(cur_start->x+(cur_end->x-cur_start->x)*cur_portion,
-                                 cur_start->y+(cur_end->y-cur_start->y)*cur_portion);
-            positions.push_back(p);
-            // move to next point
-            point_index++;
-            cur_dis += speed;
-        }
-        //move to next street
-        dist_from_origin += length;
-    }
-
-    trajectory.clear();
-    ret.clear();
-    delete originnode;
-    delete destnode;
-    return positions.size();
-}
-
-int Map::navigate(vector<Point *> &positions, Trace_Meta & meta, int duration){
+void Map::navigate(Point *positions, Trace_Meta & meta, int duration, int &count, uint num_objects, int obj){
 
 //    assert(origin);
 //    assert(dest);
 //    assert(speed>0);
-
     if(meta.trajectory.empty()){
         // get the closest points streets to the source and destination points
         vector<Street *> ret;
@@ -549,22 +548,24 @@ int Map::navigate(vector<Point *> &positions, Trace_Meta & meta, int duration){
         while(cur_dis<length) {
             //have other position can be reported in this street
             double cur_portion = cur_dis/length;
+            assert(count<duration);
             //now get the longitude and latitude and timestamp for current event and add to return list
-            Point *p = new Point(cur_start->x+(cur_end->x-cur_start->x)*cur_portion,
-                                 cur_start->y+(cur_end->y-cur_start->y)*cur_portion);
-            positions.push_back(p);
+            positions[count*num_objects+obj].x = cur_start->x+(cur_end->x-cur_start->x)*cur_portion;
+            positions[count*num_objects+obj].y = cur_start->y+(cur_end->y-cur_start->y)*cur_portion;
+            count++;
             // move to next point
             cur_dis += meta.speed;
             point_index++;
-            if(positions.size()==duration&&meta.trajectory.size()>2){
+            //if(count==duration&&meta.trajectory.size()>2){
+            if(count==duration){
                 finish = false;
                 break;
             }
         }
         if(!finish){
-            meta.loc = Point(positions.back());
-            Node * new_originnode = new Node(meta.loc.x, meta.loc.y);
-            meta.trajectory[0] = new_originnode;
+            meta.loc = positions[(count-1)*num_objects+obj];
+            delete meta.trajectory[0];
+            meta.trajectory[0] = new Node(meta.loc.x, meta.loc.y);
             break;
         }
         delete meta.trajectory[0];
@@ -573,16 +574,12 @@ int Map::navigate(vector<Point *> &positions, Trace_Meta & meta, int duration){
         dist_from_origin += length;
     }
     if(finish){
-        //cout<<"meta.trajectory.size() "<<meta.trajectory.size()<<endl;
         assert(meta.trajectory.size()==1);
         delete meta.trajectory[0];
         meta.trajectory.clear();
         meta.loc = meta.end;
     }
-    //meta.trajectory.clear();
-//    delete originnode;
-//    delete destnode;
-    return positions.size();
+
 }
 
 void Map::print_region(box *region){
