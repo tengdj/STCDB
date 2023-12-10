@@ -13,6 +13,15 @@ workbench::workbench(workbench *bench):workbench(bench->config){
 	schema_stack_index = bench->schema_stack_index;
 	cur_time = bench->cur_time;
 	mbr = bench->mbr;
+
+    if(config->bloom_filter) {
+        dwMaxItems = bench->dwMaxItems;
+        dProbFalse = bench->dProbFalse;
+        dwFilterBits = bench->dwFilterBits;
+        dwHashFuncs = bench->dwHashFuncs;
+        dwSeed = bench->dwSeed;
+        dwFilterSize = bench->dwFilterSize;
+    }
 }
 
 workbench::workbench(configuration *conf){
@@ -116,41 +125,44 @@ void workbench::claim_space(){
 //		meeting_buckets[i].key = ULL_MAX;
 //	}
 
-    size = MemTable_capacity*sizeof(__uint128_t *);                 //sort
+    size = config->MemTable_capacity*sizeof(__uint128_t *);                 //sort
     h_keys = (__uint128_t **)allocate(size);
     //log("\t%.2f MB\tmeeting bucket space",size/1024.0/1024.0);
 
-    size = MemTable_capacity*sizeof(uint *);
+    size = config->MemTable_capacity*sizeof(uint *);
     h_values = (uint **)allocate(size);
 
-    size = MemTable_capacity*sizeof(box *);
+    size = config->MemTable_capacity*sizeof(box *);
     h_box_block = (box **)allocate(size);
 
-    for(int i=0;i<MemTable_capacity;i++){
-        size = kv_capacity*sizeof(__uint128_t);
+    for(int i=0;i<config->MemTable_capacity;i++){
+        size = config->kv_capacity*sizeof(__uint128_t);
         h_keys[i] = (__uint128_t *)allocate(size);
         log("\t%.2f MB\ta element of h_keys",size/1024.0/1024.0);
 
-        size = kv_capacity*sizeof(uint);
+        size = config->kv_capacity*sizeof(uint);
         h_values[i] = (uint *)allocate(size);
         log("\t%.2f MB\ta element of h_values",size/1024.0/1024.0);
 
-        size = kv_capacity*sizeof(box);
+        size = config->kv_capacity*sizeof(box);
         h_box_block[i] = (box *)allocate(size);
         log("\t%.2f MB\ta element of h_values",size/1024.0/1024.0);
     }
 
-    size = config->search_list_capacity*sizeof(search_info_unit);
+    size = config->search_list_capacity*sizeof(search_info_unit);                   //search
     search_list = (search_info_unit *)allocate(size);
 
-    size = MemTable_capacity*sizeof(unsigned char *);       //search
-    pstFilter = (unsigned char **)allocate(size);
+    if(config->bloom_filter) {
+        size = config->MemTable_capacity * sizeof(unsigned char *);                       //bloom
+        pstFilter = (unsigned char **) allocate(size);
 
-    for(int i=0;i<MemTable_capacity;i++){
-        size = dwFilterSize;
-        pstFilter[i] = (unsigned char *)allocate(size);
-        log("\t%.2f MB\ta pstFilter",size/1024.0/1024.0);
-        memset(pstFilter[i], 0, dwFilterSize);
+#pragma omp parallel for
+        for (int i = 0; i < config->MemTable_capacity; i++) {
+            size = dwFilterSize;
+            pstFilter[i] = (unsigned char *) allocate(size);
+            log("\t%.2f MB\ta pstFilter", size / 1024.0 / 1024.0);
+            memset(pstFilter[i], 0, dwFilterSize);
+        }
     }
 
 }

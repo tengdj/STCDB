@@ -50,6 +50,7 @@ public:
 	}
 
 	void process();
+    void trace_process();
 
 };
 

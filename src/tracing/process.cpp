@@ -181,6 +181,22 @@ void tracer::print_traces(){
 	points.clear();
 }
 
+inline bool BloomFilter_Check(workbench *bench, uint sst, uint pid){
+    int i;
+    uint pdwHashPos;
+    uint64_t hash1, hash2;
+    int ret;
+    for (i = 0; i < bench->dwHashFuncs; i++){
+        hash1 = MurmurHash2_x64((const void *)&pid, sizeof(uint), bench->dwSeed);
+        hash2 = MurmurHash2_x64((const void *)&pid, sizeof(uint), MIX_UINT64(hash1));
+        pdwHashPos = (hash1 + i*hash2) % bench->dwFilterBits;
+        ret = bench->pstFilter[sst][pdwHashPos/8] & (1<<(pdwHashPos%8));        //0 1 ... 128 ...
+        if(ret == 0)
+            return false;
+    }
+    return true;
+}
+
 #ifdef USE_GPU
 workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu);
 void process_with_gpu(workbench *bench,workbench *d_bench, gpu_info *gpu);
@@ -189,13 +205,13 @@ void process_with_gpu(workbench *bench,workbench *d_bench, gpu_info *gpu);
 void tracer::process(){
 	struct timeval start = get_cur_time();
 	for(int st=config->start_time;st<config->start_time+config->duration;st+=100){
-		//int cur_duration = min((config->start_time+config->duration-st),(uint)100);
         config->cur_duration = min((config->start_time+config->duration-st),(uint)100);
         generator->generate_trace(trace);
 		start = get_cur_time();
 		if(!bench){
 			bench = part->build_schema(trace, config->num_objects);
 			bench->mbr = mbr;
+
 #ifdef USE_GPU
 			if(config->gpu){
 				d_bench = cuda_create_device_bench(bench, gpu);
@@ -206,17 +222,20 @@ void tracer::process(){
 			log("");
 			bench->reset();
 			bench->points = trace+t*config->num_objects;
-			bench->cur_time = st+t;
+			bench->cur_time = st + t;
 			// process the coordinate in this time point
 
-            bench->search_kv = true;                            //cuda search
-            bench->search_count = 100;
-            for(int i=0;i<bench->search_count;i++){
-                bench->search_list[i].pid = 10000+i;
-                bench->search_list[i].target = 0;
-                bench->search_list[i].start = 0;
-                bench->search_list[i].end = 0;
+            bench->config->search_kv = true;                            //cuda search
+            if(bench->config->search_kv){
+                bench->search_count = 100;
+                for(int i=0;i<bench->search_count;i++){
+                    bench->search_list[i].pid = i;
+                    bench->search_list[i].target = 0;
+                    bench->search_list[i].start = 0;
+                    bench->search_list[i].end = 0;
+                }
             }
+
 			if(!config->gpu){
 				struct timeval ct = get_cur_time();
 				bench->filter();
@@ -224,7 +243,7 @@ void tracer::process(){
 				bench->reachability();
 				bench->pro.refine_time += get_time_elapsed(ct,true);
 				//bench->update_meetings();
-				bench->pro.meeting_identify_time += get_time_elapsed(ct,true);
+				//bench->pro.meeting_identify_time += get_time_elapsed(ct,true);
 			}else{
 #ifdef USE_GPU
                 process_with_gpu(bench,d_bench,gpu);
@@ -233,27 +252,28 @@ void tracer::process(){
             for(int i=0;i<bench->search_count;i++){
                 if(bench->search_list[i].target>0)
                 cout<< bench->search_list[i].pid<<"-"<<bench->search_list[i].target<<"-"<<bench->search_list[i].start<<"-"<<bench->search_list[i].end<<endl;
+                if(bench->MemTable_count>0){
+                    if(BloomFilter_Check(bench, 0 ,bench->search_list[i].pid)){
+                        cout<< bench->search_list[i].pid <<"BloomFilter_Check :"<<endl;
+                    }
+                }
             }
 
-            if(bench->MemTable_count==bench->MemTable_capacity){
-                //merge sort can be optimized, since they are always kv_2G now.
-
-                for(int i=0;i<bench->dwFilterSize;i++){
-                    printBits(bench->pstFilter[0][i]);
-                }
+            if(bench->MemTable_count==bench->config->MemTable_capacity){
+                //merge sort can be optimized, since they are always kv_restriction now.
 
                 ofstream SSTable;
                 SSTable.open("../store/SSTable"+to_string(t), ios::out | ios::trunc);           //config.DBPath
-                uint *key_index = new uint[bench->MemTable_capacity]{0};
+                uint *key_index = new uint[bench->config->MemTable_capacity]{0};
                 int finish = 0;
                 clock_t time1,time2;
                 time1 = clock();
-                while(finish<bench->MemTable_capacity){
+                while(finish<bench->config->MemTable_capacity){
                     finish = 0;
                     __uint128_t temp_key = (__uint128_t)1<<126;
                     box * temp_box;
                     uint take_id =0;
-                    for(int i=0;i<bench->MemTable_capacity;i++){
+                    for(int i=0;i<bench->config->MemTable_capacity;i++){
                         if( bench->h_keys[i][key_index[i]] == 0){              //empty kv
                             finish++;
                             continue;
@@ -265,7 +285,7 @@ void tracer::process(){
                             bench->h_keys[i][key_index[i]] = 0;                 //init
                         }
                     }
-                    if(finish<bench->MemTable_capacity){
+                    if(finish<bench->config->MemTable_capacity){
                         key_index[take_id]++;
                         print_128(temp_key);
                         cout<< ": "<< temp_box->low[0] << endl;
@@ -277,7 +297,7 @@ void tracer::process(){
                 time2 = clock();
                 double this_time = (double)(time2-time1)/CLOCKS_PER_SEC;
                 cout<<"merge sort t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
-                for(int i=0;i<bench->MemTable_capacity;i++){
+                for(int i=0;i<bench->config->MemTable_capacity;i++){
                     cout<<"key_index"<<key_index[i]<<endl;
                 }
                 delete[] key_index;
@@ -287,8 +307,8 @@ void tracer::process(){
 
                 //init
                 bench->MemTable_count = 0;
-                for(uint i=0;i<bench->MemTable_capacity;i++){                   //useless
-                    for(uint j=bench->kv_2G; j<bench->kv_capacity ;j++){
+                for(uint i=0;i<bench->config->MemTable_capacity;i++){                   //useless
+                    for(uint j=bench->config->kv_restriction; j < bench->config->kv_capacity ; j++){
                         bench->h_keys[i][j] = 0;
                     }
                 }
@@ -340,60 +360,150 @@ void tracer::process(){
 	//bench->print_profile();
 }
 
-//void tracer::process(){
-//    struct timeval start = get_cur_time();
-//    for(int st=config->start_time;st<config->start_time+config->duration;st+=100){
-//        int cur_duration = min((config->start_time+config->duration-st),(uint)100);
-//        loadData(config->trace_path.c_str(),st,cur_duration);
-//        start = get_cur_time();
-//        if(!bench){
-//            bench = part->build_schema(trace, config->num_objects);
-//            bench->mbr = mbr;
-//#ifdef USE_GPU
-//            if(config->gpu){
-//				d_bench = cuda_create_device_bench(bench, gpu);
-//			}
-//#endif
-//        }
-//        for(int t=0;t<cur_duration;t++) {
-//            log("");
-//            bench->reset();
-//            bench->points = trace + t * config->num_objects;
-//            bench->cur_time = st + t;
-//            // process the coordinate in this time point
-//            if (!config->gpu) {
-//                struct timeval ct = get_cur_time();
-//                bench->filter();
-//                bench->pro.filter_time += get_time_elapsed(ct, true);
-//                bench->reachability();
-//                bench->pro.refine_time += get_time_elapsed(ct, true);
-////                bench->update_meetings();
-////                bench->pro.meeting_identify_time += get_time_elapsed(ct, true);
-//            } else {
-//#ifdef USE_GPU
-//                process_with_gpu(bench,d_bench,gpu);
-//#endif
-//            }
-//
-//            if (config->analyze_grid || config->profile) {
-//                bench->analyze_grids();
-//            }
-//            if (config->analyze_reach) {
-//                bench->analyze_reaches();
-//            }
-//            if (config->dynamic_schema && !config->gpu) {
-//                struct timeval ct = get_cur_time();
-//                bench->update_schema();
-//                bench->pro.index_update_time += get_time_elapsed(ct, true);
-//            }
-//            logt("round %d", start, st + t + 1);
-//            bench->pro.rounds++;
-//            bench->pro.max_refine_size = max(bench->pro.max_refine_size, bench->grid_check_counter);
-//            bench->pro.max_filter_size = max(bench->pro.max_filter_size, bench->filter_list_index);
-//            bench->pro.max_bucket_num = max(bench->pro.max_bucket_num, bench->num_taken_buckets);
-//            bench->pro.num_pairs += bench->num_active_meetings;
-//
-//        }
-//    }
-//    //bench->print_profile();
-//}
+void tracer::trace_process(){
+    struct timeval start = get_cur_time();
+    for(int st=config->start_time;st<config->start_time+config->duration;st+=100){
+        int cur_duration = min((config->start_time+config->duration-st),(uint)100);
+        loadData(config->trace_path.c_str(),st,cur_duration);
+        start = get_cur_time();
+        if(!bench){
+            bench = part->build_schema(trace, config->num_objects);
+            bench->mbr = mbr;
+
+#ifdef USE_GPU
+            if(config->gpu){
+				d_bench = cuda_create_device_bench(bench, gpu);
+			}
+#endif
+        }
+        for(int t=0;t<cur_duration;t++) {
+            log("");
+            bench->reset();
+            bench->points = trace + t * config->num_objects;
+            bench->cur_time = st + t;
+
+            bench->config->search_kv = true;                            //cuda search
+            if(bench->config->search_kv){
+                bench->search_count = 100;
+                for(int i=0;i<bench->search_count;i++){
+                    bench->search_list[i].pid = i;
+                    bench->search_list[i].target = 0;
+                    bench->search_list[i].start = 0;
+                    bench->search_list[i].end = 0;
+                }
+            }
+
+            // process the coordinate in this time point
+            if (!config->gpu) {
+                struct timeval ct = get_cur_time();
+                bench->filter();
+                bench->pro.filter_time += get_time_elapsed(ct, true);
+                bench->reachability();
+                bench->pro.refine_time += get_time_elapsed(ct, true);
+//                bench->update_meetings();
+//                bench->pro.meeting_identify_time += get_time_elapsed(ct, true);
+            } else {
+#ifdef USE_GPU
+                process_with_gpu(bench,d_bench,gpu);
+#endif
+            }
+
+            for(int i=0;i<bench->search_count;i++){
+                if(bench->search_list[i].target>0)
+                    cout<< bench->search_list[i].pid<<"-"<<bench->search_list[i].target<<"-"<<bench->search_list[i].start<<"-"<<bench->search_list[i].end<<endl;
+                if(bench->MemTable_count>0){
+                    if(BloomFilter_Check(bench, 0 ,bench->search_list[i].pid)){
+                        cout<< bench->search_list[i].pid <<"BloomFilter_Check :"<<endl;
+                    }
+                }
+            }
+
+            if(bench->MemTable_count==bench->config->MemTable_capacity){
+                //merge sort can be optimized, since they are always kv_restriction now.
+
+                ofstream SSTable;
+                SSTable.open("../store/SSTable"+to_string(t), ios::out | ios::trunc);           //config.DBPath
+                uint *key_index = new uint[bench->config->MemTable_capacity]{0};
+                int finish = 0;
+                clock_t time1,time2;
+                time1 = clock();
+                while(finish<bench->config->MemTable_capacity){
+                    finish = 0;
+                    __uint128_t temp_key = (__uint128_t)1<<126;
+                    box * temp_box;
+                    uint take_id =0;
+                    for(int i=0;i<bench->config->MemTable_capacity;i++){
+                        if( bench->h_keys[i][key_index[i]] == 0){              //empty kv
+                            finish++;
+                            continue;
+                        }
+                        if( temp_key > bench->h_keys[i][key_index[i]] ){
+                            temp_key = bench->h_keys[i][key_index[i]];
+                            temp_box = &bench->h_box_block[i][bench->h_values[i][key_index[i]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
+                            take_id = i;
+                            bench->h_keys[i][key_index[i]] = 0;                 //init
+                        }
+                    }
+                    if(finish<bench->config->MemTable_capacity){
+                        key_index[take_id]++;
+                        print_128(temp_key);
+                        cout<< ": "<< temp_box->low[0] << endl;
+                        SSTable.write((char *)&temp_key, sizeof(__uint128_t));
+                        SSTable.write((char *) temp_box, sizeof(box));
+                    }
+                }
+
+                time2 = clock();
+                double this_time = (double)(time2-time1)/CLOCKS_PER_SEC;
+                cout<<"merge sort t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
+                for(int i=0;i<bench->config->MemTable_capacity;i++){
+                    cout<<"key_index"<<key_index[i]<<endl;
+                }
+                delete[] key_index;
+
+                SSTable.flush();
+                SSTable.close();
+
+                //init
+                bench->MemTable_count = 0;
+                for(uint i=0;i<bench->config->MemTable_capacity;i++){                   //useless
+                    for(uint j=bench->config->kv_restriction; j < bench->config->kv_capacity ; j++){
+                        bench->h_keys[i][j] = 0;
+                    }
+                }
+
+//                ifstream read_f;
+//                read_f.open("SSTable377");
+//                for(int i=0;i<100;i++){
+//                    __uint128_t first_key;
+//                    box first_box;
+//                    read_f.read((char *)&first_key, sizeof(__uint128_t));
+//                    read_f.read((char *)&first_box, sizeof(box));
+//                    print_128(first_key);
+//                    cout<< ": "<< first_box.low[0] << endl;
+//                }
+            }
+
+
+            if (config->analyze_grid || config->profile) {
+                bench->analyze_grids();
+            }
+            if (config->analyze_reach) {
+                bench->analyze_reaches();
+            }
+            if (config->dynamic_schema && !config->gpu) {
+                struct timeval ct = get_cur_time();
+                bench->update_schema();
+                bench->pro.index_update_time += get_time_elapsed(ct, true);
+            }
+            logt("round %d", start, st + t + 1);
+            bench->pro.rounds++;
+            bench->pro.max_refine_size = max(bench->pro.max_refine_size, bench->grid_check_counter);
+            bench->pro.max_filter_size = max(bench->pro.max_filter_size, bench->filter_list_index);
+            bench->pro.max_bucket_num = max(bench->pro.max_bucket_num, bench->num_taken_buckets);
+            bench->pro.num_pairs += bench->num_active_meetings;
+
+        }
+    }
+    //bench->print_profile();
+}

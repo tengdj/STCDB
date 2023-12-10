@@ -58,9 +58,16 @@ workbench *partitioner::build_schema(Point *points, size_t num_objects){
 
 	// create and initialize the workbench
 	workbench *bench = new workbench(config);
-    bench->dwMaxItems = bench->kv_capacity*5;
-    CalcBloomFilterParam(bench->dwMaxItems, bench->dProbFalse, &bench->dwFilterBits, &bench->dwHashFuncs);
-    bench->dwFilterSize = bench->dwFilterBits / 8;          //BYTE_BITS == 8
+
+    if(config->bloom_filter) {
+        bench->dProbFalse = config->false_positive_rate;
+        bench->dwMaxItems = bench->config->kv_capacity * 5;
+        CalcBloomFilterParam(bench->dwMaxItems, bench->dProbFalse, &bench->dwFilterBits, &bench->dwHashFuncs);
+        bench->dwFilterSize = bench->dwFilterBits / 8;          //BYTE_BITS == 8
+        cout << "bench->dwMaxItems :" << bench->dwMaxItems << " bench->dProbFalse :" << bench->dProbFalse
+             << " bench->dwFilterBits :" << bench->dwFilterBits << " bench->dwHashFuncs :" << bench->dwHashFuncs
+             << " bench->dwFilterSize :" << bench->dwFilterSize << endl;
+    }
 
 	bench->claim_space();
 	logt("claim %.3f MB memory space",start, bench->space_claimed()/1024.0/1024.0);

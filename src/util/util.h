@@ -496,7 +496,6 @@ const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
 
         *pm = m;
         *pk = k;
-        return;
     }
 
     inline void printBits(unsigned char byte) {

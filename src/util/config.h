@@ -29,7 +29,6 @@ public:
     uint grid_capacity = 100;
     uint zone_capacity = 100;
     size_t num_meeting_buckets = 100000;
-    uint search_list_capacity =  100;
 
     double grid_amplify = 2;
     uint refine_size = 3;
@@ -46,6 +45,19 @@ public:
     bool analyze_reach = false;
     bool analyze_grid = false;
     bool profile = false;
+
+    //added
+    uint kv_capacity = 250000;            //45000000
+    uint kv_restriction = 200000;                  //44739243
+    uint MemTable_capacity = 5;             //5*2
+
+    bool search_kv = true;
+    uint search_list_capacity = 1000;
+
+    bool bloom_filter = true;
+    double false_positive_rate = 0.0004;
+
+
 
     void print(){
         fprintf(stderr,"configuration:\n");

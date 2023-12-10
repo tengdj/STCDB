@@ -20,7 +20,7 @@ int main(int argc, char **argv){
 	configuration config = get_parameters(argc, argv);
 	tracer *tr = new tracer(&config);
 	//tr->print_trace();
-	tr->process();
+	tr->trace_process();
 	delete tr;
 
 //	Map *m = new Map(config.map_path);
