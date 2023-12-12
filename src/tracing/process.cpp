@@ -7,7 +7,7 @@
 
 #include "trace.h"
 #include "../index/QTree.h"
-
+#include "step_merge.h"
 
 
 /*
@@ -66,7 +66,7 @@ tracer::tracer(configuration *conf){
 		}
 	}
 #endif
-};
+}
 tracer::~tracer(){
 	if(owned_trace){
 		free(trace);
@@ -197,6 +197,85 @@ inline bool BloomFilter_Check(workbench *bench, uint sst, uint pid){
     return true;
 }
 
+void *sst_dump(void *arg){
+    cout<<"step into the sst_dump"<<endl;
+    workbench *bench = (workbench *)arg;
+    bench->bg_run->first_pid = new uint[bench->bg_run->SSTable_count];
+
+    //merge sort
+    ofstream SSTable_of;
+    //bool of_open = false;
+    uint kv_count = 0;
+    uint sst_count = 0;
+    uint sst_capacity = 2185;             //218454
+    uint t_min = 3600*24*14;
+    uint t_max = 0;
+
+    uint *key_index = new uint[bench->config->MemTable_capacity]{0};
+    int finish = 0;
+    SSTable sst;
+    clock_t time1,time2;
+    time1 = clock();
+    while(finish<bench->config->MemTable_capacity){
+        if(kv_count==0){
+            SSTable_of.open("../store/SSTable" + to_string(sst_count), ios::out | ios::trunc);
+        }
+        finish = 0;
+        __uint128_t temp_key = (__uint128_t)1<<126;
+        box * temp_box;
+        uint take_id =0;
+        for(int i=0;i<bench->config->MemTable_capacity;i++){
+            if( bench->h_keys[i][key_index[i]] == 0){              //empty kv
+                finish++;
+                continue;
+            }
+            if( temp_key > bench->h_keys[i][key_index[i]] ){
+                temp_key = bench->h_keys[i][key_index[i]];
+                temp_box = &bench->h_box_block[i][bench->h_values[i][key_index[i]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
+                take_id = i;
+                bench->h_keys[i][key_index[i]] = 0;                 //init
+            }
+        }
+        if(finish<bench->config->MemTable_capacity){
+            key_index[take_id]++;                                                   // one while, one kv
+            if(kv_count==0){
+                bench->bg_run->first_pid[sst_count] = temp_key/100000000 / 100000000 / 100000000;
+            }
+            kv_count++;
+            uint start = (temp_key/100000000) % 100000000;
+            if(t_min>start){
+                t_min = start;
+            }
+            uint end = temp_key % 100000000;
+            if(t_max<end){
+                t_max = end;
+            }
+            print_128(temp_key);
+            cout<< ": "<< temp_box->low[0] << endl;
+            SSTable_of.write((char *)&temp_key, sizeof(__uint128_t));
+            SSTable_of.write((char *) temp_box, sizeof(box));
+        }
+        if(kv_count==sst_capacity||finish==bench->config->MemTable_capacity){
+            SSTable_of.flush();
+            SSTable_of.close();
+            sst_count++;
+            kv_count = 0;
+        }
+    }
+    cout<<"sst_count :"<<sst_count<<" less than"<<1024<<endl;
+    time2 = clock();
+    double this_time = (double)(time2-time1)/CLOCKS_PER_SEC;
+    cout<<"merge sort t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
+    for(int i=0;i<bench->config->MemTable_capacity;i++){
+        cout<<"key_index"<<key_index[i]<<endl;
+    }
+    delete[] key_index;
+    bench->bg_run->timestamp_max = t_min;
+    bench->bg_run->timestamp_max = t_max;
+
+    return NULL;
+}
+
 #ifdef USE_GPU
 workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu);
 void process_with_gpu(workbench *bench,workbench *d_bench, gpu_info *gpu);
@@ -249,81 +328,133 @@ void tracer::process(){
                 process_with_gpu(bench,d_bench,gpu);
 #endif
 			}
-            for(int i=0;i<bench->search_count;i++){
-                if(bench->search_list[i].target>0)
-                cout<< bench->search_list[i].pid<<"-"<<bench->search_list[i].target<<"-"<<bench->search_list[i].start<<"-"<<bench->search_list[i].end<<endl;
-                if(bench->MemTable_count>0){
-                    if(BloomFilter_Check(bench, 0 ,bench->search_list[i].pid)){
-                        cout<< bench->search_list[i].pid <<"BloomFilter_Check :"<<endl;
-                    }
-                }
-            }
+//            for(int i=0;i<bench->search_count;i++){
+//                if(bench->search_list[i].target>0)
+//                cout<< bench->search_list[i].pid<<"-"<<bench->search_list[i].target<<"-"<<bench->search_list[i].start<<"-"<<bench->search_list[i].end<<endl;
+//                if(bench->MemTable_count>0){
+//                    if(BloomFilter_Check(bench, 0 ,bench->search_list[i].pid)){
+//                        cout<< bench->search_list[i].pid <<"BloomFilter_Check :"<<endl;
+//                    }
+//                }
+//            }
+
+
+//            if(bench->MemTable_count>0){
+//                bool *check_2G = new bool[10000000];
+//                int count = 0;
+//                for(int i=0;i<bench->config->kv_restriction;i++){
+//                    uint pid = bench->h_keys[0][i]/100000000 / 100000000 / 100000000;
+//                    if(!check_2G[pid]){
+//                        check_2G[pid] = true;
+//                        count++;
+//                    }
+//                }
+//                cout<<count<<" in "<<10000000<<endl;
+//                assert(0);
+//            }
+
+//            if(bench->MemTable_count==bench->config->MemTable_capacity){
+//                bool *check_2G = new bool[10000000];
+//                int unique_count = 0;
+//                for(int j=0;j<bench->MemTable_count;j++){
+//                    for(int i=0;i<bench->config->kv_restriction;i++){
+//                        uint pid = bench->h_keys[j][i]/100000000 / 100000000 / 100000000;
+//                        if(!check_2G[pid]){
+//                            check_2G[pid] = true;
+//                            unique_count++;
+//                        }
+//                    }
+//                }
+//                cout<<unique_count<<" in "<<10000000<<endl;
+//                assert(0);
+//            }
+
+
+//            if(bench->MemTable_count==bench->config->MemTable_capacity){
+//                cout<<"dump begin time: "<<bench->cur_time<<endl;
+//                pthread_t bg_thread;
+//                int ret;
+//                if ((ret=pthread_create(&bg_thread,NULL,sst_dump,(void*)bench)) != 0){
+//                    fprintf(stderr,"pthread_create:%s\n",strerror(ret));
+//                    exit(1);
+//                }
+//                pthread_detach(bg_thread);
+//                //pthread_join(bg_thread, NULL);
+
 
             if(bench->MemTable_count==bench->config->MemTable_capacity){
-                //merge sort can be optimized, since they are always kv_restriction now.
-
-                ofstream SSTable;
-                SSTable.open("../store/SSTable"+to_string(t), ios::out | ios::trunc);           //config.DBPath
-                uint *key_index = new uint[bench->config->MemTable_capacity]{0};
-                int finish = 0;
-                clock_t time1,time2;
-                time1 = clock();
-                while(finish<bench->config->MemTable_capacity){
-                    finish = 0;
-                    __uint128_t temp_key = (__uint128_t)1<<126;
-                    box * temp_box;
-                    uint take_id =0;
-                    for(int i=0;i<bench->config->MemTable_capacity;i++){
-                        if( bench->h_keys[i][key_index[i]] == 0){              //empty kv
-                            finish++;
-                            continue;
-                        }
-                        if( temp_key > bench->h_keys[i][key_index[i]] ){
-                            temp_key = bench->h_keys[i][key_index[i]];
-                            temp_box = &bench->h_box_block[i][bench->h_values[i][key_index[i]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
-                            take_id = i;
-                            bench->h_keys[i][key_index[i]] = 0;                 //init
-                        }
-                    }
-                    if(finish<bench->config->MemTable_capacity){
-                        key_index[take_id]++;
-                        print_128(temp_key);
-                        cout<< ": "<< temp_box->low[0] << endl;
-                        SSTable.write((char *)&temp_key, sizeof(__uint128_t));
-                        SSTable.write((char *) temp_box, sizeof(box));
-                    }
-                }
-
-                time2 = clock();
-                double this_time = (double)(time2-time1)/CLOCKS_PER_SEC;
-                cout<<"merge sort t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
-                for(int i=0;i<bench->config->MemTable_capacity;i++){
-                    cout<<"key_index"<<key_index[i]<<endl;
-                }
-                delete[] key_index;
-
-                SSTable.flush();
-                SSTable.close();
-
-                //init
                 bench->MemTable_count = 0;
-                for(uint i=0;i<bench->config->MemTable_capacity;i++){                   //useless
-                    for(uint j=bench->config->kv_restriction; j < bench->config->kv_capacity ; j++){
-                        bench->h_keys[i][j] = 0;
-                    }
-                }
-
-//                ifstream read_f;
-//                read_f.open("SSTable377");
-//                for(int i=0;i<100;i++){
-//                    __uint128_t first_key;
-//                    box first_box;
-//                    read_f.read((char *)&first_key, sizeof(__uint128_t));
-//                    read_f.read((char *)&first_box, sizeof(box));
-//                    print_128(first_key);
-//                    cout<< ": "<< first_box.low[0] << endl;
-//                }
+                cout<<"dump begin time: "<<bench->cur_time<<endl;
+                thread bg_t(sst_dump,bench);
+                bg_t.detach();
             }
+
+
+//            if(bench->MemTable_count==bench->config->MemTable_capacity){
+//                //merge sort can be optimized, since they are always kv_restriction now.
+//
+//                ofstream SSTable_of;
+//                SSTable_of.open("../store/SSTable" + to_string(t), ios::out | ios::trunc);           //config.DBPath
+//                uint *key_index = new uint[bench->config->MemTable_capacity]{0};
+//                int finish = 0;
+//                clock_t time1,time2;
+//                time1 = clock();
+//                while(finish<bench->config->MemTable_capacity){
+//                    finish = 0;
+//                    __uint128_t temp_key = (__uint128_t)1<<126;
+//                    box * temp_box;
+//                    uint take_id =0;
+//                    for(int i=0;i<bench->config->MemTable_capacity;i++){
+//                        if( bench->h_keys[i][key_index[i]] == 0){              //empty kv
+//                            finish++;
+//                            continue;
+//                        }
+//                        if( temp_key > bench->h_keys[i][key_index[i]] ){
+//                            temp_key = bench->h_keys[i][key_index[i]];
+//                            temp_box = &bench->h_box_block[i][bench->h_values[i][key_index[i]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
+//                            take_id = i;
+//                            bench->h_keys[i][key_index[i]] = 0;                 //init
+//                        }
+//                    }
+//                    if(finish<bench->config->MemTable_capacity){
+//                        key_index[take_id]++;
+//                        print_128(temp_key);
+//                        cout<< ": "<< temp_box->low[0] << endl;
+//                        SSTable_of.write((char *)&temp_key, sizeof(__uint128_t));
+//                        SSTable_of.write((char *) temp_box, sizeof(box));
+//                    }
+//                }
+//
+//                time2 = clock();
+//                double this_time = (double)(time2-time1)/CLOCKS_PER_SEC;
+//                cout<<"merge sort t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
+//                for(int i=0;i<bench->config->MemTable_capacity;i++){
+//                    cout<<"key_index"<<key_index[i]<<endl;
+//                }
+//                delete[] key_index;
+//
+//                SSTable_of.flush();
+//                SSTable_of.close();
+//
+//                //init
+//                bench->MemTable_count = 0;
+//                for(uint i=0;i<bench->config->MemTable_capacity;i++){                   //useless
+//                    for(uint j=bench->config->kv_restriction; j < bench->config->kv_capacity ; j++){
+//                        bench->h_keys[i][j] = 0;
+//                    }
+//                }
+//
+////                ifstream read_f;
+////                read_f.open("SSTable377");
+////                for(int i=0;i<100;i++){
+////                    __uint128_t first_key;
+////                    box first_box;
+////                    read_f.read((char *)&first_key, sizeof(__uint128_t));
+////                    read_f.read((char *)&first_box, sizeof(box));
+////                    print_128(first_key);
+////                    cout<< ": "<< first_box.low[0] << endl;
+////                }
+//            }
 
 			if(config->analyze_grid||config->profile){
 				bench->analyze_grids();
@@ -349,8 +480,8 @@ void tracer::process(){
 //                for (int i = 0; i < bench->meeting_counter; i++) {
 //                    //fprintf(stdout,"(%d,%d) %d-%d (%f,%f); ",bench->meetings[i].get_pid1(),bench->meetings[i].get_pid2(),bench->meetings[i].start,bench->meetings[i].end,bench->meetings[i].midpoint.x,bench->meetings[i].midpoint.y);
 //                    fprintf(stdout, "%zu (%f,%f)(%f,%f)|%d-%d;", bench->meetings[i].key,
-//                            bench->meetings[i].mbr.low[0], bench->meetings[i].mbr.low[1], bench->meetings[i].mbr.high[0], bench->meetings[i].mbr.high[1],
-//                            bench->meetings[i].start, bench->meetings[i].end);
+//                            bench->meetings[i].mbr.ow[0], bench->meetings[i].mbr.low[1], bench->meetings[i].mbr.high[0], bench->meetings[i].mbr.high[1],
+//                            bench->meetings[i].start, benlch->meetings[i].end);
 //                }
 //                fprintf(stdout, "\n");
 //            }
@@ -408,81 +539,92 @@ void tracer::trace_process(){
 #endif
             }
 
-            for(int i=0;i<bench->search_count;i++){
-                if(bench->search_list[i].target>0)
-                    cout<< bench->search_list[i].pid<<"-"<<bench->search_list[i].target<<"-"<<bench->search_list[i].start<<"-"<<bench->search_list[i].end<<endl;
-                if(bench->MemTable_count>0){
-                    if(BloomFilter_Check(bench, 0 ,bench->search_list[i].pid)){
-                        cout<< bench->search_list[i].pid <<"BloomFilter_Check :"<<endl;
-                    }
-                }
-            }
-
-            if(bench->MemTable_count==bench->config->MemTable_capacity){
-                //merge sort can be optimized, since they are always kv_restriction now.
-
-                ofstream SSTable;
-                SSTable.open("../store/SSTable"+to_string(t), ios::out | ios::trunc);           //config.DBPath
-                uint *key_index = new uint[bench->config->MemTable_capacity]{0};
-                int finish = 0;
-                clock_t time1,time2;
-                time1 = clock();
-                while(finish<bench->config->MemTable_capacity){
-                    finish = 0;
-                    __uint128_t temp_key = (__uint128_t)1<<126;
-                    box * temp_box;
-                    uint take_id =0;
-                    for(int i=0;i<bench->config->MemTable_capacity;i++){
-                        if( bench->h_keys[i][key_index[i]] == 0){              //empty kv
-                            finish++;
-                            continue;
-                        }
-                        if( temp_key > bench->h_keys[i][key_index[i]] ){
-                            temp_key = bench->h_keys[i][key_index[i]];
-                            temp_box = &bench->h_box_block[i][bench->h_values[i][key_index[i]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
-                            take_id = i;
-                            bench->h_keys[i][key_index[i]] = 0;                 //init
-                        }
-                    }
-                    if(finish<bench->config->MemTable_capacity){
-                        key_index[take_id]++;
-                        print_128(temp_key);
-                        cout<< ": "<< temp_box->low[0] << endl;
-                        SSTable.write((char *)&temp_key, sizeof(__uint128_t));
-                        SSTable.write((char *) temp_box, sizeof(box));
-                    }
-                }
-
-                time2 = clock();
-                double this_time = (double)(time2-time1)/CLOCKS_PER_SEC;
-                cout<<"merge sort t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
-                for(int i=0;i<bench->config->MemTable_capacity;i++){
-                    cout<<"key_index"<<key_index[i]<<endl;
-                }
-                delete[] key_index;
-
-                SSTable.flush();
-                SSTable.close();
-
-                //init
-                bench->MemTable_count = 0;
-                for(uint i=0;i<bench->config->MemTable_capacity;i++){                   //useless
-                    for(uint j=bench->config->kv_restriction; j < bench->config->kv_capacity ; j++){
-                        bench->h_keys[i][j] = 0;
-                    }
-                }
-
-//                ifstream read_f;
-//                read_f.open("SSTable377");
-//                for(int i=0;i<100;i++){
-//                    __uint128_t first_key;
-//                    box first_box;
-//                    read_f.read((char *)&first_key, sizeof(__uint128_t));
-//                    read_f.read((char *)&first_box, sizeof(box));
-//                    print_128(first_key);
-//                    cout<< ": "<< first_box.low[0] << endl;
+//            for(int i=0;i<bench->search_count;i++){
+//                if(bench->search_list[i].target>0)
+//                    cout<< bench->search_list[i].pid<<"-"<<bench->search_list[i].target<<"-"<<bench->search_list[i].start<<"-"<<bench->search_list[i].end<<endl;
+//                if(bench->MemTable_count>0){
+//                    if(BloomFilter_Check(bench, 0 ,bench->search_list[i].pid)){
+//                        cout<< bench->search_list[i].pid <<"BloomFilter_Check :"<<endl;
+//                    }
 //                }
-            }
+//            }
+
+//            if(bench->MemTable_count==bench->config->MemTable_capacity){
+//                cout<<"dump begin time: "<<bench->cur_time<<endl;
+//                pthread_t bg_thread;
+//                int ret;
+//                if ((ret=pthread_create(&bg_thread,NULL,sst_dump,(void*)bench)) != 0){
+//                    fprintf(stderr,"pthread_create:%s\n",strerror(ret));
+//                    exit(1);
+//                }
+//            }
+
+
+//            if(bench->MemTable_count==bench->config->MemTable_capacity){
+//                //merge sort can be optimized, since they are always kv_restriction now.
+//
+//                ofstream SSTable_of;
+//                SSTable_of.open("../store/SSTable_of" + to_string(t), ios::out | ios::trunc);           //config.DBPath
+//                uint *key_index = new uint[bench->config->MemTable_capacity]{0};
+//                int finish = 0;
+//                clock_t time1,time2;
+//                time1 = clock();
+//                while(finish<bench->config->MemTable_capacity){
+//                    finish = 0;
+//                    __uint128_t temp_key = (__uint128_t)1<<126;
+//                    box * temp_box;
+//                    uint take_id =0;
+//                    for(int i=0;i<bench->config->MemTable_capacity;i++){
+//                        if( bench->h_keys[i][key_index[i]] == 0){              //empty kv
+//                            finish++;
+//                            continue;
+//                        }
+//                        if( temp_key > bench->h_keys[i][key_index[i]] ){
+//                            temp_key = bench->h_keys[i][key_index[i]];
+//                            temp_box = &bench->h_box_block[i][bench->h_values[i][key_index[i]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
+//                            take_id = i;
+//                            bench->h_keys[i][key_index[i]] = 0;                 //init
+//                        }
+//                    }
+//                    if(finish<bench->config->MemTable_capacity){
+//                        key_index[take_id]++;
+//                        print_128(temp_key);
+//                        cout<< ": "<< temp_box->low[0] << endl;
+//                        SSTable_of.write((char *)&temp_key, sizeof(__uint128_t));
+//                        SSTable_of.write((char *) temp_box, sizeof(box));
+//                    }
+//                }
+//
+//                time2 = clock();
+//                double this_time = (double)(time2-time1)/CLOCKS_PER_SEC;
+//                cout<<"merge sort t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
+//                for(int i=0;i<bench->config->MemTable_capacity;i++){
+//                    cout<<"key_index"<<key_index[i]<<endl;
+//                }
+//                delete[] key_index;
+//
+//                SSTable_of.flush();
+//                SSTable_of.close();
+//
+//                //init
+//                bench->MemTable_count = 0;
+//                for(uint i=0;i<bench->config->MemTable_capacity;i++){                   //useless
+//                    for(uint j=bench->config->kv_restriction; j < bench->config->kv_capacity ; j++){
+//                        bench->h_keys[i][j] = 0;
+//                    }
+//                }
+//
+////                ifstream read_f;
+////                read_f.open("SSTable377");
+////                for(int i=0;i<100;i++){
+////                    __uint128_t first_key;
+////                    box first_box;
+////                    read_f.read((char *)&first_key, sizeof(__uint128_t));
+////                    read_f.read((char *)&first_box, sizeof(box));
+////                    print_128(first_key);
+////                    cout<< ": "<< first_box.low[0] << endl;
+////                }
+//            }
 
 
             if (config->analyze_grid || config->profile) {

@@ -28,13 +28,14 @@ class tracer{
 	// for query
 	configuration *config = NULL;
 	partitioner *part = NULL;
-	workbench *bench = NULL;
+	//workbench *bench = NULL;
     trace_generator *generator = NULL;
 #ifdef USE_GPU
 	gpu_info *gpu = NULL;
 	workbench *d_bench = NULL;
 #endif
 public:
+    workbench *bench = NULL;
 	box mbr;
 	tracer(configuration *conf, box &b, Point *t, trace_generator *gen);
 	tracer(configuration *conf);

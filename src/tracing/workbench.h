@@ -12,6 +12,7 @@
 #include "../util/query_context.h"
 #include "../geometry/geometry.h"
 #include "../index/QTree.h"
+#include "step_merge.h"
 
 typedef struct profiler{
 	double copy_time = 0;
@@ -170,6 +171,8 @@ public:
     //space for search list
     search_info_unit * search_list = NULL;
     uint search_count = 0;
+
+    sorted_run *bg_run = NULL;
 
 	// the temporary space
 	uint *tmp_space = NULL;
