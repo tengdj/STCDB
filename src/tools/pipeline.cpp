@@ -1,12 +1,6 @@
 #include "../geometry/Map.h"
-#include "../util/config.h"
-#include <vector>
-#include <stdlib.h>
 #include "../tracing/generator.h"
 #include "../tracing/trace.h"
-//#include <unistd.h>
-#include <chrono>
-#include <thread>
 
 using namespace std;
 
@@ -19,7 +13,6 @@ int main(int argc, char **argv){
     Point *traces = new Point[config.num_objects*100];
     tracer *t = new tracer(&config, *m->getMBR(), traces, gen);
     t->process();
-
 
     delete []traces;
     delete gen;

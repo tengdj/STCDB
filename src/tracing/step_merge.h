@@ -23,15 +23,20 @@ typedef struct SSTable{
     key_value kv[218454];                  //44739243 * 5 / 1024 = 218454 (Round up)
 }SSTable;
 
-class sorted_run {
+class sorted_run {                          //10G
 
 public:
     SSTable * sst = NULL;
     uint SSTable_count = 1024;
-    uint SSTable_size = 10*1024*1024;
+    uint SSTable_size = 10*1024*1024;       //useless
+    uint SSTable_kv_capacity = 218454;
     uint *first_pid = NULL;
-    uint timestamp_max = 0;
     uint timestamp_min = 0;
+    uint timestamp_max = 0;
+
+    void print_meta(){
+        fprintf(stdout,"SSTable_count:%d timestamp_min:%d timestamp_max:%d\n",SSTable_count,timestamp_min,timestamp_max);
+    }
 };
 
 #endif

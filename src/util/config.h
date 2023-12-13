@@ -47,8 +47,8 @@ public:
     bool profile = false;
 
     //added
-    uint kv_capacity = 100000;            //45000000
-    uint kv_restriction = 44739;                  //44739243
+    uint kv_capacity = 45000000;            //45000000
+    uint kv_restriction = 44739243;                  //44739243
     uint MemTable_capacity = 5;             //5*2
 
     bool search_kv = true;

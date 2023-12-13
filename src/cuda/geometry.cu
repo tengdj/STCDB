@@ -111,9 +111,6 @@ void cuda_reset_bench(workbench *bench){
 	bench->merge_list_index = 0;
 }
 
-
-
-
 __global__
 void cuda_clean_buckets(workbench *bench){
 	size_t bid = blockIdx.x*blockDim.x+threadIdx.x;
@@ -493,8 +490,8 @@ void cuda_identify_meetings(workbench *bench) {
                     pid = target;
                     target = swap;
                 }
-                if(pid==0)                              //key of 0 is shorter, not easy to read
-                    continue;
+//                if(pid==0)                              //key of 0 is shorter, not easy to read. But for Correctness, reserve 0
+//                    continue;
 
 //            string str_key = to_string(pid) +
 //                             get_prefix0(8 - to_string(target).length()) + to_string(target) +

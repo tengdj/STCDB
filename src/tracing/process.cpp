@@ -182,11 +182,10 @@ void tracer::print_traces(){
 }
 
 inline bool BloomFilter_Check(workbench *bench, uint sst, uint pid){
-    int i;
     uint pdwHashPos;
     uint64_t hash1, hash2;
     int ret;
-    for (i = 0; i < bench->dwHashFuncs; i++){
+    for (int i = 0; i < bench->dwHashFuncs; i++){
         hash1 = MurmurHash2_x64((const void *)&pid, sizeof(uint), bench->dwSeed);
         hash2 = MurmurHash2_x64((const void *)&pid, sizeof(uint), MIX_UINT64(hash1));
         pdwHashPos = (hash1 + i*hash2) % bench->dwFilterBits;
@@ -200,6 +199,8 @@ inline bool BloomFilter_Check(workbench *bench, uint sst, uint pid){
 void *sst_dump(void *arg){
     cout<<"step into the sst_dump"<<endl;
     workbench *bench = (workbench *)arg;
+    cout<<"cur_time: "<<bench->cur_time<<endl;
+    bench->bg_run = new sorted_run;
     bench->bg_run->first_pid = new uint[bench->bg_run->SSTable_count];
 
     //merge sort
@@ -207,13 +208,12 @@ void *sst_dump(void *arg){
     //bool of_open = false;
     uint kv_count = 0;
     uint sst_count = 0;
-    uint sst_capacity = 2185;             //218454
+    uint sst_capacity = 218454;             //218454
     uint t_min = 3600*24*14;
     uint t_max = 0;
 
     uint *key_index = new uint[bench->config->MemTable_capacity]{0};
     int finish = 0;
-    SSTable sst;
     clock_t time1,time2;
     time1 = clock();
     while(finish<bench->config->MemTable_capacity){
@@ -233,10 +233,10 @@ void *sst_dump(void *arg){
                 temp_key = bench->h_keys[i][key_index[i]];
                 temp_box = &bench->h_box_block[i][bench->h_values[i][key_index[i]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
                 take_id = i;
-                bench->h_keys[i][key_index[i]] = 0;                 //init
             }
         }
         if(finish<bench->config->MemTable_capacity){
+            bench->h_keys[take_id][key_index[take_id]] = 0;                                     //init
             key_index[take_id]++;                                                   // one while, one kv
             if(kv_count==0){
                 bench->bg_run->first_pid[sst_count] = temp_key/100000000 / 100000000 / 100000000;
@@ -250,8 +250,8 @@ void *sst_dump(void *arg){
             if(t_max<end){
                 t_max = end;
             }
-            print_128(temp_key);
-            cout<< ": "<< temp_box->low[0] << endl;
+//            print_128(temp_key);
+//            cout<< ": "<< temp_box->low[0] << endl;
             SSTable_of.write((char *)&temp_key, sizeof(__uint128_t));
             SSTable_of.write((char *) temp_box, sizeof(box));
         }
@@ -272,9 +272,128 @@ void *sst_dump(void *arg){
     delete[] key_index;
     bench->bg_run->timestamp_max = t_min;
     bench->bg_run->timestamp_max = t_max;
-
+    bench->bg_run->print_meta();
     return NULL;
 }
+
+////range query
+//bool search_SSTable(SSTable *ST, uint pid) {
+//    int low = 0;
+//    int find = -1;
+//    int high = 218454 - 1;
+//    int mid;
+//    uint temp_pid;
+//    while (low <= high) {
+//        mid = (low + high) / 2;
+//        temp_pid = ST->kv[mid].key/100000000 / 100000000 / 100000000;
+//        if ( temp_pid == pid){
+//            find = mid;
+//        }
+//        else if (temp_pid > pid){
+//            high = mid - 1;
+//        }
+//        else {
+//            low = mid + 1;
+//        }
+//    }
+//    if(find==-1){
+//        return false;
+//    }
+//    uint cursor = find;
+//    while(temp_pid==pid&&cursor>=1){
+//        cursor--;
+//        temp_pid = ST->kv[cursor].key/100000000 / 100000000 / 100000000;
+//    }
+//    if(temp_pid==pid&&cursor==0){
+//        print_128(ST->kv[0].key);
+//    }
+//    while(cursor+1<218454){
+//        cursor++;
+//        temp_pid = ST->kv[cursor].key/100000000 / 100000000 / 100000000;
+//        if(temp_pid==pid){
+//            print_128(ST->kv[cursor].key);
+//        }
+//    }
+//    return true;
+//}
+//
+//bool search_in_disk(workbench *bench, uint pid){
+//    ifstream read_sst;
+//
+//    //binary search
+//    int low = 0;
+//    int find = -1;
+//    int high = bench->bg_run->SSTable_count - 1;
+//    int mid;
+//    while (low <= high) {
+//        mid = (low + high) / 2;
+//        if (bench->bg_run->first_pid[mid] == pid){
+//            find = mid;
+//        }
+//        else if (bench->bg_run->first_pid[mid] > pid){
+//            high = mid - 1;
+//        }
+//        else {
+//            low = mid + 1;
+//        }
+//    }
+//    if(find==-1){
+//        SSTable ST;
+//        read_sst.open("../store/SSTable"+ to_string(mid));                   //final place is not high+1, but mid; usually mid == high+1
+//        read_sst.read((char *)&ST,sizeof(SSTable));
+//        return search_SSTable(&ST, pid);
+//    }
+//
+//    //for the case, there are many SSTables that first_pid==pid
+//    bench->bg_run->sst = new SSTable[bench->bg_run->SSTable_count];
+//    //find start and end
+//    uint pid_start = find,pid_end = find;           //=mid
+//    while(pid_start>=1){
+//        pid_start--;
+//        if(bench->bg_run->first_pid[pid_start]!=find){
+//            break;
+//        }
+//    }
+//    read_sst.open("../store/SSTable"+ to_string(pid_start));
+//    read_sst.read((char *)&bench->bg_run->sst[pid_start],sizeof(SSTable));
+//    search_SSTable(&bench->bg_run->sst[pid_start], pid);
+//    uint cursor = pid_start;
+//    uint temp_pid;
+//    while(true){
+//        if(cursor+1<bench->bg_run->SSTable_count){
+//            read_sst.open("../store/SSTable"+ to_string(cursor));
+//            read_sst.read((char *)&bench->bg_run->sst[cursor],sizeof(SSTable));
+//            search_SSTable(&bench->bg_run->sst[cursor], pid);
+//        }
+//        else break;
+//        if(bench->bg_run->first_pid[cursor+1]!=find){               //must shut down in this cursor
+//            uint index = 0;
+//            while(index<=218454 - 1){
+//                temp_pid = bench->bg_run->sst[cursor].kv[index].key/100000000 / 100000000 / 100000000;
+//                if(temp_pid==pid){
+//                    print_128(bench->bg_run->sst[cursor].kv[index].key);
+//                }
+//                else break;
+//                index++;
+//            }
+//            break;
+//        }
+//        if(bench->bg_run->first_pid[cursor+1]==find){               //mustn't shut down in this cursor
+//            for(uint i=0;i<218454;i++){
+//                print_128(bench->bg_run->sst[cursor].kv[i].key);
+//            }
+//        }
+//        cursor++;
+//    }
+//    return true;
+//
+//}
+
+//bool searchkv_in_all_place(workbench *bench, uint pid){
+//    //search_in_gpu
+//    //search_in_memory
+//    return search_in_disk(bench, pid);
+//}
 
 #ifdef USE_GPU
 workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu);
@@ -370,24 +489,35 @@ void tracer::process(){
 //            }
 
 
-//            if(bench->MemTable_count==bench->config->MemTable_capacity){
-//                cout<<"dump begin time: "<<bench->cur_time<<endl;
-//                pthread_t bg_thread;
-//                int ret;
-//                if ((ret=pthread_create(&bg_thread,NULL,sst_dump,(void*)bench)) != 0){
-//                    fprintf(stderr,"pthread_create:%s\n",strerror(ret));
-//                    exit(1);
-//                }
-//                pthread_detach(bg_thread);
-//                //pthread_join(bg_thread, NULL);
-
-
-            if(bench->MemTable_count==bench->config->MemTable_capacity){
+            if(bench->MemTable_count==bench->config->MemTable_capacity) {
                 bench->MemTable_count = 0;
-                cout<<"dump begin time: "<<bench->cur_time<<endl;
-                thread bg_t(sst_dump,bench);
-                bg_t.detach();
+                cout << "dump begin time: " << bench->cur_time << endl;
+                for(int i=0;i<bench->config->MemTable_capacity;i++){
+                    for(int j=0;j<10;j++){
+                        print_128(bench->h_keys[i][j]);
+                        cout<<endl;
+                    }
+                    cout<<endl;
+                }
+                pthread_t bg_thread;
+                int ret;
+                if ((ret = pthread_create(&bg_thread, NULL, sst_dump, (void *) bench)) != 0) {
+                    fprintf(stderr, "pthread_create:%s\n", strerror(ret));
+                    exit(1);
+                }
+                //pthread_create(&bg_thread, NULL, sst_dump, (void *) bench);
+                //pthread_detach(bg_thread);
+
+                //bool findit = searchkv_in_all_place(bench, 2);
             }
+
+//            if(bench->MemTable_count==bench->config->MemTable_capacity){
+//                bench->MemTable_count = 0;
+//                cout<<"dump begin time: "<<bench->cur_time<<endl;
+//                int a = 0;
+//                thread bg_t(sst_dump,bench);
+//                bg_t.detach();
+//            }
 
 
 //            if(bench->MemTable_count==bench->config->MemTable_capacity){
