@@ -317,7 +317,10 @@ void *sst_dump(void *arg){
 //    return true;
 //}
 //
-//bool search_in_disk(workbench *bench, uint pid){
+//bool search_in_disk(void *arg){
+//    workbench *bench = (workbench *)arg;
+//    uint pid =100000;
+//    cout<<"into disk"<<endl;
 //    ifstream read_sst;
 //
 //    //binary search
@@ -779,3 +782,19 @@ void tracer::trace_process(){
     }
     //bench->print_profile();
 }
+
+
+//void tracer::searchsst_process(){
+//    cout<<"into searchsst_process"<<endl;
+//    struct timeval start = get_cur_time();
+//    generator->generate_trace(trace);
+//    bench = part->build_schema(trace, config->num_objects);
+//    cout<<"build_schema"<<endl;
+//    bench->mbr = mbr;
+//    //search_in_disk(bench);
+//    thread bg_t(search_in_disk,bench);
+//    bg_t.detach();
+////    thread bg_t(sst_dump,bench);
+////    bg_t.detach();
+//
+//}

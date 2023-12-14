@@ -51,6 +51,7 @@ public:
 
 	void process();
     void trace_process();
+    void searchsst_process();
 
 };
 
