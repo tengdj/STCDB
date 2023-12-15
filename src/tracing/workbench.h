@@ -172,7 +172,9 @@ public:
     search_info_unit * search_list = NULL;
     uint search_count = 0;
 
+    //big sorted run
     sorted_run *bg_run = NULL;
+    uint big_sorted_run_count = 0;
 
 	// the temporary space
 	uint *tmp_space = NULL;

@@ -47,17 +47,19 @@ public:
     bool profile = false;
 
     //added
+    bool load_data = true;
+
     uint kv_capacity = 45000000;            //45000000
     uint kv_restriction = 44739243;                  //44739243
-    uint MemTable_capacity = 5;             //5*2
+    uint small_sorted_run_capacity = 10;             //5*2          //MemTable
+
+    uint big_sorted_run_capacity = 100;
 
     bool search_kv = true;
     uint search_list_capacity = 1000;
 
     bool bloom_filter = true;
     double false_positive_rate = 0.0004;
-
-
 
     void print(){
         fprintf(stderr,"configuration:\n");

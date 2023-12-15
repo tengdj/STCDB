@@ -177,7 +177,7 @@ int main(int argc, char **argv){
     cout<<endl;
     read_meta.close();
     cout<<"before func"<<endl;
-    uint pid = 9990364;
+    uint pid = 0;
     if(search_in_disk(bg_run,pid)){
         cout<<"finally find"<<endl;
     }

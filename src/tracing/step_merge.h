@@ -30,7 +30,6 @@ public:
     SSTable * sst = NULL;
     uint SSTable_count = 1024;
     uint SSTable_size = 10*1024*1024;       //10M   useless
-    //uint SSTable_kv_capacity = 218454;
     uint *first_pid = NULL;
     uint timestamp_min = 0;
     uint timestamp_max = 0;

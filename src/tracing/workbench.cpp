@@ -125,17 +125,17 @@ void workbench::claim_space(){
 //		meeting_buckets[i].key = ULL_MAX;
 //	}
 
-    size = config->MemTable_capacity*sizeof(__uint128_t *);                 //sort
+    size = config->small_sorted_run_capacity * sizeof(__uint128_t *);                 //sort
     h_keys = (__uint128_t **)allocate(size);
     //log("\t%.2f MB\tmeeting bucket space",size/1024.0/1024.0);
 
-    size = config->MemTable_capacity*sizeof(uint *);
+    size = config->small_sorted_run_capacity * sizeof(uint *);
     h_values = (uint **)allocate(size);
 
-    size = config->MemTable_capacity*sizeof(box *);
+    size = config->small_sorted_run_capacity * sizeof(box *);
     h_box_block = (box **)allocate(size);
 
-    for(int i=0;i<config->MemTable_capacity;i++){
+    for(int i=0;i<config->small_sorted_run_capacity; i++){
         size = config->kv_capacity*sizeof(__uint128_t);
         h_keys[i] = (__uint128_t *)allocate(size);
         log("\t%.2f MB\ta element of h_keys",size/1024.0/1024.0);
@@ -153,16 +153,19 @@ void workbench::claim_space(){
     search_list = (search_info_unit *)allocate(size);
 
     if(config->bloom_filter) {
-        size = config->MemTable_capacity * sizeof(unsigned char *);                       //bloom
+        size = config->small_sorted_run_capacity * sizeof(unsigned char *);                       //bloom
         pstFilter = (unsigned char **) allocate(size);
 
 #pragma omp parallel for
-        for (int i = 0; i < config->MemTable_capacity; i++) {
+        for (int i = 0; i < config->small_sorted_run_capacity; i++) {
             size = dwFilterSize;
             pstFilter[i] = (unsigned char *) allocate(size);
             log("\t%.2f MB\ta pstFilter", size / 1024.0 / 1024.0);
             memset(pstFilter[i], 0, dwFilterSize);
         }
     }
+
+    size = config->big_sorted_run_capacity*sizeof(sorted_run);                   //search
+    bg_run = (sorted_run *)allocate(size);
 
 }
