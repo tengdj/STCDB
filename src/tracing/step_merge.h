@@ -19,10 +19,14 @@ typedef struct key_value{
     box value;
 }key_value;
 
-typedef struct SSTable{
+class SSTable{
+
+public:
     key_value *kv = NULL;                  //44739243 * 5 / 1024 = 218454 (Round up)
     uint SSTable_kv_capacity = 218454;
-}SSTable;
+
+    bool search_SSTable(uint pid);
+};
 
 class sorted_run {                          //10G
 
@@ -37,6 +41,7 @@ public:
     void print_meta(){
         fprintf(stdout,"SSTable_count:%d timestamp_min:%d timestamp_max:%d\n",SSTable_count,timestamp_min,timestamp_max);
     }
+    bool search_in_disk(uint pid);
 };
 
 #endif

@@ -6,8 +6,6 @@
  */
 
 #include "trace.h"
-#include "../index/QTree.h"
-#include "step_merge.h"
 
 
 /*
@@ -199,9 +197,13 @@ inline bool BloomFilter_Check(workbench *bench, uint sst, uint pid){
 void *sst_dump(void *arg){
     cout<<"step into the sst_dump"<<endl;
     workbench *bench = (workbench *)arg;
+    assert(bench->config->MemTable_capacity%2==0);
     cout<<"cur_time: "<<bench->cur_time<<endl;
-    bench->bg_run = new sorted_run;
-    bench->bg_run->first_pid = new uint[bench->bg_run->SSTable_count];
+    uint offset = 0;
+    if(bench->big_sorted_run_count%2==1){
+        offset = bench->config->big_sorted_run_capacity/2;
+    }
+    bench->bg_run[bench->big_sorted_run_count].first_pid = new uint[bench->bg_run[0].SSTable_count];
 
     //merge sort
     ofstream SSTable_of;
@@ -212,11 +214,11 @@ void *sst_dump(void *arg){
     uint t_min = 3600*24*14;
     uint t_max = 0;
 
-    uint *key_index = new uint[bench->config->small_sorted_run_capacity]{0};
+    uint *key_index = new uint[bench->config->MemTable_capacity/2]{0};
     int finish = 0;
     clock_t time1,time2;
     time1 = clock();
-    while(finish<bench->config->small_sorted_run_capacity){
+    while(finish<bench->config->MemTable_capacity/2){
         if(kv_count==0){
             SSTable_of.open("../store/SSTable" + to_string(sst_count), ios::out | ios::trunc);
         }
@@ -224,22 +226,22 @@ void *sst_dump(void *arg){
         __uint128_t temp_key = (__uint128_t)1<<126;
         box * temp_box;
         uint take_id =0;
-        for(int i=0;i<bench->config->small_sorted_run_capacity; i++){
-            if( bench->h_keys[i][key_index[i]] == 0){              //empty kv
+        for(int i=0;i<bench->config->MemTable_capacity/2; i++){
+            if( bench->h_keys[offset+i][key_index[i]] == 0){              //empty kv
                 finish++;
                 continue;
             }
-            if( temp_key > bench->h_keys[i][key_index[i]] ){
-                temp_key = bench->h_keys[i][key_index[i]];
-                temp_box = &bench->h_box_block[i][bench->h_values[i][key_index[i]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
+            if( temp_key > bench->h_keys[offset+i][key_index[i]] ){
+                temp_key = bench->h_keys[offset+i][key_index[i]];
+                temp_box = &bench->h_box_block[offset+i][bench->h_values[i][key_index[i]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
                 take_id = i;
             }
         }
-        if(finish<bench->config->small_sorted_run_capacity){
-            bench->h_keys[take_id][key_index[take_id]] = 0;                                     //init
+        if(finish<bench->config->MemTable_capacity/2){
+            bench->h_keys[offset+take_id][key_index[take_id]] = 0;                                     //init
             key_index[take_id]++;                                                   // one while, one kv
             if(kv_count==0){
-                bench->bg_run->first_pid[sst_count] = temp_key/100000000 / 100000000 / 100000000;
+                bench->bg_run[bench->big_sorted_run_count].first_pid[sst_count] = temp_key/100000000 / 100000000 / 100000000;
             }
             kv_count++;
             uint end = temp_key % 100000000;
@@ -254,7 +256,7 @@ void *sst_dump(void *arg){
             SSTable_of.write((char *)&temp_key, sizeof(__uint128_t));
             SSTable_of.write((char *) temp_box, sizeof(box));
         }
-        if(kv_count==sst_capacity||finish==bench->config->small_sorted_run_capacity){
+        if(kv_count==sst_capacity||finish==bench->config->MemTable_capacity/2){
             SSTable_of.flush();
             SSTable_of.close();
             sst_count++;
@@ -265,137 +267,15 @@ void *sst_dump(void *arg){
     time2 = clock();
     double this_time = (double)(time2-time1)/CLOCKS_PER_SEC;
     cout<<"merge sort t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
-    for(int i=0;i<bench->config->small_sorted_run_capacity; i++){
+    for(int i=0;i<bench->config->MemTable_capacity/2; i++){
         cout<<"key_index"<<key_index[i]<<endl;
     }
     delete[] key_index;
-    bench->bg_run->timestamp_max = t_min;
-    bench->bg_run->timestamp_max = t_max;
-    bench->bg_run->print_meta();
+    bench->bg_run[bench->big_sorted_run_count].timestamp_max = t_min;
+    bench->bg_run[bench->big_sorted_run_count].timestamp_max = t_max;
+    bench->bg_run[bench->big_sorted_run_count].print_meta();
     return NULL;
 }
-
-////range query
-//bool search_SSTable(SSTable *ST, uint pid) {
-//    int low = 0;
-//    int find = -1;
-//    int high = 218454 - 1;
-//    int mid;
-//    uint temp_pid;
-//    while (low <= high) {
-//        mid = (low + high) / 2;
-//        temp_pid = ST->kv[mid].key/100000000 / 100000000 / 100000000;
-//        if ( temp_pid == pid){
-//            find = mid;
-//        }
-//        else if (temp_pid > pid){
-//            high = mid - 1;
-//        }
-//        else {
-//            low = mid + 1;
-//        }
-//    }
-//    if(find==-1){
-//        return false;
-//    }
-//    uint cursor = find;
-//    while(temp_pid==pid&&cursor>=1){
-//        cursor--;
-//        temp_pid = ST->kv[cursor].key/100000000 / 100000000 / 100000000;
-//    }
-//    if(temp_pid==pid&&cursor==0){
-//        print_128(ST->kv[0].key);
-//    }
-//    while(cursor+1<218454){
-//        cursor++;
-//        temp_pid = ST->kv[cursor].key/100000000 / 100000000 / 100000000;
-//        if(temp_pid==pid){
-//            print_128(ST->kv[cursor].key);
-//        }
-//    }
-//    return true;
-//}
-//
-//bool search_in_disk(void *arg){
-//    workbench *bench = (workbench *)arg;
-//    uint pid =100000;
-//    cout<<"into disk"<<endl;
-//    ifstream read_sst;
-//
-//    //binary search
-//    int low = 0;
-//    int find = -1;
-//    int high = bench->bg_run->SSTable_count - 1;
-//    int mid;
-//    while (low <= high) {
-//        mid = (low + high) / 2;
-//        if (bench->bg_run->first_pid[mid] == pid){
-//            find = mid;
-//        }
-//        else if (bench->bg_run->first_pid[mid] > pid){
-//            high = mid - 1;
-//        }
-//        else {
-//            low = mid + 1;
-//        }
-//    }
-//    if(find==-1){
-//        SSTable ST;
-//        read_sst.open("../store/SSTable"+ to_string(mid));                   //final place is not high+1, but mid; usually mid == high+1
-//        read_sst.read((char *)&ST,sizeof(SSTable));
-//        return search_SSTable(&ST, pid);
-//    }
-//
-//    //for the case, there are many SSTables that first_pid==pid
-//    bench->bg_run->sst = new SSTable[bench->bg_run->SSTable_count];
-//    //find start and end
-//    uint pid_start = find,pid_end = find;           //=mid
-//    while(pid_start>=1){
-//        pid_start--;
-//        if(bench->bg_run->first_pid[pid_start]!=find){
-//            break;
-//        }
-//    }
-//    read_sst.open("../store/SSTable"+ to_string(pid_start));
-//    read_sst.read((char *)&bench->bg_run->sst[pid_start],sizeof(SSTable));
-//    search_SSTable(&bench->bg_run->sst[pid_start], pid);
-//    uint cursor = pid_start;
-//    uint temp_pid;
-//    while(true){
-//        if(cursor+1<bench->bg_run->SSTable_count){
-//            read_sst.open("../store/SSTable"+ to_string(cursor));
-//            read_sst.read((char *)&bench->bg_run->sst[cursor],sizeof(SSTable));
-//            search_SSTable(&bench->bg_run->sst[cursor], pid);
-//        }
-//        else break;
-//        if(bench->bg_run->first_pid[cursor+1]!=find){               //must shut down in this cursor
-//            uint index = 0;
-//            while(index<=218454 - 1){
-//                temp_pid = bench->bg_run->sst[cursor].kv[index].key/100000000 / 100000000 / 100000000;
-//                if(temp_pid==pid){
-//                    print_128(bench->bg_run->sst[cursor].kv[index].key);
-//                }
-//                else break;
-//                index++;
-//            }
-//            break;
-//        }
-//        if(bench->bg_run->first_pid[cursor+1]==find){               //mustn't shut down in this cursor
-//            for(uint i=0;i<218454;i++){
-//                print_128(bench->bg_run->sst[cursor].kv[i].key);
-//            }
-//        }
-//        cursor++;
-//    }
-//    return true;
-//
-//}
-
-//bool searchkv_in_all_place(workbench *bench, uint pid){
-//    //search_in_gpu
-//    //search_in_memory
-//    return search_in_disk(bench, pid);
-//}
 
 #ifdef USE_GPU
 workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu);
@@ -434,7 +314,7 @@ void tracer::process(){
             if(bench->config->search_kv){
                 bench->search_count = 100;
                 for(int i=0;i<bench->search_count;i++){
-                    bench->search_list[i].pid = i;
+                    bench->search_list[i].pid = 10000+i;
                     bench->search_list[i].target = 0;
                     bench->search_list[i].start = 0;
                     bench->search_list[i].end = 0;
@@ -479,7 +359,7 @@ void tracer::process(){
 //                assert(0);
 //            }
 
-//            if(bench->MemTable_count==bench->config->small_sorted_run_capacity){
+//            if(bench->MemTable_count==bench->config->MemTable_capacity){
 //                bool *check_2G = new bool[10000000];
 //                int unique_count = 0;
 //                for(int j=0;j<bench->MemTable_count;j++){
@@ -496,101 +376,29 @@ void tracer::process(){
 //            }
 
 
-            if(bench->MemTable_count==bench->config->small_sorted_run_capacity) {
-                bench->MemTable_count = 0;
+            if(bench->MemTable_count==bench->config->MemTable_capacity/2) {
+                bench->MemTable_count = 0;                                  //0<MemTable_count<MemTable_capacity/2
                 cout << "dump begin time: " << bench->cur_time << endl;
-                for(int i=0;i<bench->config->small_sorted_run_capacity; i++){
+                for(int i=0;i<bench->config->MemTable_capacity/2; i++){
                     for(int j=0;j<10;j++){
                         print_128(bench->h_keys[i][j]);
                         cout<<endl;
                     }
                     cout<<endl;
                 }
+                struct timeval bg_start = get_cur_time();
                 pthread_t bg_thread;
                 int ret;
                 if ((ret = pthread_create(&bg_thread, NULL, sst_dump, (void *) bench)) != 0) {
                     fprintf(stderr, "pthread_create:%s\n", strerror(ret));
                     exit(1);
                 }
+                bench->pro.bg_merge_flush += get_time_elapsed(bg_start,false);
+                logt("merge sort and flush", bg_start);
                 bench->big_sorted_run_count++;
                 //pthread_detach(bg_thread);
                 //bool findit = searchkv_in_all_place(bench, 2);
             }
-
-//            if(bench->MemTable_count==bench->config->small_sorted_run_capacity){
-//                bench->MemTable_count = 0;
-//                cout<<"dump begin time: "<<bench->cur_time<<endl;
-//                int a = 0;
-//                thread bg_t(sst_dump,bench);
-//                bg_t.detach();
-//            }
-
-
-//            if(bench->MemTable_count==bench->config->small_sorted_run_capacity){
-//                //merge sort can be optimized, since they are always kv_restriction now.
-//
-//                ofstream SSTable_of;
-//                SSTable_of.open("../store/SSTable" + to_string(t), ios::out | ios::trunc);           //config.DBPath
-//                uint *key_index = new uint[bench->config->small_sorted_run_capacity]{0};
-//                int finish = 0;
-//                clock_t time1,time2;
-//                time1 = clock();
-//                while(finish<bench->config->small_sorted_run_capacity){
-//                    finish = 0;
-//                    __uint128_t temp_key = (__uint128_t)1<<126;
-//                    box * temp_box;
-//                    uint take_id =0;
-//                    for(int i=0;i<bench->config->small_sorted_run_capacity;i++){
-//                        if( bench->h_keys[i][key_index[i]] == 0){              //empty kv
-//                            finish++;
-//                            continue;
-//                        }
-//                        if( temp_key > bench->h_keys[i][key_index[i]] ){
-//                            temp_key = bench->h_keys[i][key_index[i]];
-//                            temp_box = &bench->h_box_block[i][bench->h_values[i][key_index[i]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
-//                            take_id = i;
-//                            bench->h_keys[i][key_index[i]] = 0;                 //init
-//                        }
-//                    }
-//                    if(finish<bench->config->small_sorted_run_capacity){
-//                        key_index[take_id]++;
-//                        print_128(temp_key);
-//                        cout<< ": "<< temp_box->low[0] << endl;
-//                        SSTable_of.write((char *)&temp_key, sizeof(__uint128_t));
-//                        SSTable_of.write((char *) temp_box, sizeof(box));
-//                    }
-//                }
-//
-//                time2 = clock();
-//                double this_time = (double)(time2-time1)/CLOCKS_PER_SEC;
-//                cout<<"merge sort t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
-//                for(int i=0;i<bench->config->small_sorted_run_capacity;i++){
-//                    cout<<"key_index"<<key_index[i]<<endl;
-//                }
-//                delete[] key_index;
-//
-//                SSTable_of.flush();
-//                SSTable_of.close();
-//
-//                //init
-//                bench->MemTable_count = 0;
-//                for(uint i=0;i<bench->config->small_sorted_run_capacity;i++){                   //useless
-//                    for(uint j=bench->config->kv_restriction; j < bench->config->kv_capacity ; j++){
-//                        bench->h_keys[i][j] = 0;
-//                    }
-//                }
-//
-////                ifstream read_f;
-////                read_f.open("SSTable377");
-////                for(int i=0;i<100;i++){
-////                    __uint128_t first_key;
-////                    box first_box;
-////                    read_f.read((char *)&first_key, sizeof(__uint128_t));
-////                    read_f.read((char *)&first_box, sizeof(box));
-////                    print_128(first_key);
-////                    cout<< ": "<< first_box.low[0] << endl;
-////                }
-//            }
 
 			if(config->analyze_grid||config->profile){
 				bench->analyze_grids();
@@ -624,8 +432,17 @@ void tracer::process(){
 
 		}
 	}
-	//bench->print_profile();
+	bench->print_profile();
 }
+
+
+
+
+
+
+
+
+
 
 //void tracer::trace_process(){
 //    struct timeval start = get_cur_time();
@@ -685,7 +502,7 @@ void tracer::process(){
 ////                }
 ////            }
 //
-////            if(bench->MemTable_count==bench->config->small_sorted_run_capacity){
+////            if(bench->MemTable_count==bench->config->MemTable_capacity){
 ////                cout<<"dump begin time: "<<bench->cur_time<<endl;
 ////                pthread_t bg_thread;
 ////                int ret;
@@ -696,21 +513,21 @@ void tracer::process(){
 ////            }
 //
 //
-////            if(bench->MemTable_count==bench->config->small_sorted_run_capacity){
+////            if(bench->MemTable_count==bench->config->MemTable_capacity){
 ////                //merge sort can be optimized, since they are always kv_restriction now.
 ////
 ////                ofstream SSTable_of;
 ////                SSTable_of.open("../store/SSTable_of" + to_string(t), ios::out | ios::trunc);           //config.DBPath
-////                uint *key_index = new uint[bench->config->small_sorted_run_capacity]{0};
+////                uint *key_index = new uint[bench->config->MemTable_capacity]{0};
 ////                int finish = 0;
 ////                clock_t time1,time2;
 ////                time1 = clock();
-////                while(finish<bench->config->small_sorted_run_capacity){
+////                while(finish<bench->config->MemTable_capacity){
 ////                    finish = 0;
 ////                    __uint128_t temp_key = (__uint128_t)1<<126;
 ////                    box * temp_box;
 ////                    uint take_id =0;
-////                    for(int i=0;i<bench->config->small_sorted_run_capacity;i++){
+////                    for(int i=0;i<bench->config->MemTable_capacity;i++){
 ////                        if( bench->h_keys[i][key_index[i]] == 0){              //empty kv
 ////                            finish++;
 ////                            continue;
@@ -722,7 +539,7 @@ void tracer::process(){
 ////                            bench->h_keys[i][key_index[i]] = 0;                 //init
 ////                        }
 ////                    }
-////                    if(finish<bench->config->small_sorted_run_capacity){
+////                    if(finish<bench->config->MemTable_capacity){
 ////                        key_index[take_id]++;
 ////                        print_128(temp_key);
 ////                        cout<< ": "<< temp_box->low[0] << endl;
@@ -734,7 +551,7 @@ void tracer::process(){
 ////                time2 = clock();
 ////                double this_time = (double)(time2-time1)/CLOCKS_PER_SEC;
 ////                cout<<"merge sort t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
-////                for(int i=0;i<bench->config->small_sorted_run_capacity;i++){
+////                for(int i=0;i<bench->config->MemTable_capacity;i++){
 ////                    cout<<"key_index"<<key_index[i]<<endl;
 ////                }
 ////                delete[] key_index;
@@ -744,7 +561,7 @@ void tracer::process(){
 ////
 ////                //init
 ////                bench->MemTable_count = 0;
-////                for(uint i=0;i<bench->config->small_sorted_run_capacity;i++){                   //useless
+////                for(uint i=0;i<bench->config->MemTable_capacity;i++){                   //useless
 ////                    for(uint j=bench->config->kv_restriction; j < bench->config->kv_capacity ; j++){
 ////                        bench->h_keys[i][j] = 0;
 ////                    }

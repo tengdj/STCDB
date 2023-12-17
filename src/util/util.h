@@ -21,6 +21,7 @@
 #include <math.h>
 #include <limits.h>
 #include <algorithm>
+#include <fstream>
 
 using namespace std;
 typedef unsigned int uint;

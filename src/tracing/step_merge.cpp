@@ -1,0 +1,164 @@
+/*
+ * workbench.cpp
+ *
+ *  Created on: Feb 18, 2021
+ *      Author: teng
+ */
+
+#include "workbench.h"
+
+//range query
+bool SSTable::search_SSTable(uint pid) {
+    cout<<"into search_SSTable"<<endl;
+    int find = -1;
+    int low = 0;
+    int high = SSTable_kv_capacity - 1;
+    int mid;
+    uint temp_pid;
+    while (low <= high) {
+        mid = (low + high) / 2;
+        temp_pid = kv[mid].key/100000000 / 100000000 / 100000000;
+        if ( temp_pid == pid){
+            find = mid;
+            break;
+        }
+        else if (temp_pid > pid){
+            high = mid - 1;
+        }
+        else {
+            low = mid + 1;
+        }
+    }
+    if(find==-1){
+        cout<<"cannot find"<<endl;
+        return false;
+    }
+    cout<<"exactly find"<<endl;
+    uint cursor = find;
+    while(temp_pid==pid&&cursor>=1){
+        cursor--;
+        temp_pid = kv[cursor].key/100000000 / 100000000 / 100000000;
+    }
+    if(temp_pid==pid&&cursor==0){
+        print_128(kv[0].key);
+        cout<<endl;
+    }
+    while(cursor+1<SSTable_kv_capacity){
+        cursor++;
+        temp_pid = kv[cursor].key/100000000 / 100000000 / 100000000;
+        if(temp_pid==pid){
+            print_128(kv[cursor].key);
+            cout<<endl;
+        }
+    }
+    cout<<"find !"<<endl;
+    return true;
+}
+
+bool sorted_run::search_in_disk(uint pid){                              //this pointer refers to a single sorted_run
+    cout<<"into disk"<<endl;
+    ifstream read_sst;
+
+    //high level binary search
+    int find = -1;
+    int low = 0;
+    int high = SSTable_count - 1;
+    int mid;
+    while (low <= high) {
+        mid = (low + high) / 2;
+        if (first_pid[mid] == pid){
+            find = mid;
+            break;
+        }
+        else if (first_pid[mid] > pid){
+            high = mid - 1;
+        }
+        else {
+            low = mid + 1;
+        }
+    }
+    if(find==-1){
+        read_sst.open("../store/SSTable"+ to_string(high));                   //final place is not high+1, but high
+        cout<<low<<"-"<<first_pid[low]<<endl;
+        cout<<mid<<"-"<<first_pid[mid]<<endl;
+        cout<<high<<"-"<<first_pid[high]<<endl;
+        read_sst.read((char *)sst[high].kv,sizeof(key_value)*sst[high].SSTable_kv_capacity);
+        read_sst.close();
+        return sst[high].search_SSTable(pid);
+    }
+    cout<<"high level binary search finish"<<endl;
+
+    //for the case, there are many SSTables that first_pid==pid
+    //find start and end
+    uint pid_start = find;
+    while(pid_start>=1){
+        pid_start--;
+        if(first_pid[pid_start]!=pid){
+            break;
+        }
+    }
+    read_sst.open("../store/SSTable"+ to_string(pid_start));
+    read_sst.read((char *)sst[pid_start].kv,sizeof(key_value)*sst[pid_start].SSTable_kv_capacity);
+    sst[pid_start].search_SSTable(pid);
+    read_sst.close();
+    uint cursor = pid_start+1;
+    uint temp_pid;
+    while(true){
+        read_sst.open("../store/SSTable"+ to_string(cursor));
+        read_sst.read((char *)sst[cursor].kv,sizeof(key_value)*sst[cursor].SSTable_kv_capacity);
+        read_sst.close();
+        if(cursor+1<SSTable_count){
+            if(first_pid[cursor+1]!=pid){               //must shut down in this cursor
+                uint index = 0;
+                while(index<=sst[cursor].SSTable_kv_capacity - 1){
+                    temp_pid = sst[cursor].kv[index].key/100000000 / 100000000 / 100000000;
+                    if(temp_pid==pid){
+                        print_128(sst[cursor].kv[index].key);
+                        cout<<endl;
+                    }
+                    else break;
+                    index++;
+                }
+                break;
+            }
+            if(first_pid[cursor+1]==pid){               //mustn't shut down in this cursor
+                for(uint i=0;i<sst[cursor].SSTable_kv_capacity;i++){
+                    print_128(sst[cursor].kv[i].key);
+                    cout<<endl;
+                }
+            }
+            cursor++;
+        }
+        else {                                           // cursor is the last one, same too bg_run->first_pid[cursor+1]!=pid
+            uint index = 0;
+            while(index<=sst[cursor].SSTable_kv_capacity - 1){
+                temp_pid = sst[cursor].kv[index].key/100000000 / 100000000 / 100000000;
+                if(temp_pid==pid){
+                    print_128(sst[cursor].kv[index].key);
+                    cout<<endl;
+                }
+                else break;
+                index++;
+            }
+            break;
+        }
+
+//        bool check = false;
+//        if(cursor+1<bg_run->SSTable_count){
+//            if(bg_run->first_pid[cursor+1]!=pid){
+//                check = true;
+//            }
+//        }
+//        if(cursor+1<bg_run->SSTable_count){
+//            check = true;
+//        }
+//        if(check){
+//            ...
+//            break;
+//        }
+//        else{
+//
+//        }
+    }
+    return true;
+}

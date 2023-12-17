@@ -39,6 +39,8 @@ typedef struct profiler{
 	size_t num_meetings = 0;
 
     double cuda_sort_time = 0;
+    double cuda_search_kv_time = 0;
+    double bg_merge_flush = 0;
 }profiler;
 
 typedef struct checking_unit{
@@ -86,7 +88,6 @@ typedef struct reach_unit{
 
 // the workbench where stores the memory space
 // used for processing
-
 
 class workbench{
 	pthread_mutex_t *insert_lk;

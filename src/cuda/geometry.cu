@@ -1057,6 +1057,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         // wrap raw pointer with a device_ptr
         thrust::device_ptr<__uint128_t> d_vector_keys = thrust::device_pointer_cast(h_bench.d_keys);
         thrust::device_ptr<uint> d_vector_values = thrust::device_pointer_cast(h_bench.d_values);
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("pointer_cast: ",start);
         // use device_ptr in Thrust algorithms
         thrust::sort_by_key(d_vector_keys, d_vector_keys + bench->config->kv_restriction, d_vector_values);
@@ -1065,31 +1066,36 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         check_execution();
         cudaDeviceSynchronize();
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-        bench->pro.cuda_sort_time = get_time_elapsed(start,false);
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("cuda_sort_time: ",start);
-        CUDA_SAFE_CALL(cudaMemcpy(bench->h_box_block[bench->MemTable_count], h_bench.d_box_block, bench->config->kv_restriction * sizeof(box), cudaMemcpyDeviceToHost));       //can be cpy before sort
-        CUDA_SAFE_CALL(cudaMemcpy(bench->h_keys[bench->MemTable_count], h_bench.d_keys, bench->config->kv_restriction * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
-        CUDA_SAFE_CALL(cudaMemcpy(bench->h_values[bench->MemTable_count], h_bench.d_values, bench->config->kv_restriction * sizeof(uint), cudaMemcpyDeviceToHost));
+        uint offset = 0;
+        if(bench->big_sorted_run_count%2==1){
+            offset = bench->config->big_sorted_run_capacity/2;
+        }
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_box_block[offset+bench->MemTable_count], h_bench.d_box_block, bench->config->kv_restriction * sizeof(box), cudaMemcpyDeviceToHost));       //can be cpy before sort
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_keys[offset+bench->MemTable_count], h_bench.d_keys, bench->config->kv_restriction * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_values[offset+bench->MemTable_count], h_bench.d_values, bench->config->kv_restriction * sizeof(uint), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("cudaMemcpy kv",start);
 //        printf("cudaMemcpy kv right\n");
-//        print_128(bench->h_keys[bench->MemTable_count][10]);
+//        print_128(bench->h_keys[offset+bench->MemTable_count][10]);
 //        printf("\n");
-//        print_128(bench->h_keys[bench->MemTable_count][11]);
+//        print_128(bench->h_keys[offset+bench->MemTable_count][11]);
 //        printf("\n");
-//        print_128(bench->h_keys[bench->MemTable_count][12]);
+//        print_128(bench->h_keys[offset+bench->MemTable_count][12]);
 //        printf("\n");
 
         //thrust::copy(d_vector_keys, d_vector_keys+bench->kv_count, bench->h_keys[bench->MemTable_count]);     //wrong
         //::copy(d_vector_values, d_vector_values+bench->kv_count, bench->h_values[bench->MemTable_count]);
 
-        //bloom filter
+        //bloom filter //bloom filter is useless, so code is not updated.
         if(bench->config->bloom_filter){
             BloomFilter_Add<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
             check_execution();
             cudaDeviceSynchronize();
             CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
             logt("bloom filter ", start);
-            CUDA_SAFE_CALL(cudaMemcpy(bench->pstFilter[bench->MemTable_count], h_bench.d_pstFilter, bench->dwFilterSize, cudaMemcpyDeviceToHost));
+            CUDA_SAFE_CALL(cudaMemcpy(bench->pstFilter[bench->MemTable_count], h_bench.d_pstFilter, bench->dwFilterSize, cudaMemcpyDeviceToHost));      //offset not change
             cudaMemset(h_bench.d_pstFilter, 0, bench->dwFilterSize);
         }
         bench->MemTable_count++;
@@ -1101,7 +1107,8 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         CUDA_SAFE_CALL(cudaMemcpy(h_bench.d_box_block, h_bench.d_box_block + bench->config->kv_restriction, overflow * sizeof(box), cudaMemcpyDeviceToDevice));
         h_bench.kv_count = overflow;
         CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));                       //update kv_count, other effect ???
-
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("init after sort",start);
     }
 
 	// todo do the data analyzes, for test only, should not copy out so much stuff
@@ -1153,8 +1160,9 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         check_execution();
         cudaDeviceSynchronize();
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-        logt("search_kv ", start);
         CUDA_SAFE_CALL(cudaMemcpy(bench->search_list, h_bench.search_list, bench->search_count*sizeof(search_info_unit), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_search_kv_time += get_time_elapsed(start,false);
+        logt("search_kv ", start);
     }
 
 	/* 6. post-process, copy out data*/
