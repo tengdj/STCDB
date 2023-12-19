@@ -1070,7 +1070,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         logt("cuda_sort_time: ",start);
         uint offset = 0;
         if(bench->big_sorted_run_count%2==1){
-            offset = bench->config->big_sorted_run_capacity/2;
+            offset = bench->config->MemTable_capacity/2;
         }
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_box_block[offset+bench->MemTable_count], h_bench.d_box_block, bench->config->kv_restriction * sizeof(box), cudaMemcpyDeviceToHost));       //can be cpy before sort
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_keys[offset+bench->MemTable_count], h_bench.d_keys, bench->config->kv_restriction * sizeof(__uint128_t), cudaMemcpyDeviceToHost));

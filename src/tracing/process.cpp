@@ -195,13 +195,14 @@ inline bool BloomFilter_Check(workbench *bench, uint sst, uint pid){
 }
 
 void *sst_dump(void *arg){
+    struct timeval bg_start = get_cur_time();
     cout<<"step into the sst_dump"<<endl;
     workbench *bench = (workbench *)arg;
-    assert(bench->config->MemTable_capacity%2==0);
     cout<<"cur_time: "<<bench->cur_time<<endl;
     uint offset = 0;
+    assert(bench->config->MemTable_capacity%2==0);
     if(bench->big_sorted_run_count%2==1){
-        offset = bench->config->big_sorted_run_capacity/2;
+        offset = bench->config->MemTable_capacity/2;
     }
     bench->bg_run[bench->big_sorted_run_count].first_pid = new uint[bench->bg_run[0].SSTable_count];
 
@@ -220,20 +221,24 @@ void *sst_dump(void *arg){
     time1 = clock();
     while(finish<bench->config->MemTable_capacity/2){
         if(kv_count==0){
-            SSTable_of.open("../store/SSTable" + to_string(sst_count), ios::out | ios::trunc);
+            SSTable_of.open("../store/SSTable" + to_string(bench->big_sorted_run_count*+sst_count), ios::out | ios::trunc);
         }
         finish = 0;
         __uint128_t temp_key = (__uint128_t)1<<126;
         box * temp_box;
         uint take_id =0;
         for(int i=0;i<bench->config->MemTable_capacity/2; i++){
-            if( bench->h_keys[offset+i][key_index[i]] == 0){              //empty kv
+//            if( bench->h_keys[offset+i][key_index[i]] == 0){              //empty kv
+//                finish++;
+//                continue;
+//            }
+            if(key_index[i]>= bench->config->kv_restriction){              //empty kv
                 finish++;
                 continue;
             }
             if( temp_key > bench->h_keys[offset+i][key_index[i]] ){
                 temp_key = bench->h_keys[offset+i][key_index[i]];
-                temp_box = &bench->h_box_block[offset+i][bench->h_values[i][key_index[i]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
+                temp_box = &bench->h_box_block[offset+i][bench->h_values[offset+i][key_index[i]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
                 take_id = i;
             }
         }
@@ -274,6 +279,9 @@ void *sst_dump(void *arg){
     bench->bg_run[bench->big_sorted_run_count].timestamp_max = t_min;
     bench->bg_run[bench->big_sorted_run_count].timestamp_max = t_max;
     bench->bg_run[bench->big_sorted_run_count].print_meta();
+
+    bench->pro.bg_merge_flush += get_time_elapsed(bg_start,false);
+    logt("merge sort and flush", bg_start);
     return NULL;
 }
 
@@ -310,14 +318,16 @@ void tracer::process(){
 			bench->cur_time = st + t;
 			// process the coordinate in this time point
 
-            bench->config->search_kv = true;                            //cuda search
-            if(bench->config->search_kv){
-                bench->search_count = 100;
-                for(int i=0;i<bench->search_count;i++){
-                    bench->search_list[i].pid = 10000+i;
-                    bench->search_list[i].target = 0;
-                    bench->search_list[i].start = 0;
-                    bench->search_list[i].end = 0;
+            if(bench->cur_time==1700){
+                bench->config->search_kv = true;                            //cuda search
+                if(bench->config->search_kv){
+                    bench->search_count = 100;
+                    for(int i=0;i<bench->search_count;i++){
+                        bench->search_list[i].pid = 500000;                      //range query
+                        bench->search_list[i].target = 0;
+                        bench->search_list[i].start = 0;
+                        bench->search_list[i].end = 0;
+                    }
                 }
             }
 
@@ -334,15 +344,33 @@ void tracer::process(){
                 process_with_gpu(bench,d_bench,gpu);
 #endif
 			}
-//            for(int i=0;i<bench->search_count;i++){
-//                if(bench->search_list[i].target>0)
-//                cout<< bench->search_list[i].pid<<"-"<<bench->search_list[i].target<<"-"<<bench->search_list[i].start<<"-"<<bench->search_list[i].end<<endl;
-//                if(bench->MemTable_count>0){
-//                    if(BloomFilter_Check(bench, 0 ,bench->search_list[i].pid)){
-//                        cout<< bench->search_list[i].pid <<"BloomFilter_Check :"<<endl;
-//                    }
-//                }
-//            }
+            if(bench->cur_time==1700){
+                uint pid = 500000;
+                for(int i=0;i<bench->search_count;i++){
+                    //set<key_value> *range_result = new set<key_value>;
+                    if(bench->search_list[i].target>0) {
+                        cout << bench->search_list[i].pid << "-" << bench->search_list[i].target << "-"
+                             << bench->search_list[i].start << "-" << bench->search_list[i].end << endl;
+                    }
+
+    //                if(bench->MemTable_count>0){
+    //                    if(BloomFilter_Check(bench, 0 ,bench->search_list[i].pid)){
+    //                        cout<< bench->search_list[i].pid <<"BloomFilter_Check :"<<endl;
+    //                    }
+    //                }
+                }
+
+                //search memtable
+                bench->search_memtable(pid);
+
+                bench->search_count = 0;                //init
+                uint valid_timestamp = 1000;
+                for(int i=0;i<bench->big_sorted_run_count;i++){
+                    if((bench->bg_run[i].timestamp_min<valid_timestamp)&&(valid_timestamp<bench->bg_run[i].timestamp_max)){
+                        bench->bg_run[i].search_in_disk(pid);
+                    }
+                }
+            }
 
 
 //            if(bench->MemTable_count>0){
@@ -378,7 +406,6 @@ void tracer::process(){
 
             if(bench->MemTable_count==bench->config->MemTable_capacity/2) {
                 bench->MemTable_count = 0;                                  //0<MemTable_count<MemTable_capacity/2
-                cout << "dump begin time: " << bench->cur_time << endl;
                 for(int i=0;i<bench->config->MemTable_capacity/2; i++){
                     for(int j=0;j<10;j++){
                         print_128(bench->h_keys[i][j]);
@@ -386,17 +413,15 @@ void tracer::process(){
                     }
                     cout<<endl;
                 }
-                struct timeval bg_start = get_cur_time();
+                cout << "dump begin time: " << bench->cur_time << endl;
                 pthread_t bg_thread;
                 int ret;
                 if ((ret = pthread_create(&bg_thread, NULL, sst_dump, (void *) bench)) != 0) {
                     fprintf(stderr, "pthread_create:%s\n", strerror(ret));
                     exit(1);
                 }
-                bench->pro.bg_merge_flush += get_time_elapsed(bg_start,false);
-                logt("merge sort and flush", bg_start);
+                pthread_detach(bg_thread);
                 bench->big_sorted_run_count++;
-                //pthread_detach(bg_thread);
                 //bool findit = searchkv_in_all_place(bench, 2);
             }
 

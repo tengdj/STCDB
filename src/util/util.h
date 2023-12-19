@@ -22,6 +22,7 @@
 #include <limits.h>
 #include <algorithm>
 #include <fstream>
+#include <set>
 
 using namespace std;
 typedef unsigned int uint;

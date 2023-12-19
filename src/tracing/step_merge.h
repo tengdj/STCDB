@@ -25,6 +25,7 @@ public:
     key_value *kv = NULL;                  //44739243 * 5 / 1024 = 218454 (Round up)
     uint SSTable_kv_capacity = 218454;
 
+    ~SSTable();
     bool search_SSTable(uint pid);
 };
 
@@ -38,6 +39,7 @@ public:
     uint timestamp_min = 0;
     uint timestamp_max = 0;
 
+    ~sorted_run();
     void print_meta(){
         fprintf(stdout,"SSTable_count:%d timestamp_min:%d timestamp_max:%d\n",SSTable_count,timestamp_min,timestamp_max);
     }

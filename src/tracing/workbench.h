@@ -245,6 +245,7 @@ public:
 	void unlock(uint key = 0){
 		pthread_mutex_unlock(&insert_lk[key%MAX_LOCK_NUM]);
 	}
+    bool search_memtable(uint pid);
 };
 extern void lookup_rec(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);
 extern void lookup_stack(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);

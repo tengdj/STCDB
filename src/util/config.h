@@ -58,7 +58,7 @@ public:
     bool search_kv = true;
     uint search_list_capacity = 1000;
 
-    bool bloom_filter = true;
+    bool bloom_filter = false;
     double false_positive_rate = 0.0004;
 
     void print(){

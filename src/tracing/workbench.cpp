@@ -169,3 +169,61 @@ void workbench::claim_space(){
     bg_run = (sorted_run *)allocate(size);
 
 }
+
+bool workbench::search_memtable(uint pid){
+    cout<<"into search_memtable"<<endl;
+    uint offset = 0;
+    if(big_sorted_run_count%2==1){
+        offset = config->MemTable_capacity/2;
+    }
+    bool ret = false;
+
+    for(int i=0;i<MemTable_count;i++) {
+
+        int find = -1;
+        int low = 0;
+        int high = config->kv_restriction - 1;
+        int mid;
+        uint temp_pid;
+        box * temp_box;
+        while (low <= high) {
+            mid = (low + high) / 2;
+            temp_pid = h_keys[offset+i][mid]/ 100000000 / 100000000 / 100000000;
+            if (temp_pid == pid) {
+                find = mid;
+                ret = true;
+                break;
+            } else if (temp_pid > pid) {
+                high = mid - 1;
+            } else {
+                low = mid + 1;
+            }
+        }
+        if (find == -1) {
+            cout << "cannot find" << endl;
+            break;
+        }
+        cout << "exactly find" << endl;
+        uint cursor = find;
+        while (temp_pid == pid && cursor >= 1) {
+            cursor--;
+            temp_pid = h_keys[offset+i][cursor]/ 100000000 / 100000000 / 100000000;
+        }
+        if (temp_pid == pid && cursor == 0) {
+            print_128(h_keys[offset+i][0]);
+            temp_box = &h_box_block[offset+i][h_values[offset+i][0]];
+            cout<< ": "<< temp_box->low[0] << endl;
+        }
+        while (cursor + 1 < config->kv_restriction) {
+            cursor++;
+            temp_pid = h_keys[offset+i][cursor]/ 100000000 / 100000000 / 100000000;
+            if (temp_pid == pid) {
+                print_128(h_keys[offset+i][cursor]);
+                temp_box = &h_box_block[offset+i][h_values[offset+i][cursor]];
+                cout<< ": "<< temp_box->low[0] << endl;
+            }
+        }
+        cout << "find !" << endl;
+    }
+    return ret;
+}

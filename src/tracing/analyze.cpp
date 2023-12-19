@@ -196,12 +196,13 @@ void workbench::print_profile(){
 		fprintf(stderr,"\tfiltering:\t%.2f\n",pro.filter_time/pro.rounds);
 		fprintf(stderr,"\trefinement:\t%.2f\n",pro.refine_time/pro.rounds);
 		fprintf(stderr,"\tupdate meets:\t%.2f\n",pro.meeting_identify_time/pro.rounds);
-        fprintf(stderr,"\tcuda sort:\t%.2f\n",pro.cuda_sort_time/pro.rounds);
 		fprintf(stderr,"\tupdate index:\t%.2f\n",pro.index_update_time/pro.rounds);
-        fprintf(stderr,"\tsearch kv:\t%.2f\n",pro.cuda_search_kv_time/pro.rounds);
-        fprintf(stderr,"\tmerge sort and flush:\t%.2f\n",pro.bg_merge_flush/pro.rounds);
-		fprintf(stderr,"\toverall:\t%.2f\n",(pro.copy_time+pro.partition_time+pro.filter_time+pro.refine_time+pro.meeting_identify_time+pro.index_update_time
-            +pro.cuda_sort_time+pro.cuda_search_kv_time+pro.bg_merge_flush)/pro.rounds);
+		fprintf(stderr,"\tave per round:\t%.2f\n",(pro.copy_time+pro.partition_time+pro.filter_time+pro.refine_time+pro.meeting_identify_time+pro.index_update_time)/pro.rounds);
+        fprintf(stderr,"\tcuda sort:\t%.2f\n",pro.cuda_sort_time);
+        fprintf(stderr,"\tsearch kv:\t%.2f\n",pro.cuda_search_kv_time);
+        fprintf(stderr,"\toverall :\t%.2f\n",(pro.copy_time+pro.partition_time+pro.filter_time+pro.refine_time+pro.meeting_identify_time+pro.index_update_time
+                                                           +pro.cuda_sort_time+pro.cuda_search_kv_time));
+        fprintf(stderr,"\tmerge sort and flush:\t%.2f\n",pro.bg_merge_flush);
 
 
 		fprintf(stderr,"statistics:\n");

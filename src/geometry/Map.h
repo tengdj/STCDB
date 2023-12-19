@@ -120,11 +120,16 @@ public:
     int core = -2;
     Point end;
 
-    double speed;
+    double speed = 0;
     vector<Node *> trajectory;
 
 //    Trace_Meta();
-//    ~Trace_Meta();
+    ~Trace_Meta(){
+        for (Node *node : trajectory) {
+            delete node;
+        }
+        trajectory.clear();
+    }
 };
 
 class Map {

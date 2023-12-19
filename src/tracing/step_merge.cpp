@@ -5,7 +5,11 @@
  *      Author: teng
  */
 
-#include "workbench.h"
+#include "step_merge.h"
+
+SSTable::~SSTable(){
+    delete []kv;
+}
 
 //range query
 bool SSTable::search_SSTable(uint pid) {
@@ -53,6 +57,11 @@ bool SSTable::search_SSTable(uint pid) {
     }
     cout<<"find !"<<endl;
     return true;
+}
+
+sorted_run::~sorted_run(){
+    delete []sst;
+    delete []first_pid;
 }
 
 bool sorted_run::search_in_disk(uint pid){                              //this pointer refers to a single sorted_run
