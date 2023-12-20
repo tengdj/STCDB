@@ -21,7 +21,7 @@ int main(int argc, char **argv){
     read_meta.close();
     cout<<"before func"<<endl;
     uint pid = 0;
-    if(bg_run->search_in_disk(pid)){
+    if(bg_run->search_in_disk(0,pid)){
         cout<<"finally find"<<endl;
     }
     return 0;

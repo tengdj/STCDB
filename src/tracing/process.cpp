@@ -201,10 +201,13 @@ void *sst_dump(void *arg){
     cout<<"cur_time: "<<bench->cur_time<<endl;
     uint offset = 0;
     assert(bench->config->MemTable_capacity%2==0);
-    if(bench->big_sorted_run_count%2==1){
+    uint old_big = bench->big_sorted_run_count;                 //atomic add
+    bench->big_sorted_run_count++;
+    if(old_big%2==1){
         offset = bench->config->MemTable_capacity/2;
     }
-    bench->bg_run[bench->big_sorted_run_count].first_pid = new uint[bench->bg_run[0].SSTable_count];
+    bench->bg_run[old_big].first_pid = new uint[bench->bg_run[0].SSTable_count];
+    cout<<"origin SSTable_count:"<<bench->bg_run[0].SSTable_count<<endl;
 
     //merge sort
     ofstream SSTable_of;
@@ -221,7 +224,8 @@ void *sst_dump(void *arg){
     time1 = clock();
     while(finish<bench->config->MemTable_capacity/2){
         if(kv_count==0){
-            SSTable_of.open("../store/SSTable" + to_string(bench->big_sorted_run_count*+sst_count), ios::out | ios::trunc);
+            SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out | ios::trunc);
+            //SSTable_of.open("../store/SSTable" + to_string(bench->big_sorted_run_count*+sst_count), ios::out | ios::trunc);
         }
         finish = 0;
         __uint128_t temp_key = (__uint128_t)1<<126;
@@ -246,7 +250,7 @@ void *sst_dump(void *arg){
             bench->h_keys[offset+take_id][key_index[take_id]] = 0;                                     //init
             key_index[take_id]++;                                                   // one while, one kv
             if(kv_count==0){
-                bench->bg_run[bench->big_sorted_run_count].first_pid[sst_count] = temp_key/100000000 / 100000000 / 100000000;
+                bench->bg_run[old_big].first_pid[sst_count] = temp_key/100000000 / 100000000 / 100000000;
             }
             kv_count++;
             uint end = temp_key % 100000000;
@@ -276,9 +280,10 @@ void *sst_dump(void *arg){
         cout<<"key_index"<<key_index[i]<<endl;
     }
     delete[] key_index;
-    bench->bg_run[bench->big_sorted_run_count].timestamp_max = t_min;
-    bench->bg_run[bench->big_sorted_run_count].timestamp_max = t_max;
-    bench->bg_run[bench->big_sorted_run_count].print_meta();
+    bench->bg_run[old_big].timestamp_min = t_min;
+    bench->bg_run[old_big].timestamp_max = t_max;
+    bench->bg_run[old_big].print_meta();
+    cout<<"now SSTable_count:"<<bench->bg_run[old_big].SSTable_count<<endl;
 
     bench->pro.bg_merge_flush += get_time_elapsed(bg_start,false);
     logt("merge sort and flush", bg_start);
@@ -321,7 +326,7 @@ void tracer::process(){
             if(bench->cur_time==1700){
                 bench->config->search_kv = true;                            //cuda search
                 if(bench->config->search_kv){
-                    bench->search_count = 100;
+                    bench->search_count = config->search_list_capacity;     //1000
                     for(int i=0;i<bench->search_count;i++){
                         bench->search_list[i].pid = 500000;                      //range query
                         bench->search_list[i].target = 0;
@@ -367,7 +372,7 @@ void tracer::process(){
                 uint valid_timestamp = 1000;
                 for(int i=0;i<bench->big_sorted_run_count;i++){
                     if((bench->bg_run[i].timestamp_min<valid_timestamp)&&(valid_timestamp<bench->bg_run[i].timestamp_max)){
-                        bench->bg_run[i].search_in_disk(pid);
+                        bench->bg_run[i].search_in_disk(i,pid);
                     }
                 }
             }
@@ -421,7 +426,6 @@ void tracer::process(){
                     exit(1);
                 }
                 pthread_detach(bg_thread);
-                bench->big_sorted_run_count++;
                 //bool findit = searchkv_in_all_place(bench, 2);
             }
 

@@ -64,7 +64,7 @@ sorted_run::~sorted_run(){
     delete []first_pid;
 }
 
-bool sorted_run::search_in_disk(uint pid){                              //this pointer refers to a single sorted_run
+bool sorted_run::search_in_disk(uint big_sort_id,uint pid){                              //this pointer refers to a single sorted_run
     cout<<"into disk"<<endl;
     ifstream read_sst;
 
@@ -87,7 +87,8 @@ bool sorted_run::search_in_disk(uint pid){                              //this p
         }
     }
     if(find==-1){
-        read_sst.open("../store/SSTable"+ to_string(high));                   //final place is not high+1, but high
+        cout<<"not find in first"<<endl;
+        read_sst.open("../store/SSTable_"+to_string(big_sort_id)+"-"+to_string(high));                   //final place is not high+1, but high
         cout<<low<<"-"<<first_pid[low]<<endl;
         cout<<mid<<"-"<<first_pid[mid]<<endl;
         cout<<high<<"-"<<first_pid[high]<<endl;
@@ -106,14 +107,14 @@ bool sorted_run::search_in_disk(uint pid){                              //this p
             break;
         }
     }
-    read_sst.open("../store/SSTable"+ to_string(pid_start));
+    read_sst.open("../store/SSTable_"+to_string(big_sort_id)+"-"+to_string(pid_start));
     read_sst.read((char *)sst[pid_start].kv,sizeof(key_value)*sst[pid_start].SSTable_kv_capacity);
     sst[pid_start].search_SSTable(pid);
     read_sst.close();
     uint cursor = pid_start+1;
     uint temp_pid;
     while(true){
-        read_sst.open("../store/SSTable"+ to_string(cursor));
+        read_sst.open("../store/SSTable_"+to_string(big_sort_id)+"-"+to_string(cursor));
         read_sst.read((char *)sst[cursor].kv,sizeof(key_value)*sst[cursor].SSTable_kv_capacity);
         read_sst.close();
         if(cursor+1<SSTable_count){

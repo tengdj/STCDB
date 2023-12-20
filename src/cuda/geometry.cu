@@ -475,6 +475,18 @@ void cuda_identify_meetings(workbench *bench) {
     }
     // is still active
     if (bench->meeting_buckets[bid].end == bench->cur_time) {
+        if (bench->cur_time - bench->meeting_buckets[bid].start >= bench->config->min_meet_time + 1) {
+            if(bench->search_list[0].pid==getpid1(bench->meeting_buckets[bid].key)){
+                uint meeting_idx = atomicAdd(&bench->find_count, 1);
+                bench->search_list[meeting_idx].target = getpid2(bench->meeting_buckets[bid].key);
+                bench->search_list[meeting_idx].start = bench->meeting_buckets[bid].start;
+                bench->search_list[meeting_idx].end = bench->meeting_buckets[bid].end;
+                bench->search_list[meeting_idx].mbr.low[0] = bench->meeting_buckets[bid].mbr.low[0];
+                bench->search_list[meeting_idx].mbr.low[1] = bench->meeting_buckets[bid].mbr.low[1];
+                bench->search_list[meeting_idx].mbr.high[0] = bench->meeting_buckets[bid].mbr.high[0];
+                bench->search_list[meeting_idx].mbr.high[1] = bench->meeting_buckets[bid].mbr.high[1];
+            }
+        }
         return;
     }
     if (bench->cur_time - bench->meeting_buckets[bid].start >= bench->config->min_meet_time + 1) {
@@ -517,17 +529,17 @@ void cuda_search_kv(workbench *bench){
     if(kid>=bench->kv_count){
         return;
     }
-    for(int i=0;i<bench->search_count;i++){
-        if((uint)(bench->d_keys[kid]/100000000 / 100000000 / 100000000) == bench->search_list[i].pid){
-            bench->search_list[i].target = (uint)((bench->d_keys[kid]/100000000 / 100000000) % 100000000);
-            bench->search_list[i].start = (bench->d_keys[kid]/100000000) % 100000000;
-            bench->search_list[i].end = bench->d_keys[kid] % 100000000;
-            bench->search_list[i].mbr.low[0] = bench->d_box_block[kid].low[0];
-            bench->search_list[i].mbr.low[1] = bench->d_box_block[kid].low[1];
-            bench->search_list[i].mbr.high[0] = bench->d_box_block[kid].high[0];
-            bench->search_list[i].mbr.high[1] = bench->d_box_block[kid].high[1];
-        }
+    if((uint)(bench->d_keys[kid]/100000000 / 100000000 / 100000000) == bench->search_list[bench->find_count].pid){
+        uint meeting_idx = atomicAdd(&bench->find_count, 1);
+        bench->search_list[meeting_idx].target = (uint)((bench->d_keys[kid]/100000000 / 100000000) % 100000000);
+        bench->search_list[meeting_idx].start = (bench->d_keys[kid]/100000000) % 100000000;
+        bench->search_list[meeting_idx].end = bench->d_keys[kid] % 100000000;
+        bench->search_list[meeting_idx].mbr.low[0] = bench->d_box_block[kid].low[0];
+        bench->search_list[meeting_idx].mbr.low[1] = bench->d_box_block[kid].low[1];
+        bench->search_list[meeting_idx].mbr.high[0] = bench->d_box_block[kid].high[0];
+        bench->search_list[meeting_idx].mbr.high[1] = bench->d_box_block[kid].high[1];
     }
+
 }
 
 __global__

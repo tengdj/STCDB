@@ -43,7 +43,7 @@ public:
     void print_meta(){
         fprintf(stdout,"SSTable_count:%d timestamp_min:%d timestamp_max:%d\n",SSTable_count,timestamp_min,timestamp_max);
     }
-    bool search_in_disk(uint pid);
+    bool search_in_disk(uint big_sort_id,uint pid);
 };
 
 #endif

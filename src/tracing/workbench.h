@@ -172,6 +172,7 @@ public:
     //space for search list
     search_info_unit * search_list = NULL;
     uint search_count = 0;
+    uint find_count = 0;
 
     //big sorted run
     sorted_run *bg_run = NULL;
