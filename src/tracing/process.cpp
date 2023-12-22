@@ -206,15 +206,15 @@ void *sst_dump(void *arg){
     if(old_big%2==1){
         offset = bench->config->MemTable_capacity/2;
     }
-    bench->bg_run[old_big].first_pid = new uint[bench->bg_run[0].SSTable_count];
-    cout<<"origin SSTable_count:"<<bench->bg_run[0].SSTable_count<<endl;
+    //bench->bg_run[old_big].SSTable_count = bench->config->SSTable_count;
+    bench->bg_run[old_big].first_pid = new uint[bench->bg_run[old_big].SSTable_count];
 
     //merge sort
     ofstream SSTable_of;
     //bool of_open = false;
     uint kv_count = 0;
     uint sst_count = 0;
-    uint sst_capacity = 218454;             //218454
+    uint sst_capacity = 500;             //218454   10G /1024
     uint t_min = 3600*24*14;
     uint t_max = 0;
 
@@ -225,6 +225,7 @@ void *sst_dump(void *arg){
     while(finish<bench->config->MemTable_capacity/2){
         if(kv_count==0){
             SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out | ios::trunc);
+            assert(SSTable_of.is_open());
             //SSTable_of.open("../store/SSTable" + to_string(bench->big_sorted_run_count*+sst_count), ios::out | ios::trunc);
         }
         finish = 0;
@@ -323,12 +324,14 @@ void tracer::process(){
 			bench->cur_time = st + t;
 			// process the coordinate in this time point
 
-            if(bench->cur_time==1700){
+            if(bench->cur_time==900){
                 bench->config->search_kv = true;                            //cuda search
                 if(bench->config->search_kv){
-                    bench->search_count = config->search_list_capacity;     //1000
+                    bench->search_count = 100;     //1000   config->search_list_capacity
                     for(int i=0;i<bench->search_count;i++){
-                        bench->search_list[i].pid = 500000;                      //range query
+                        //bench->search_list[i].pid = 500000;                      //range query
+                        //bench->search_list[i].pid = bench->h_keys[0][500]/100000000/100000000/100000000;
+                        bench->search_list[i].pid = bench->bg_run[1].first_pid[300];
                         bench->search_list[i].target = 0;
                         bench->search_list[i].start = 0;
                         bench->search_list[i].end = 0;
@@ -349,8 +352,11 @@ void tracer::process(){
                 process_with_gpu(bench,d_bench,gpu);
 #endif
 			}
-            if(bench->cur_time==1700){
-                uint pid = 500000;
+            if(bench->cur_time==900){                                   //total search
+                cout<<"cuda sort"<<endl;
+                //uint pid = bench->h_keys[0][500]/100000000/100000000/100000000;
+                uint pid = bench->bg_run[1].first_pid[300];
+                cout<<"pid: "<<pid<<endl;
                 for(int i=0;i<bench->search_count;i++){
                     //set<key_value> *range_result = new set<key_value>;
                     if(bench->search_list[i].target>0) {
@@ -369,7 +375,7 @@ void tracer::process(){
                 bench->search_memtable(pid);
 
                 bench->search_count = 0;                //init
-                uint valid_timestamp = 1000;
+                uint valid_timestamp = 400;
                 for(int i=0;i<bench->big_sorted_run_count;i++){
                     if((bench->bg_run[i].timestamp_min<valid_timestamp)&&(valid_timestamp<bench->bg_run[i].timestamp_max)){
                         bench->bg_run[i].search_in_disk(i,pid);
@@ -411,9 +417,13 @@ void tracer::process(){
 
             if(bench->MemTable_count==bench->config->MemTable_capacity/2) {
                 bench->MemTable_count = 0;                                  //0<MemTable_count<MemTable_capacity/2
+                uint offset = 0;
+                if(bench->big_sorted_run_count%2==1){
+                    offset = bench->config->MemTable_capacity/2;
+                }
                 for(int i=0;i<bench->config->MemTable_capacity/2; i++){
                     for(int j=0;j<10;j++){
-                        print_128(bench->h_keys[i][j]);
+                        print_128(bench->h_keys[offset+i][j]);
                         cout<<endl;
                     }
                     cout<<endl;

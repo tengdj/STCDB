@@ -167,6 +167,9 @@ void workbench::claim_space(){
 
     size = config->big_sorted_run_capacity*sizeof(sorted_run);
     bg_run = (sorted_run *)allocate(size);
+    for(int i=0;i<config->big_sorted_run_capacity;i++){
+        bg_run[i].SSTable_count = config->SSTable_count;
+    }
 
 }
 
@@ -223,7 +226,6 @@ bool workbench::search_memtable(uint pid){
                 cout<< ": "<< temp_box->low[0] << endl;
             }
         }
-        cout << "find !" << endl;
     }
     return ret;
 }

@@ -13,6 +13,7 @@ int main(int argc, char **argv){
     }
     ifstream read_meta;
     read_meta.open("../store/first_pid_meta");
+    assert(read_meta.is_open());
     for(int i=0;i<bg_run->SSTable_count;i++){
         read_meta.read((char *)&bg_run->first_pid[i], sizeof(uint));
         cout<<bg_run->first_pid[i]<<" ";
@@ -21,7 +22,7 @@ int main(int argc, char **argv){
     read_meta.close();
     cout<<"before func"<<endl;
     uint pid = 0;
-    if(bg_run->search_in_disk(0,pid)){
+    if(bg_run->search_in_disk(0,500000)){
         cout<<"finally find"<<endl;
     }
     return 0;
