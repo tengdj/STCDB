@@ -214,7 +214,9 @@ void *sst_dump(void *arg){
     //bool of_open = false;
     uint kv_count = 0;
     uint sst_count = 0;
-    uint sst_capacity = 500;             //218454   10G /1024
+    //uint sst_capacity = bench->config->big_sorted_run_capacity*bench->config->MemTable_capacity/2/bench->config->SSTable_count;     //218454   10G /1024
+    uint sst_capacity = 218454;
+
     uint t_min = 3600*24*14;
     uint t_max = 0;
 
@@ -226,7 +228,6 @@ void *sst_dump(void *arg){
         if(kv_count==0){
             SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out | ios::trunc);
             assert(SSTable_of.is_open());
-            //SSTable_of.open("../store/SSTable" + to_string(bench->big_sorted_run_count*+sst_count), ios::out | ios::trunc);
         }
         finish = 0;
         __uint128_t temp_key = (__uint128_t)1<<126;
@@ -324,14 +325,14 @@ void tracer::process(){
 			bench->cur_time = st + t;
 			// process the coordinate in this time point
 
-            if(bench->cur_time==900){
+            if(bench->cur_time==1900){
                 bench->config->search_kv = true;                            //cuda search
                 if(bench->config->search_kv){
                     bench->search_count = 100;     //1000   config->search_list_capacity
                     for(int i=0;i<bench->search_count;i++){
-                        //bench->search_list[i].pid = 500000;                      //range query
+                        bench->search_list[i].pid = 500000;                      //range query
                         //bench->search_list[i].pid = bench->h_keys[0][500]/100000000/100000000/100000000;
-                        bench->search_list[i].pid = bench->bg_run[1].first_pid[300];
+                        //bench->search_list[i].pid = bench->bg_run[1].first_pid[300];
                         bench->search_list[i].target = 0;
                         bench->search_list[i].start = 0;
                         bench->search_list[i].end = 0;
@@ -352,10 +353,11 @@ void tracer::process(){
                 process_with_gpu(bench,d_bench,gpu);
 #endif
 			}
-            if(bench->cur_time==900){                                   //total search
-                cout<<"cuda sort"<<endl;
+            if(bench->cur_time==1900){                                   //total search
+                cout<<"cuda search"<<endl;
+                uint pid = 500000;
                 //uint pid = bench->h_keys[0][500]/100000000/100000000/100000000;
-                uint pid = bench->bg_run[1].first_pid[300];
+                //uint pid = bench->bg_run[1].first_pid[300];
                 cout<<"pid: "<<pid<<endl;
                 for(int i=0;i<bench->search_count;i++){
                     //set<key_value> *range_result = new set<key_value>;
@@ -433,7 +435,6 @@ void tracer::process(){
                 int ret;
                 if ((ret = pthread_create(&bg_thread, NULL, sst_dump, (void *) bench)) != 0) {
                     fprintf(stderr, "pthread_create:%s\n", strerror(ret));
-                    exit(1);
                 }
                 pthread_detach(bg_thread);
                 //bool findit = searchkv_in_all_place(bench, 2);

@@ -22,8 +22,8 @@ typedef struct key_value{
 class SSTable{
 
 public:
-    key_value *kv = NULL;                  //44739243 * 5 / 1024 = 218454 (Round up)
-    uint SSTable_kv_capacity = 218454;
+    key_value *kv = NULL;
+    uint SSTable_kv_capacity = 218454;              //44739243 * 5 / 1024 = 218454 (Round up)
 
     ~SSTable();
     bool search_SSTable(uint pid);

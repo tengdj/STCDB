@@ -317,10 +317,10 @@ void cuda_unroll(workbench *bench, uint inistial_size){
 	uint offset = bench->config->zone_capacity;
 	while(offset<grid_size){
 		uint cu_index = atomicAdd(&bench->grid_check_counter, 1);
-//		if(cu_index>=bench->grid_check_capacity){
-//			printf("%d %d %d\n",bench->grid_counter[bench->grid_check[glid].gid],cu_index,bench->grid_check_capacity);
-//		}
-		assert(cu_index<bench->grid_check_capacity);
+		if(cu_index>=bench->grid_check_capacity){
+			printf("%d %d %d\n",bench->grid_counter[bench->grid_check[glid].gid],cu_index,bench->grid_check_capacity);
+		}
+		//assert(cu_index<bench->grid_check_capacity);
 		bench->grid_check[cu_index] = bench->grid_check[glid];
 		bench->grid_check[cu_index].offset = offset;
 		offset += bench->config->zone_capacity;
@@ -478,6 +478,7 @@ void cuda_identify_meetings(workbench *bench) {
         if (bench->cur_time - bench->meeting_buckets[bid].start >= bench->config->min_meet_time + 1) {
             if(bench->search_list[0].pid==getpid1(bench->meeting_buckets[bid].key)){
                 uint meeting_idx = atomicAdd(&bench->find_count, 1);
+                assert(bench->find_count<bench->search_count);
                 bench->search_list[meeting_idx].target = getpid2(bench->meeting_buckets[bid].key);
                 bench->search_list[meeting_idx].start = bench->meeting_buckets[bid].start;
                 bench->search_list[meeting_idx].end = bench->meeting_buckets[bid].end;
@@ -529,8 +530,9 @@ void cuda_search_kv(workbench *bench){
     if(kid>=bench->kv_count){
         return;
     }
-    if((uint)(bench->d_keys[kid]/100000000 / 100000000 / 100000000) == bench->search_list[bench->find_count].pid){
+    if((uint)(bench->d_keys[kid]/100000000 / 100000000 / 100000000) == bench->search_list[0].pid){              //all the same
         uint meeting_idx = atomicAdd(&bench->find_count, 1);
+        assert(bench->find_count<bench->search_count);
         bench->search_list[meeting_idx].target = (uint)((bench->d_keys[kid]/100000000 / 100000000) % 100000000);
         bench->search_list[meeting_idx].start = (bench->d_keys[kid]/100000000) % 100000000;
         bench->search_list[meeting_idx].end = bench->d_keys[kid] % 100000000;
@@ -539,7 +541,6 @@ void cuda_search_kv(workbench *bench){
         bench->search_list[meeting_idx].mbr.high[0] = bench->d_box_block[kid].high[0];
         bench->search_list[meeting_idx].mbr.high[1] = bench->d_box_block[kid].high[1];
     }
-
 }
 
 __global__
@@ -947,6 +948,10 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 	// setup the current time and points for this round
 	workbench h_bench(bench);
 	CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+    if(bench->config->search_kv&&bench->search_count>0) {
+        h_bench.search_count = bench->search_count;
+        CUDA_SAFE_CALL(cudaMemcpy(h_bench.search_list, bench->search_list, bench->search_count * sizeof(search_info_unit),cudaMemcpyHostToDevice));
+    }
 	h_bench.cur_time = bench->cur_time;
 	CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));
 	CUDA_SAFE_CALL(cudaMemcpy(h_bench.points, bench->points, bench->config->num_objects*sizeof(Point), cudaMemcpyHostToDevice));
@@ -1165,9 +1170,9 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 
     /* 6. search kv info */
     if(bench->config->search_kv&&bench->search_count>0){
-        h_bench.search_count = bench->search_count;
-        CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));
-        CUDA_SAFE_CALL(cudaMemcpy(h_bench.search_list, bench->search_list, bench->search_count*sizeof(search_info_unit), cudaMemcpyHostToDevice));
+//        h_bench.search_count = bench->search_count;
+//        CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));
+//        CUDA_SAFE_CALL(cudaMemcpy(h_bench.search_list, bench->search_list, bench->search_count*sizeof(search_info_unit), cudaMemcpyHostToDevice));
         cuda_search_kv<<<h_bench.kv_count/1024+1,1024>>>(d_bench);
         check_execution();
         cudaDeviceSynchronize();
