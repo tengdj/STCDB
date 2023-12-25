@@ -328,9 +328,24 @@ void tracer::process(){
             if(bench->cur_time==1900){
                 bench->config->search_kv = true;                            //cuda search
                 if(bench->config->search_kv){
-                    bench->search_count = 100;     //1000   config->search_list_capacity
+                    bench->search_count = config->search_list_capacity;
                     for(int i=0;i<bench->search_count;i++){
                         bench->search_list[i].pid = 500000;                      //range query
+                        //bench->search_list[i].pid = bench->h_keys[0][500]/100000000/100000000/100000000;
+                        //bench->search_list[i].pid = bench->bg_run[1].first_pid[300];
+                        bench->search_list[i].target = 0;
+                        bench->search_list[i].start = 0;
+                        bench->search_list[i].end = 0;
+                    }
+                }
+            }
+
+            if(bench->cur_time==3200){
+                bench->config->search_kv = true;                            //cuda search
+                if(bench->config->search_kv){
+                    bench->search_count = config->search_list_capacity;
+                    for(int i=0;i<bench->search_count;i++){
+                        bench->search_list[i].pid = 3333333;                      //range query
                         //bench->search_list[i].pid = bench->h_keys[0][500]/100000000/100000000/100000000;
                         //bench->search_list[i].pid = bench->bg_run[1].first_pid[300];
                         bench->search_list[i].target = 0;
@@ -377,6 +392,7 @@ void tracer::process(){
                 bench->search_memtable(pid);
 
                 bench->search_count = 0;                //init
+                bench->find_count = 0;
                 uint valid_timestamp = 400;
                 for(int i=0;i<bench->big_sorted_run_count;i++){
                     if((bench->bg_run[i].timestamp_min<valid_timestamp)&&(valid_timestamp<bench->bg_run[i].timestamp_max)){
@@ -384,7 +400,29 @@ void tracer::process(){
                     }
                 }
             }
+            if(bench->cur_time==3200){                                   //total search
+                cout<<"cuda search"<<endl;
+                uint pid = 3333333;
+                cout<<"pid: "<<pid<<endl;
+                for(int i=0;i<bench->search_count;i++){
+                    if(bench->search_list[i].target>0) {
+                        cout << bench->search_list[i].pid << "-" << bench->search_list[i].target << "-"
+                             << bench->search_list[i].start << "-" << bench->search_list[i].end << endl;
+                    }
+                }
 
+                //search memtable
+                bench->search_memtable(pid);
+
+                bench->search_count = 0;                //init
+                bench->find_count = 0;
+                uint valid_timestamp = 2000;
+                for(int i=0;i<bench->big_sorted_run_count;i++){
+                    if((bench->bg_run[i].timestamp_min<valid_timestamp)&&(valid_timestamp<bench->bg_run[i].timestamp_max)){
+                        bench->bg_run[i].search_in_disk(i,pid);
+                    }
+                }
+            }
 
 //            if(bench->MemTable_count>0){
 //                bool *check_2G = new bool[10000000];
