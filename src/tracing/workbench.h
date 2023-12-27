@@ -40,7 +40,9 @@ typedef struct profiler{
 
     double cuda_sort_time = 0;
     double cuda_search_kv_time = 0;
-    double bg_merge_flush = 0;
+    double bg_merge_flush_time = 0;
+    double search_memtable_time = 0;
+    double search_in_disk_time = 0;
 }profiler;
 
 typedef struct checking_unit{

@@ -214,8 +214,9 @@ void *sst_dump(void *arg){
     //bool of_open = false;
     uint kv_count = 0;
     uint sst_count = 0;
-    //uint sst_capacity = bench->config->big_sorted_run_capacity*bench->config->MemTable_capacity/2/bench->config->SSTable_count;     //218454   10G /1024
-    uint sst_capacity = 218454;
+    uint sst_capacity = bench->config->big_sorted_run_capacity*bench->config->MemTable_capacity/2/bench->config->SSTable_count;     //218454   10G /1024
+    //uint sst_capacity = 218454;
+    key_value *temp_kvs = new key_value[sst_capacity];
 
     uint t_min = 3600*24*14;
     uint t_max = 0;
@@ -231,7 +232,7 @@ void *sst_dump(void *arg){
         }
         finish = 0;
         __uint128_t temp_key = (__uint128_t)1<<126;
-        box * temp_box;
+        box  temp_box;
         uint take_id =0;
         for(int i=0;i<bench->config->MemTable_capacity/2; i++){
 //            if( bench->h_keys[offset+i][key_index[i]] == 0){              //empty kv
@@ -244,7 +245,7 @@ void *sst_dump(void *arg){
             }
             if( temp_key > bench->h_keys[offset+i][key_index[i]] ){
                 temp_key = bench->h_keys[offset+i][key_index[i]];
-                temp_box = &bench->h_box_block[offset+i][bench->h_values[offset+i][key_index[i]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
+                temp_box = bench->h_box_block[offset+i][bench->h_values[offset+i][key_index[i]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
                 take_id = i;
             }
         }
@@ -254,7 +255,6 @@ void *sst_dump(void *arg){
             if(kv_count==0){
                 bench->bg_run[old_big].first_pid[sst_count] = temp_key/100000000 / 100000000 / 100000000;
             }
-            kv_count++;
             uint end = temp_key % 100000000;
             if(t_min>end){
                 t_min = end;
@@ -264,10 +264,12 @@ void *sst_dump(void *arg){
             }
 //            print_128(temp_key);
 //            cout<< ": "<< temp_box->low[0] << endl;
-            SSTable_of.write((char *)&temp_key, sizeof(__uint128_t));
-            SSTable_of.write((char *) temp_box, sizeof(box));
+            temp_kvs[kv_count].key = temp_key;
+            temp_kvs[kv_count].value = temp_box;
+            kv_count++;
         }
         if(kv_count==sst_capacity||finish==bench->config->MemTable_capacity/2){
+            SSTable_of.write((char *)temp_kvs, sizeof(key_value)*sst_capacity);
             SSTable_of.flush();
             SSTable_of.close();
             sst_count++;
@@ -287,7 +289,7 @@ void *sst_dump(void *arg){
     bench->bg_run[old_big].print_meta();
     cout<<"now SSTable_count:"<<bench->bg_run[old_big].SSTable_count<<endl;
 
-    bench->pro.bg_merge_flush += get_time_elapsed(bg_start,false);
+    bench->pro.bg_merge_flush_time += get_time_elapsed(bg_start,false);
     logt("merge sort and flush", bg_start);
     return NULL;
 }
@@ -389,7 +391,10 @@ void tracer::process(){
                 }
 
                 //search memtable
+                struct timeval newstart = get_cur_time();
                 bench->search_memtable(pid);
+                bench->pro.search_memtable_time += get_time_elapsed(newstart,false);
+                logt("search memtable",newstart);
 
                 bench->search_count = 0;                //init
                 bench->find_count = 0;
@@ -399,6 +404,8 @@ void tracer::process(){
                         bench->bg_run[i].search_in_disk(i,pid);
                     }
                 }
+                bench->pro.search_in_disk_time += get_time_elapsed(newstart,false);
+                logt("search in disk",newstart);
             }
             if(bench->cur_time==3200){                                   //total search
                 cout<<"cuda search"<<endl;
