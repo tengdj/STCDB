@@ -180,6 +180,8 @@ public:
     sorted_run *bg_run = NULL;
     uint big_sorted_run_count = 0;
 
+    bool crash_consistency = false;
+
 	// the temporary space
 	uint *tmp_space = NULL;
 	uint tmp_space_capacity = 0;

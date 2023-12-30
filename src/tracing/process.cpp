@@ -214,7 +214,8 @@ void *sst_dump(void *arg){
     //bool of_open = false;
     uint kv_count = 0;
     uint sst_count = 0;
-    uint sst_capacity = bench->config->big_sorted_run_capacity*bench->config->MemTable_capacity/2/bench->config->SSTable_count;     //218454   10G /1024
+    uint sst_capacity = bench->config->kv_restriction*bench->config->MemTable_capacity/2/bench->config->SSTable_count;     //218454   10G /1024
+    cout<<"sst_capacity:"<<sst_capacity<<endl;
     //uint sst_capacity = 218454;
     key_value *temp_kvs = new key_value[sst_capacity];
 
@@ -325,6 +326,9 @@ void tracer::process(){
 			bench->reset();
 			bench->points = trace+t*config->num_objects;
 			bench->cur_time = st + t;
+            if(bench->cur_time==config->start_time+config->duration-1){         //finish and all dump
+                bench->crash_consistency = true;
+            }
 			// process the coordinate in this time point
 
             if(bench->cur_time==1900){
@@ -445,7 +449,7 @@ void tracer::process(){
 //                assert(0);
 //            }
 
-//            if(bench->MemTable_count==bench->config->MemTable_capacity){
+//            if(bench->MemTable_count==bench->config->MemTable_capacity){              //check 10G
 //                bool *check_2G = new bool[10000000];
 //                int unique_count = 0;
 //                for(int j=0;j<bench->MemTable_count;j++){
