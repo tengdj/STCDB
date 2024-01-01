@@ -295,6 +295,39 @@ void *sst_dump(void *arg){
     return NULL;
 }
 
+void* commandThreadFunction(void* arg) {
+    workbench *bench = (workbench *)arg;
+    cout<<"bench->config->SSTable_count: "<<bench->config->SSTable_count<<endl;
+    pthread_mutex_init(&bench->mutex_i,NULL);
+    while (true) {
+        std::string command;
+        std::cout << "Enter command: ";
+        std::cin >> command;
+
+        if (command == "interrupt") {
+            cout<<"will interrupt in next round"<<endl;
+            pthread_mutex_lock(&bench->mutex_i);
+            bench->interrupted = true;
+            pthread_mutex_unlock(&bench->mutex_i);
+            cout<<"search pid: ";
+            cin>>bench->search_pid;
+            cout<<"\nvalid_timestamp: ";
+            cin>>bench->valid_timestamp;
+            cout<<"\nconfig->search_list_capacity: "<<bench->config->search_list_capacity<<endl;
+            cout<<"\nsearch_count(less than search_list_capacity): ";
+            cin>>bench->search_count;
+            cout<<endl;
+        } else if (command == "exit") {
+            cout<<"will exit"<<endl;
+            break;
+        } else {
+            std::cout << "Unknown command: " << command << std::endl;
+        }
+        sleep(1);
+    }
+    return NULL;
+}
+
 #ifdef USE_GPU
 workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu);
 void process_with_gpu(workbench *bench,workbench *d_bench, gpu_info *gpu);
@@ -302,6 +335,7 @@ void process_with_gpu(workbench *bench,workbench *d_bench, gpu_info *gpu);
 
 void tracer::process(){
 	struct timeval start = get_cur_time();
+    std::cout << "Running main program..." << std::endl;
 	for(int st=config->start_time;st<config->start_time+config->duration;st+=100){
         config->cur_duration = min((config->start_time+config->duration-st),(uint)100);
         if(config->load_data){
@@ -315,6 +349,13 @@ void tracer::process(){
 			bench = part->build_schema(trace, config->num_objects);
 			bench->mbr = mbr;
 
+            //command
+            pthread_t command_thread;
+            int ret1;
+            if ((ret1 = pthread_create(&command_thread, NULL, commandThreadFunction, (void *) bench)) != 0) {
+                fprintf(stderr, "pthread_create:%s\n", strerror(ret1));
+            }
+            pthread_detach(command_thread);
 #ifdef USE_GPU
 			if(config->gpu){
 				d_bench = cuda_create_device_bench(bench, gpu);
@@ -331,33 +372,13 @@ void tracer::process(){
             }
 			// process the coordinate in this time point
 
-            if(bench->cur_time==1900){
-                bench->config->search_kv = true;                            //cuda search
-                if(bench->config->search_kv){
-                    bench->search_count = config->search_list_capacity;
-                    for(int i=0;i<bench->search_count;i++){
-                        bench->search_list[i].pid = 500000;                      //range query
-                        //bench->search_list[i].pid = bench->h_keys[0][500]/100000000/100000000/100000000;
-                        //bench->search_list[i].pid = bench->bg_run[1].first_pid[300];
-                        bench->search_list[i].target = 0;
-                        bench->search_list[i].start = 0;
-                        bench->search_list[i].end = 0;
-                    }
-                }
-            }
-
-            if(bench->cur_time==3200){
-                bench->config->search_kv = true;                            //cuda search
-                if(bench->config->search_kv){
-                    bench->search_count = config->search_list_capacity;
-                    for(int i=0;i<bench->search_count;i++){
-                        bench->search_list[i].pid = 3333333;                      //range query
-                        //bench->search_list[i].pid = bench->h_keys[0][500]/100000000/100000000/100000000;
-                        //bench->search_list[i].pid = bench->bg_run[1].first_pid[300];
-                        bench->search_list[i].target = 0;
-                        bench->search_list[i].start = 0;
-                        bench->search_list[i].end = 0;
-                    }
+            if(bench->interrupted){
+                for(int i=0;i<bench->search_count;i++){
+                    //bench->search_list[i].pid = bench->h_keys[0][500]/100000000/100000000/100000000;
+                    //bench->search_list[i].pid = bench->bg_run[1].first_pid[300];
+                    bench->search_list[i].target = 0;
+                    bench->search_list[i].start = 0;
+                    bench->search_list[i].end = 0;
                 }
             }
 
@@ -374,7 +395,10 @@ void tracer::process(){
                 process_with_gpu(bench,d_bench,gpu);
 #endif
 			}
-            if(bench->cur_time==1900){                                   //total search
+            if(bench->interrupted){                                   //total search
+                pthread_mutex_lock(&bench->mutex_i);
+                bench->interrupted = false;                         //reset
+                pthread_mutex_unlock(&bench->mutex_i);
                 cout<<"cuda search"<<endl;
                 uint pid = 500000;
                 //uint pid = bench->h_keys[0][500]/100000000/100000000/100000000;
@@ -383,7 +407,7 @@ void tracer::process(){
                 for(int i=0;i<bench->search_count;i++){
                     //set<key_value> *range_result = new set<key_value>;
                     if(bench->search_list[i].target>0) {
-                        cout << bench->search_list[i].pid << "-" << bench->search_list[i].target << "-"
+                        cout << bench->search_pid << "-" << bench->search_list[i].target << "-"
                              << bench->search_list[i].start << "-" << bench->search_list[i].end << endl;
                     }
 
@@ -402,37 +426,13 @@ void tracer::process(){
 
                 bench->search_count = 0;                //init
                 bench->find_count = 0;
-                uint valid_timestamp = 400;
                 for(int i=0;i<bench->big_sorted_run_count;i++){
-                    if((bench->bg_run[i].timestamp_min<valid_timestamp)&&(valid_timestamp<bench->bg_run[i].timestamp_max)){
+                    if((bench->bg_run[i].timestamp_min<bench->valid_timestamp)&&(bench->valid_timestamp<bench->bg_run[i].timestamp_max)){
                         bench->bg_run[i].search_in_disk(i,pid);
                     }
                 }
                 bench->pro.search_in_disk_time += get_time_elapsed(newstart,false);
                 logt("search in disk",newstart);
-            }
-            if(bench->cur_time==3200){                                   //total search
-                cout<<"cuda search"<<endl;
-                uint pid = 3333333;
-                cout<<"pid: "<<pid<<endl;
-                for(int i=0;i<bench->search_count;i++){
-                    if(bench->search_list[i].target>0) {
-                        cout << bench->search_list[i].pid << "-" << bench->search_list[i].target << "-"
-                             << bench->search_list[i].start << "-" << bench->search_list[i].end << endl;
-                    }
-                }
-
-                //search memtable
-                bench->search_memtable(pid);
-
-                bench->search_count = 0;                //init
-                bench->find_count = 0;
-                uint valid_timestamp = 2000;
-                for(int i=0;i<bench->big_sorted_run_count;i++){
-                    if((bench->bg_run[i].timestamp_min<valid_timestamp)&&(valid_timestamp<bench->bg_run[i].timestamp_max)){
-                        bench->bg_run[i].search_in_disk(i,pid);
-                    }
-                }
             }
 
 //            if(bench->MemTable_count>0){

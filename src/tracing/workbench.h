@@ -75,7 +75,7 @@ typedef struct meeting_unit{
 }meeting_unit;
 
 typedef struct search_info_unit{
-    uint pid;
+    //uint pid;                       //useless
     uint target;
     uint start;
     uint end;
@@ -173,8 +173,12 @@ public:
 
     //space for search list
     search_info_unit * search_list = NULL;
+    uint search_pid = 0;
     uint search_count = 0;
     uint find_count = 0;
+    pthread_mutex_t mutex_i;
+    bool interrupted = false;
+    uint valid_timestamp = 0;
 
     //big sorted run
     sorted_run *bg_run = NULL;

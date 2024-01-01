@@ -49,14 +49,14 @@ public:
     //added
     bool load_data = true;
 
-    uint kv_capacity = 45000000;            //45000000
-    uint kv_restriction = 44739243;                  //44739243
+    uint kv_capacity = 150000;            //45000000
+    uint kv_restriction = 100000;                  //44739243
     uint MemTable_capacity = 10;             //5*2          //MemTable
 
     uint big_sorted_run_capacity = 100;
     uint SSTable_count = 1024;
 
-    bool search_kv = true;
+    //bool search_kv = true;
     uint search_list_capacity = 1000;
 
     bool bloom_filter = false;

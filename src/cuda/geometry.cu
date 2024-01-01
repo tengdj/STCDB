@@ -475,9 +475,9 @@ void cuda_identify_meetings(workbench *bench) {
     }
     // is still active
     if (bench->meeting_buckets[bid].end == bench->cur_time) {
-        if(bench->config->search_kv&&bench->search_count>0) {
+        if(bench->search_count>0) {
             if (bench->cur_time - bench->meeting_buckets[bid].start >= bench->config->min_meet_time + 1) {
-                if (bench->search_list[0].pid == getpid1(bench->meeting_buckets[bid].key)) {
+                if (bench->search_pid == getpid1(bench->meeting_buckets[bid].key)) {
                     uint meeting_idx = atomicAdd(&bench->find_count, 1);
                     assert(bench->find_count < bench->search_count);
                     bench->search_list[meeting_idx].target = getpid2(bench->meeting_buckets[bid].key);
@@ -532,7 +532,7 @@ void cuda_search_kv(workbench *bench){
     if(kid>=bench->kv_count){
         return;
     }
-    if((uint)(bench->d_keys[kid]/100000000 / 100000000 / 100000000) == bench->search_list[0].pid){              //all the same
+    if((uint)(bench->d_keys[kid]/100000000 / 100000000 / 100000000) == bench->search_pid){              //all the same
         uint meeting_idx = atomicAdd(&bench->find_count, 1);
         assert(bench->find_count<bench->search_count);
         bench->search_list[meeting_idx].target = (uint)((bench->d_keys[kid]/100000000 / 100000000) % 100000000);
@@ -950,7 +950,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 	// setup the current time and points for this round
 	workbench h_bench(bench);
 	CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-    if(bench->config->search_kv&&bench->search_count>0) {
+    if(bench->search_count>0) {
         h_bench.search_count = bench->search_count;
         CUDA_SAFE_CALL(cudaMemcpy(h_bench.search_list, bench->search_list, bench->search_count * sizeof(search_info_unit),cudaMemcpyHostToDevice));
     }
@@ -1171,7 +1171,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 	}
 
     /* 6. search kv info */
-    if(bench->config->search_kv&&bench->search_count>0){
+    if(bench->search_count>0){
 //        h_bench.search_count = bench->search_count;
 //        CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));
 //        CUDA_SAFE_CALL(cudaMemcpy(h_bench.search_list, bench->search_list, bench->search_count*sizeof(search_info_unit), cudaMemcpyHostToDevice));
