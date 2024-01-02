@@ -1130,6 +1130,34 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         logt("init after sort",start);
     }
 
+    if(bench->crash_consistency){
+        cout<<"crash_consistency, 1 cuda sort"<<endl;
+        // wrap raw pointer with a device_ptr
+        thrust::device_ptr<__uint128_t> d_vector_keys = thrust::device_pointer_cast(h_bench.d_keys);
+        thrust::device_ptr<uint> d_vector_values = thrust::device_pointer_cast(h_bench.d_values);
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("pointer_cast: ",start);
+        // use device_ptr in Thrust algorithms
+        thrust::sort_by_key(d_vector_keys, d_vector_keys + bench->kv_count, d_vector_values);
+        // access device memory transparently through device_ptr
+        //dev_ptr[0] = 1;
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("cuda_sort_time: ",start);
+        uint offset = 0;
+        if(bench->big_sorted_run_count%2==1){
+            offset = bench->config->MemTable_capacity/2;
+        }
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_box_block[offset+bench->MemTable_count], h_bench.d_box_block, bench->kv_count * sizeof(box), cudaMemcpyDeviceToHost));       //can be cpy before sort
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_keys[offset+bench->MemTable_count], h_bench.d_keys, bench->kv_count * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_values[offset+bench->MemTable_count], h_bench.d_values, bench->kv_count * sizeof(uint), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("cudaMemcpy kv",start);
+        bench->MemTable_count++;
+    }
+
 	// todo do the data analyzes, for test only, should not copy out so much stuff
 	if(bench->config->analyze_grid||bench->config->analyze_reach||bench->config->profile){
 		CUDA_SAFE_CALL(cudaMemcpy(bench->grid_counter, h_bench.grid_counter,
