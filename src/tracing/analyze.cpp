@@ -204,7 +204,8 @@ void workbench::print_profile(){
         fprintf(stderr,"\tsearch disk:\t%.2f\n",pro.search_in_disk_time);
         fprintf(stderr,"\toverall :\t%.2f\n",(pro.copy_time+pro.partition_time+pro.filter_time+pro.refine_time+pro.meeting_identify_time+pro.index_update_time
                                                            +pro.cuda_sort_time+pro.cuda_search_kv_time));
-        fprintf(stderr,"\tmerge sort and flush:\t%.2f\n",pro.bg_merge_flush_time);
+        fprintf(stderr,"\tmerge sort:\t%.2f\n",pro.bg_merge_time);
+        fprintf(stderr,"\tmerge sort:\t%.2f\n",pro.bg_flush_time);
 
 
 		fprintf(stderr,"statistics:\n");

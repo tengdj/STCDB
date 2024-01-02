@@ -195,13 +195,13 @@ inline bool BloomFilter_Check(workbench *bench, uint sst, uint pid){
 }
 
 void *sst_dump(void *arg){
-    struct timeval bg_start = get_cur_time();
     cout<<"step into the sst_dump"<<endl;
     workbench *bench = (workbench *)arg;
     cout<<"cur_time: "<<bench->cur_time<<endl;
     uint offset = 0;
     assert(bench->config->MemTable_capacity%2==0);
     uint old_big = bench->big_sorted_run_count;                 //atomic add
+    cout<<"old big_sorted_run_count: "<<old_big<<endl;
     bench->big_sorted_run_count++;
     if(old_big%2==1){
         offset = bench->config->MemTable_capacity/2;
@@ -224,6 +224,7 @@ void *sst_dump(void *arg){
 
     uint *key_index = new uint[bench->config->MemTable_capacity/2]{0};
     int finish = 0;
+    struct timeval bg_start = get_cur_time();
     clock_t time1,time2;
     time1 = clock();
     while(finish<bench->config->MemTable_capacity/2){
@@ -270,9 +271,11 @@ void *sst_dump(void *arg){
             kv_count++;
         }
         if(kv_count==sst_capacity||finish==bench->config->MemTable_capacity/2){
+            bench->pro.bg_merge_time += get_time_elapsed(bg_start,true);
             SSTable_of.write((char *)temp_kvs, sizeof(key_value)*sst_capacity);
             SSTable_of.flush();
             SSTable_of.close();
+            bench->pro.bg_flush_time += get_time_elapsed(bg_start,true);
             sst_count++;
             kv_count = 0;
         }
@@ -280,7 +283,7 @@ void *sst_dump(void *arg){
     cout<<"sst_count :"<<sst_count<<" less than"<<1024<<endl;
     time2 = clock();
     double this_time = (double)(time2-time1)/CLOCKS_PER_SEC;
-    cout<<"merge sort t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
+    cout<<"merge sort and flush t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
     for(int i=0;i<bench->config->MemTable_capacity/2; i++){
         cout<<"key_index"<<key_index[i]<<endl;
     }
@@ -289,20 +292,18 @@ void *sst_dump(void *arg){
     bench->bg_run[old_big].timestamp_max = t_max;
     bench->bg_run[old_big].print_meta();
     cout<<"now SSTable_count:"<<bench->bg_run[old_big].SSTable_count<<endl;
-
-    bench->pro.bg_merge_flush_time += get_time_elapsed(bg_start,false);
     logt("merge sort and flush", bg_start);
     return NULL;
 }
 
 void *crash_sst_dump(void *arg){
-    struct timeval bg_start = get_cur_time();
     cout<<"step into the sst_dump"<<endl;
     workbench *bench = (workbench *)arg;
     cout<<"cur_time: "<<bench->cur_time<<endl;
     uint offset = 0;
     assert(bench->config->MemTable_capacity%2==0);
     uint old_big = bench->big_sorted_run_count;                 //atomic add
+    cout<<"old big_sorted_run_count: "<<old_big<<endl;
     bench->big_sorted_run_count++;
     if(old_big%2==1){
         offset = bench->config->MemTable_capacity/2;
@@ -325,6 +326,7 @@ void *crash_sst_dump(void *arg){
 
     uint *key_index = new uint[bench->config->MemTable_capacity/2]{0};
     int finish = 0;
+    struct timeval bg_start = get_cur_time();
     clock_t time1,time2;
     time1 = clock();
     while(finish<bench->MemTable_count){
@@ -371,9 +373,11 @@ void *crash_sst_dump(void *arg){
             kv_count++;
         }
         if(kv_count==sst_capacity||finish==bench->MemTable_count){
+            bench->pro.bg_merge_time += get_time_elapsed(bg_start,true);
             SSTable_of.write((char *)temp_kvs, sizeof(key_value)*kv_count);
             SSTable_of.flush();
             SSTable_of.close();
+            bench->pro.bg_flush_time += get_time_elapsed(bg_start,true);
             sst_count++;
             kv_count = 0;
         }
@@ -381,7 +385,7 @@ void *crash_sst_dump(void *arg){
     cout<<"sst_count :"<<sst_count<<" less than"<<1024<<endl;
     time2 = clock();
     double this_time = (double)(time2-time1)/CLOCKS_PER_SEC;
-    cout<<"merge sort t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
+    cout<<"merge sort and flush t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
     for(int i=0;i<bench->config->MemTable_capacity/2; i++){
         cout<<"key_index"<<key_index[i]<<endl;
     }
@@ -390,8 +394,6 @@ void *crash_sst_dump(void *arg){
     bench->bg_run[old_big].timestamp_max = t_max;
     bench->bg_run[old_big].print_meta();
     cout<<"now SSTable_count:"<<bench->bg_run[old_big].SSTable_count<<endl;
-
-    bench->pro.bg_merge_flush_time += get_time_elapsed(bg_start,false);
     logt("merge sort and flush", bg_start);
     return NULL;
 }
@@ -401,30 +403,19 @@ void* commandThreadFunction(void* arg) {
     cout<<"bench->config->SSTable_count: "<<bench->config->SSTable_count<<endl;
     pthread_mutex_init(&bench->mutex_i,NULL);
     while (true) {
+        pthread_mutex_lock(&bench->mutex_i);
         std::string command;
         std::cout << "Enter command: ";
         std::cin >> command;
-
         if (command == "interrupt") {
             cout<<"will interrupt in next round"<<endl;
-            pthread_mutex_lock(&bench->mutex_i);
             bench->interrupted = true;
-            pthread_mutex_unlock(&bench->mutex_i);
-            cout<<"search pid: ";
-            cin>>bench->search_pid;
-            cout<<"\nvalid_timestamp: ";
-            cin>>bench->valid_timestamp;
-            cout<<"\nconfig->search_list_capacity: "<<bench->config->search_list_capacity<<endl;
-            cout<<"\nsearch_count(less than search_list_capacity): ";
-            cin>>bench->search_count;
-            cout<<endl;
         } else if (command == "exit") {
             cout<<"will exit"<<endl;
             break;
         } else {
             std::cout << "Unknown command: " << command << std::endl;
         }
-        sleep(1);
     }
     return NULL;
 }
@@ -474,6 +465,14 @@ void tracer::process(){
 			// process the coordinate in this time point
 
             if(bench->interrupted){
+                cout<<"search pid: ";
+                cin>>bench->search_pid;
+                cout<<"valid_timestamp: ";
+                cin>>bench->valid_timestamp;
+                cout<<"config->search_list_capacity: "<<config->search_list_capacity<<endl;
+                cout<<"search_count(less than search_list_capacity): ";
+                cin>>bench->search_count;
+                cout<<endl;
                 for(int i=0;i<bench->search_count;i++){
                     //bench->search_list[i].pid = bench->h_keys[0][500]/100000000/100000000/100000000;
                     //bench->search_list[i].pid = bench->bg_run[1].first_pid[300];
@@ -481,6 +480,7 @@ void tracer::process(){
                     bench->search_list[i].start = 0;
                     bench->search_list[i].end = 0;
                 }
+                cout<<"search init"<<endl;
             }
 
 			if(!config->gpu){
@@ -497,14 +497,10 @@ void tracer::process(){
 #endif
 			}
             if(bench->interrupted){                                   //total search
-                pthread_mutex_lock(&bench->mutex_i);
                 bench->interrupted = false;                         //reset
-                pthread_mutex_unlock(&bench->mutex_i);
                 cout<<"cuda search"<<endl;
-                uint pid = 500000;
                 //uint pid = bench->h_keys[0][500]/100000000/100000000/100000000;
                 //uint pid = bench->bg_run[1].first_pid[300];
-                cout<<"pid: "<<pid<<endl;
                 for(int i=0;i<bench->search_count;i++){
                     //set<key_value> *range_result = new set<key_value>;
                     if(bench->search_list[i].target>0) {
@@ -512,16 +508,16 @@ void tracer::process(){
                              << bench->search_list[i].start << "-" << bench->search_list[i].end << endl;
                     }
 
-    //                if(bench->MemTable_count>0){
-    //                    if(BloomFilter_Check(bench, 0 ,bench->search_list[i].pid)){
-    //                        cout<< bench->search_list[i].pid <<"BloomFilter_Check :"<<endl;
-    //                    }
-    //                }
+                    //                if(bench->MemTable_count>0){
+                    //                    if(BloomFilter_Check(bench, 0 ,bench->search_list[i].pid)){
+                    //                        cout<< bench->search_list[i].pid <<"BloomFilter_Check :"<<endl;
+                    //                    }
+                    //                }
                 }
 
                 //search memtable
                 struct timeval newstart = get_cur_time();
-                bench->search_memtable(pid);
+                bench->search_memtable(bench->search_pid);
                 bench->pro.search_memtable_time += get_time_elapsed(newstart,false);
                 logt("search memtable",newstart);
 
@@ -529,11 +525,12 @@ void tracer::process(){
                 bench->find_count = 0;
                 for(int i=0;i<bench->big_sorted_run_count;i++){
                     if((bench->bg_run[i].timestamp_min<bench->valid_timestamp)&&(bench->valid_timestamp<bench->bg_run[i].timestamp_max)){
-                        bench->bg_run[i].search_in_disk(i,pid);
+                        bench->bg_run[i].search_in_disk(i,bench->search_pid);
                     }
                 }
                 bench->pro.search_in_disk_time += get_time_elapsed(newstart,false);
                 logt("search in disk",newstart);
+                pthread_mutex_unlock(&bench->mutex_i);
             }
 
 //            if(bench->MemTable_count>0){
