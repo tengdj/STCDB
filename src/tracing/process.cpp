@@ -246,7 +246,7 @@ void *sst_dump(void *arg){
         }
         if(finish<bench->config->MemTable_capacity/2){
             bench->h_keys[offset+take_id][key_index[take_id]] = 0;                                     //init
-            //box temp_box = bench->h_box_block[offset+take_id][bench->h_values[offset+take_id][key_index[take_id]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
+            box temp_box = bench->h_box_block[offset+take_id][bench->h_values[offset+take_id][key_index[take_id]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
             key_index[take_id]++;                                                   // one while, one kv
             if(kv_count==0){
                 bench->bg_run[old_big].first_pid[sst_count] = temp_key/100000000 / 100000000 / 100000000;
@@ -261,7 +261,7 @@ void *sst_dump(void *arg){
 //            print_128(temp_key);
 //            cout<< ": "<< temp_box->low[0] << endl;
             temp_kvs[kv_count].key = temp_key;
-            temp_kvs[kv_count].value = bench->h_box_block[offset+take_id][bench->h_values[offset+take_id][key_index[take_id]]];     //box
+            temp_kvs[kv_count].value = temp_box;     //box
             kv_count++;
         }
         if(kv_count==sst_capacity||finish==bench->config->MemTable_capacity/2){
