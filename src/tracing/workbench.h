@@ -42,6 +42,8 @@ typedef struct profiler{
     double cuda_search_kv_time = 0;
     double bg_merge_time = 0;
     double bg_flush_time = 0;
+    double bg_open_time = 0;
+
     double search_memtable_time = 0;
     double search_in_disk_time = 0;
 }profiler;

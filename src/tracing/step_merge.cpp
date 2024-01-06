@@ -64,7 +64,7 @@ sorted_run::~sorted_run(){
     delete []first_pid;
 }
 
-bool sorted_run::search_in_disk(uint big_sort_id,uint pid){                              //this pointer refers to a single sorted_run
+bool sorted_run::search_in_disk(uint big_sort_id, uint pid){                              //this pointer refers to a single sorted_run
     cout<<"into disk"<<endl;
     sst = new SSTable[SSTable_count];                   //maybe useful later, should not delete after this func
     ifstream read_sst;

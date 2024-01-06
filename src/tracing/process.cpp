@@ -206,7 +206,6 @@ void *sst_dump(void *arg){
     if(old_big%2==1){
         offset = bench->config->MemTable_capacity/2;
     }
-    //bench->bg_run[old_big].SSTable_count = bench->config->SSTable_count;
     bench->bg_run[old_big].first_pid = new uint[bench->bg_run[old_big].SSTable_count];
 
     //merge sort
@@ -216,25 +215,20 @@ void *sst_dump(void *arg){
     uint sst_count = 0;
     uint sst_capacity = bench->config->kv_restriction*bench->config->MemTable_capacity/2/bench->config->SSTable_count;     //218454   10G /1024
     cout<<"sst_capacity:"<<sst_capacity<<endl;
-    //uint sst_capacity = 218454;
     key_value *temp_kvs = new key_value[sst_capacity];
-
     uint t_min = 3600*24*14;
     uint t_max = 0;
-
     uint *key_index = new uint[bench->config->MemTable_capacity/2]{0};
     int finish = 0;
     struct timeval bg_start = get_cur_time();
-    clock_t time1,time2;
-    time1 = clock();
     while(finish<bench->config->MemTable_capacity/2){
         if(kv_count==0){
             SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out | ios::trunc);
             assert(SSTable_of.is_open());
+            bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
         }
         finish = 0;
         __uint128_t temp_key = (__uint128_t)1<<126;
-        box  temp_box;
         uint take_id =0;
         for(int i=0;i<bench->config->MemTable_capacity/2; i++){
 //            if( bench->h_keys[offset+i][key_index[i]] == 0){              //empty kv
@@ -247,12 +241,12 @@ void *sst_dump(void *arg){
             }
             if( temp_key > bench->h_keys[offset+i][key_index[i]] ){
                 temp_key = bench->h_keys[offset+i][key_index[i]];
-                temp_box = bench->h_box_block[offset+i][bench->h_values[offset+i][key_index[i]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
                 take_id = i;
             }
         }
         if(finish<bench->config->MemTable_capacity/2){
             bench->h_keys[offset+take_id][key_index[take_id]] = 0;                                     //init
+            //box temp_box = bench->h_box_block[offset+take_id][bench->h_values[offset+take_id][key_index[take_id]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
             key_index[take_id]++;                                                   // one while, one kv
             if(kv_count==0){
                 bench->bg_run[old_big].first_pid[sst_count] = temp_key/100000000 / 100000000 / 100000000;
@@ -267,7 +261,7 @@ void *sst_dump(void *arg){
 //            print_128(temp_key);
 //            cout<< ": "<< temp_box->low[0] << endl;
             temp_kvs[kv_count].key = temp_key;
-            temp_kvs[kv_count].value = temp_box;
+            temp_kvs[kv_count].value = bench->h_box_block[offset+take_id][bench->h_values[offset+take_id][key_index[take_id]]];     //box
             kv_count++;
         }
         if(kv_count==sst_capacity||finish==bench->config->MemTable_capacity/2){
@@ -280,10 +274,10 @@ void *sst_dump(void *arg){
             kv_count = 0;
         }
     }
+    fprintf(stdout,"\tmerge sort:\t%.2f\n",bench->pro.bg_merge_time);
+    fprintf(stdout,"\tflush:\t%.2f\n",bench->pro.bg_flush_time);
+    fprintf(stdout,"\topen:\t%.2f\n",bench->pro.bg_open_time);
     cout<<"sst_count :"<<sst_count<<" less than"<<1024<<endl;
-    time2 = clock();
-    double this_time = (double)(time2-time1)/CLOCKS_PER_SEC;
-    cout<<"merge sort and flush t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
     for(int i=0;i<bench->config->MemTable_capacity/2; i++){
         cout<<"key_index"<<key_index[i]<<endl;
     }
@@ -291,8 +285,7 @@ void *sst_dump(void *arg){
     bench->bg_run[old_big].timestamp_min = t_min;
     bench->bg_run[old_big].timestamp_max = t_max;
     bench->bg_run[old_big].print_meta();
-    cout<<"now SSTable_count:"<<bench->bg_run[old_big].SSTable_count<<endl;
-    logt("merge sort and flush", bg_start);
+    //logt("merge sort and flush", bg_start);
     return NULL;
 }
 
@@ -308,7 +301,6 @@ void *crash_sst_dump(void *arg){
     if(old_big%2==1){
         offset = bench->config->MemTable_capacity/2;
     }
-    //bench->bg_run[old_big].SSTable_count = bench->config->SSTable_count;
     bench->bg_run[old_big].first_pid = new uint[bench->bg_run[old_big].SSTable_count];
 
     //merge sort
@@ -333,20 +325,21 @@ void *crash_sst_dump(void *arg){
         if(kv_count==0){
             SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out | ios::trunc);
             assert(SSTable_of.is_open());
+            bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
         }
         finish = 0;
         __uint128_t temp_key = (__uint128_t)1<<126;
         box  temp_box;
         uint take_id =0;
         for(int i=0;i<bench->MemTable_count; i++){
-//            if( bench->h_keys[offset+i][key_index[i]] == 0){              //empty kv
-//                finish++;
-//                continue;
-//            }
-            if(key_index[i]>= bench->config->kv_restriction){              //empty kv
+            if( bench->h_keys[offset+i][key_index[i]] == 0){              //empty kv
                 finish++;
                 continue;
             }
+//            if(key_index[i]>= bench->config->kv_restriction){              //empty kv
+//                finish++;
+//                continue;
+//            }
             if( temp_key > bench->h_keys[offset+i][key_index[i]] ){
                 temp_key = bench->h_keys[offset+i][key_index[i]];
                 temp_box = bench->h_box_block[offset+i][bench->h_values[offset+i][key_index[i]]];               //bench->  i find the right 2G, then in box_block[ h_values ]
@@ -386,7 +379,7 @@ void *crash_sst_dump(void *arg){
     time2 = clock();
     double this_time = (double)(time2-time1)/CLOCKS_PER_SEC;
     cout<<"merge sort and flush t: "<<bench->cur_time<<" time: "<< this_time <<std::endl;
-    for(int i=0;i<bench->config->MemTable_capacity/2; i++){
+    for(int i=0;i<bench->MemTable_count; i++){
         cout<<"key_index"<<key_index[i]<<endl;
     }
     delete[] key_index;
@@ -571,10 +564,12 @@ void tracer::process(){
                 for(int i=0;i<bench->MemTable_count; i++){
                     for(int j=0;j<10;j++){
                         print_128(bench->h_keys[offset+i][j]);
+                        bench->h_box_block[offset+i][j+233].print();
                         cout<<endl;
                     }
                     cout<<endl;
                 }
+                cout<<"crash_consistency, 2 merge sort and dump"<<endl;
                 cout << "crash dump begin time: " << bench->cur_time << endl;
                 crash_sst_dump((void *)bench);
             }

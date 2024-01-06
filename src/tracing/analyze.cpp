@@ -205,8 +205,8 @@ void workbench::print_profile(){
         fprintf(stderr,"\toverall :\t%.2f\n",(pro.copy_time+pro.partition_time+pro.filter_time+pro.refine_time+pro.meeting_identify_time+pro.index_update_time
                                                            +pro.cuda_sort_time+pro.cuda_search_kv_time));
         fprintf(stderr,"\tmerge sort:\t%.2f\n",pro.bg_merge_time);
-        fprintf(stderr,"\tmerge sort:\t%.2f\n",pro.bg_flush_time);
-
+        fprintf(stderr,"\tflush:\t%.2f\n",pro.bg_flush_time);
+        fprintf(stderr,"\tbg_open:\t%.2f\n",pro.bg_open_time);
 
 		fprintf(stderr,"statistics:\n");
 		fprintf(stderr,"\tnum pairs:\t%.2f \n",2.0*(pro.num_pairs/pro.rounds)/config->num_objects);

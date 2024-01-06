@@ -1137,10 +1137,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         thrust::device_ptr<uint> d_vector_values = thrust::device_pointer_cast(h_bench.d_values);
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("pointer_cast: ",start);
-        // use device_ptr in Thrust algorithms
-        thrust::sort_by_key(d_vector_keys, d_vector_keys + bench->kv_count, d_vector_values);
-        // access device memory transparently through device_ptr
-        //dev_ptr[0] = 1;
+        thrust::sort_by_key(d_vector_keys, d_vector_keys + h_bench.kv_count, d_vector_values);
         check_execution();
         cudaDeviceSynchronize();
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
@@ -1150,11 +1147,18 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         if(bench->big_sorted_run_count%2==1){
             offset = bench->config->MemTable_capacity/2;
         }
-        CUDA_SAFE_CALL(cudaMemcpy(bench->h_box_block[offset+bench->MemTable_count], h_bench.d_box_block, bench->kv_count * sizeof(box), cudaMemcpyDeviceToHost));       //can be cpy before sort
-        CUDA_SAFE_CALL(cudaMemcpy(bench->h_keys[offset+bench->MemTable_count], h_bench.d_keys, bench->kv_count * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
-        CUDA_SAFE_CALL(cudaMemcpy(bench->h_values[offset+bench->MemTable_count], h_bench.d_values, bench->kv_count * sizeof(uint), cudaMemcpyDeviceToHost));
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_box_block[offset+bench->MemTable_count], h_bench.d_box_block, h_bench.kv_count * sizeof(box), cudaMemcpyDeviceToHost));       //can be cpy before sort
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_keys[offset+bench->MemTable_count], h_bench.d_keys, h_bench.kv_count * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_values[offset+bench->MemTable_count], h_bench.d_values, h_bench.kv_count * sizeof(uint), cudaMemcpyDeviceToHost));
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("cudaMemcpy kv",start);
+        printf("cudaMemcpy kv right\n");
+        print_128(bench->h_keys[offset+bench->MemTable_count][10]);
+        printf("\n");
+        print_128(bench->h_keys[offset+bench->MemTable_count][11]);
+        printf("\n");
+        print_128(bench->h_keys[offset+bench->MemTable_count][12]);
+        printf("\n");
         bench->MemTable_count++;
     }
 
