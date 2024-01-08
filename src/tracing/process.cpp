@@ -231,7 +231,7 @@ void *sst_dump(void *arg){
             bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
         }
         finish = 0;
-        temp_key = (uint64_t)1<<62;
+        temp_key = UINT64_MAX;
         taken_id = 0;
         for(int i=0;i<bench->config->MemTable_capacity/2; i++){
             if(key_index[i]>= bench->config->kv_restriction){              //empty kv
