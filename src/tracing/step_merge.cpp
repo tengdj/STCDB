@@ -21,7 +21,7 @@ bool SSTable::search_SSTable(uint pid) {
     uint temp_pid;
     while (low <= high) {
         mid = (low + high) / 2;
-        temp_pid = kv[mid].key/100000000 / 100000000 / 100000000;
+        temp_pid = kv[mid].key/10000000/100000;
         if ( temp_pid == pid){
             find = mid;
             break;
@@ -41,18 +41,17 @@ bool SSTable::search_SSTable(uint pid) {
     uint cursor = find;
     while(temp_pid==pid&&cursor>=1){
         cursor--;
-        temp_pid = kv[cursor].key/100000000 / 100000000 / 100000000;
+        temp_pid = kv[cursor].key/10000000/100000;
     }
     if(temp_pid==pid&&cursor==0){
-        print_128(kv[0].key);
+        cout<<kv[0].key<<endl;
         cout<<endl;
     }
     while(cursor+1<SSTable_kv_capacity){
         cursor++;
-        temp_pid = kv[cursor].key/100000000 / 100000000 / 100000000;
+        temp_pid = kv[cursor].key/10000000/100000;
         if(temp_pid==pid){
-            print_128(kv[cursor].key);
-            cout<<endl;
+            cout<<kv[cursor].key<<endl;
         }
     }
     cout<<"find !"<<endl;
@@ -121,65 +120,41 @@ bool sorted_run::search_in_disk(uint big_sort_id, uint pid){                    
     read_sst.close();
     uint cursor = pid_start+1;
     uint temp_pid;
-    while(true){
-        read_sst.open("../store/SSTable_"+to_string(big_sort_id)+"-"+to_string(cursor));
+    while(true) {
+        read_sst.open("../store/SSTable_" + to_string(big_sort_id) + "-" + to_string(cursor));
         assert(read_sst.is_open());
         sst[cursor].kv = new key_value[sst[cursor].SSTable_kv_capacity];
-        read_sst.read((char *)sst[cursor].kv,sizeof(key_value)*sst[cursor].SSTable_kv_capacity);
+        read_sst.read((char *) sst[cursor].kv, sizeof(key_value) * sst[cursor].SSTable_kv_capacity);
         read_sst.close();
-        if(cursor+1<SSTable_count){
-            if(first_pid[cursor+1]!=pid){               //must shut down in this cursor
+        if (cursor + 1 < SSTable_count) {
+            if (first_pid[cursor + 1] != pid) {               //must shut down in this cursor
                 uint index = 0;
-                while(index<=sst[cursor].SSTable_kv_capacity - 1){
-                    temp_pid = sst[cursor].kv[index].key/100000000 / 100000000 / 100000000;
-                    if(temp_pid==pid){
-                        print_128(sst[cursor].kv[index].key);
-                        cout<<endl;
-                    }
-                    else break;
+                while (index <= sst[cursor].SSTable_kv_capacity - 1) {
+                    temp_pid = sst[cursor].kv[index].key / 10000000 / 100000;
+                    if (temp_pid == pid) {
+                        cout << sst[cursor].kv[index].key << endl;
+                    } else break;
                     index++;
                 }
                 break;
             }
-            if(first_pid[cursor+1]==pid){               //mustn't shut down in this cursor
-                for(uint i=0;i<sst[cursor].SSTable_kv_capacity;i++){
-                    print_128(sst[cursor].kv[i].key);
-                    cout<<endl;
+            if (first_pid[cursor + 1] == pid) {               //mustn't shut down in this cursor
+                for (uint i = 0; i < sst[cursor].SSTable_kv_capacity; i++) {
+                    cout << sst[cursor].kv[i].key << endl;
                 }
             }
             cursor++;
-        }
-        else {                                           // cursor is the last one, same too bg_run->first_pid[cursor+1]!=pid
+        } else {                                           // cursor is the last one, same too bg_run->first_pid[cursor+1]!=pid
             uint index = 0;
-            while(index<=sst[cursor].SSTable_kv_capacity - 1){
-                temp_pid = sst[cursor].kv[index].key/100000000 / 100000000 / 100000000;
-                if(temp_pid==pid){
-                    print_128(sst[cursor].kv[index].key);
-                    cout<<endl;
-                }
-                else break;
+            while (index <= sst[cursor].SSTable_kv_capacity - 1) {
+                temp_pid = sst[cursor].kv[index].key / 10000000 / 100000;
+                if (temp_pid == pid) {
+                    cout << sst[cursor].kv[index].key << endl;
+                } else break;
                 index++;
             }
             break;
         }
-
-//        bool check = false;
-//        if(cursor+1<bg_run->SSTable_count){
-//            if(bg_run->first_pid[cursor+1]!=pid){
-//                check = true;
-//            }
-//        }
-//        if(cursor+1<bg_run->SSTable_count){
-//            check = true;
-//        }
-//        if(check){
-//            ...
-//            break;
-//        }
-//        else{
-//
-//        }
     }
-    //delete []bench->bg_run[i].sst;
     return true;
 }

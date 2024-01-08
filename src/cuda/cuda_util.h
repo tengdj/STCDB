@@ -110,5 +110,17 @@ inline uint64_t d_MurmurHash2_x64( const void * key, int len, uint32_t seed ){
     return h;
 }
 
+__device__
+inline uint float_to_uint(float xy) {
+    uint ret = 0;
+    if(xy<0){
+        ret = 10000000;
+        xy = 0-xy;
+    }
+//        uint inte = (uint)xy;
+//        uint decimals = (xy - inte)*10000;
+    ret += (uint)(xy*10000);
+    return ret;
+}
 
 #endif /* CUDA_UTIL_H_ */

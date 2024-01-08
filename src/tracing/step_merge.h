@@ -15,8 +15,8 @@
 #include "../index/QTree.h"
 
 typedef struct key_value{
-    __uint128_t key;
-    box value;
+    uint64_t key;
+    __uint128_t value;
 }key_value;
 
 class SSTable{

@@ -78,11 +78,9 @@ typedef struct meeting_unit{
 }meeting_unit;
 
 typedef struct search_info_unit{
-    //uint pid;                       //useless
     uint target;
-    uint start;
     uint end;
-    box mbr;
+    __uint128_t value;
 }search_info_unit;
 
 
@@ -151,15 +149,13 @@ public:
 //	uint meeting_counter = 0;
 
     //for space for cuda sort
-    __uint128_t *d_keys = NULL;
-    uint *d_values = NULL;
-    box *d_box_block = NULL;
+    uint64_t *d_keys = NULL;
+    __uint128_t *d_values = NULL;
     uint kv_count = 0;
 
     //space for MemTable
-    __uint128_t **h_keys = NULL;
-    uint **h_values = NULL;
-    box **h_box_block = NULL;
+    uint64_t **h_keys = NULL;
+    __uint128_t **h_values = NULL;
     uint MemTable_count = 0;
 
     //Bloom filter
@@ -186,6 +182,8 @@ public:
     //big sorted run
     sorted_run *bg_run = NULL;
     uint big_sorted_run_count = 0;
+    uint end_time_min = 0;
+    uint end_time_max = 0;
 
     bool crash_consistency = false;
 

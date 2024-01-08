@@ -125,27 +125,20 @@ void workbench::claim_space(){
 //		meeting_buckets[i].key = ULL_MAX;
 //	}
 
-    size = config->MemTable_capacity * sizeof(__uint128_t *);                 //sort
-    h_keys = (__uint128_t **)allocate(size);
+    size = config->MemTable_capacity * sizeof(uint64_t *);                 //sort
+    h_keys = (uint64_t **)allocate(size);
     //log("\t%.2f MB\tmeeting bucket space",size/1024.0/1024.0);
 
-    size = config->MemTable_capacity * sizeof(uint *);
-    h_values = (uint **)allocate(size);
-
-    size = config->MemTable_capacity * sizeof(box *);
-    h_box_block = (box **)allocate(size);
+    size = config->MemTable_capacity * sizeof(__uint128_t *);
+    h_values = (__uint128_t **)allocate(size);
 
     for(int i=0;i<config->MemTable_capacity; i++){
-        size = config->kv_capacity*sizeof(__uint128_t);
-        h_keys[i] = (__uint128_t *)allocate(size);
+        size = config->kv_capacity*sizeof(uint64_t);
+        h_keys[i] = (uint64_t *)allocate(size);
         log("\t%.2f MB\ta element of h_keys",size/1024.0/1024.0);
 
-        size = config->kv_capacity*sizeof(uint);
-        h_values[i] = (uint *)allocate(size);
-        log("\t%.2f MB\ta element of h_values",size/1024.0/1024.0);
-
-        size = config->kv_capacity*sizeof(box);
-        h_box_block[i] = (box *)allocate(size);
+        size = config->kv_capacity*sizeof(__uint128_t);
+        h_values[i] = (__uint128_t *)allocate(size);
         log("\t%.2f MB\ta element of h_values",size/1024.0/1024.0);
     }
 
@@ -180,7 +173,6 @@ bool workbench::search_memtable(uint pid){
         offset = config->MemTable_capacity/2;
     }
     bool ret = false;
-
     for(int i=0;i<MemTable_count;i++) {
 
         int find = -1;
@@ -188,10 +180,10 @@ bool workbench::search_memtable(uint pid){
         int high = config->kv_restriction - 1;
         int mid;
         uint temp_pid;
-        box * temp_box;
+        //box temp_box;
         while (low <= high) {
             mid = (low + high) / 2;
-            temp_pid = h_keys[offset+i][mid]/ 100000000 / 100000000 / 100000000;
+            temp_pid = h_keys[offset+i][mid]/10000000/100000;
             if (temp_pid == pid) {
                 find = mid;
                 ret = true;
@@ -210,20 +202,22 @@ bool workbench::search_memtable(uint pid){
         uint cursor = find;
         while (temp_pid == pid && cursor >= 1) {
             cursor--;
-            temp_pid = h_keys[offset+i][cursor]/ 100000000 / 100000000 / 100000000;
+            temp_pid = h_keys[offset+i][cursor]/10000000/100000;
         }
         if (temp_pid == pid && cursor == 0) {
-            print_128(h_keys[offset+i][0]);
-            temp_box = &h_box_block[offset+i][h_values[offset+i][0]];
-            cout<< ": "<< temp_box->low[0] << endl;
+            cout<<h_keys[offset+i][0];
+            cout<<" :"<<(uint)(h_values[offset+i][0]/100000000/100000000/100000000/100000000)<<endl;
+            box temp_box(h_values[offset+i][0]);
+            temp_box.print();
         }
         while (cursor + 1 < config->kv_restriction) {
             cursor++;
-            temp_pid = h_keys[offset+i][cursor]/ 100000000 / 100000000 / 100000000;
+            temp_pid = h_keys[offset+i][cursor]/10000000/100000;
             if (temp_pid == pid) {
-                print_128(h_keys[offset+i][cursor]);
-                temp_box = &h_box_block[offset+i][h_values[offset+i][cursor]];
-                cout<< ": "<< temp_box->low[0] << endl;
+                cout<<h_keys[offset+i][cursor]<<endl;
+                cout<<" :"<<(uint)(h_values[offset+i][cursor]/100000000/100000000/100000000/100000000)<<endl;
+                box temp_box(h_values[offset+i][cursor]);
+                temp_box.print();
             }
         }
     }

@@ -73,6 +73,13 @@ public:
 		high[1] = b->high[1];
 	}
 
+    box(__uint128_t value){                   //add
+        low[0] = uint_to_float(value/100000000/100000000/100000000%100000000);
+        low[1] = uint_to_float(value/100000000/100000000%100000000);
+        high[0] = uint_to_float(value/100000000%100000000);
+        high[1] = uint_to_float(value%100000000);
+    }
+
 	void update(Point p){
 		if(low[0]>p.x){
 			low[0] = p.x;
@@ -215,6 +222,7 @@ public:
 		low[!bigger_one] = low[!bigger_one]-difference/2;
 		high[!bigger_one] = high[!bigger_one]+difference/2;
 	}
+
 };
 
 
