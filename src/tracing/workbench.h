@@ -39,7 +39,8 @@ typedef struct profiler{
 	size_t num_meetings = 0;
 
     double cuda_sort_time = 0;
-    double cuda_search_kv_time = 0;
+    double cuda_search_single_kv_time = 0;
+    double cuda_search_multi_kv_time = 0;
     double bg_merge_time = 0;
     double bg_flush_time = 0;
     double bg_open_time = 0;
@@ -78,6 +79,7 @@ typedef struct meeting_unit{
 }meeting_unit;
 
 typedef struct search_info_unit{
+    uint pid;
     uint target;
     uint end;
     __uint128_t value;
@@ -171,10 +173,17 @@ public:
     unsigned char * d_pstFilter = NULL;
 
     //space for search list
-    search_info_unit * search_list = NULL;
-    uint search_pid = 0;
-    uint search_count = 0;
-    uint find_count = 0;
+    bool search_single = false;
+    bool search_multi = false;
+    search_info_unit *search_single_list = NULL;
+    search_info_unit *search_multi_list = NULL;
+    uint search_multi_length = 0;
+    uint *search_multi_pid = NULL;
+    uint search_single_pid = 0;
+    //uint search_count = 0;
+    uint single_find_count = 0;
+    uint multi_find_count = 0;
+
     pthread_mutex_t mutex_i;
     bool interrupted = false;
     uint valid_timestamp = 0;
@@ -255,7 +264,9 @@ public:
 	void unlock(uint key = 0){
 		pthread_mutex_unlock(&insert_lk[key%MAX_LOCK_NUM]);
 	}
+
     bool search_memtable(uint pid);
+    bool search_in_disk(uint pid, uint timestamp);
 };
 extern void lookup_rec(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);
 extern void lookup_stack(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);

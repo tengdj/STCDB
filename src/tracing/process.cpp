@@ -247,7 +247,7 @@ void *sst_dump(void *arg){
             temp_kvs[kv_count].key = temp_key;
             temp_kvs[kv_count].value = bench->h_values[offset + taken_id][key_index[taken_id]];     //box
             if(kv_count==0){
-                bench->bg_run[old_big].first_pid[sst_count] = temp_key/10000000/100000;
+                bench->bg_run[old_big].first_pid[sst_count] = temp_key >> 39;
             }
             bench->h_keys[offset + taken_id][key_index[taken_id]] = 0;                                     //init
             key_index[taken_id]++;                                                                  // one while, one kv
@@ -314,7 +314,7 @@ void *crash_sst_dump(void *arg){
             bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
         }
         finish = 0;
-        temp_key = (uint64_t)1<<62;
+        temp_key = UINT64_MAX;
         taken_id = 0;
         for(int i=0;i<bench->MemTable_count; i++){
             if( bench->h_keys[offset+i][key_index[i]] == 0){              //empty kv
@@ -334,7 +334,7 @@ void *crash_sst_dump(void *arg){
             temp_kvs[kv_count].key = temp_key;
             temp_kvs[kv_count].value = bench->h_values[offset + taken_id][key_index[taken_id]];     //box
             if(kv_count==0){
-                bench->bg_run[old_big].first_pid[sst_count] = temp_key/10000000/100000;
+                bench->bg_run[old_big].first_pid[sst_count] = temp_key >> 39;
             }
             bench->h_keys[offset + taken_id][key_index[taken_id]] = 0;                                     //init
             key_index[taken_id]++;                                                                  // one while, one kv
@@ -427,22 +427,12 @@ void tracer::process(){
 			// process the coordinate in this time point
 
             if(bench->interrupted){
+                bench->search_single = true;
                 cout<<"search pid: ";
-                cin>>bench->search_pid;
+                cin>>bench->search_single_pid;
                 cout<<"valid_timestamp: ";
                 cin>>bench->valid_timestamp;
-                cout<<"config->search_list_capacity: "<<config->search_list_capacity<<endl;
-                cout<<"search_count(less than search_list_capacity): ";
-                cin>>bench->search_count;
                 cout<<endl;
-                for(int i=0;i<bench->search_count;i++){
-                    //bench->search_list[i].pid = bench->h_keys[0][500]/100000000/100000000/100000000;
-                    //bench->search_list[i].pid = bench->bg_run[1].first_pid[300];
-                    bench->search_list[i].target = 0;
-                    bench->search_list[i].end = 0;
-                    bench->search_list[i].value = 0;
-                }
-                cout<<"search init"<<endl;
             }
 
 			if(!config->gpu){
@@ -458,41 +448,59 @@ void tracer::process(){
                 process_with_gpu(bench,d_bench,gpu);
 #endif
 			}
-            if(bench->interrupted){                                   //total search
-                bench->interrupted = false;                         //reset
-                cout<<"cuda search"<<endl;
-                //uint pid = bench->h_keys[0][500]/100000000/100000000/100000000;
-                //uint pid = bench->bg_run[1].first_pid[300];
-                for(int i=0;i<bench->search_count;i++){
-                    //set<key_value> *range_result = new set<key_value>;
-                    if(bench->search_list[i].target>0) {
-                        cout << bench->search_pid << "-" << bench->search_list[i].target << "-"
-                             << bench->search_list[i].end << endl;
-                    }
-
-                    //                if(bench->MemTable_count>0){
-                    //                    if(BloomFilter_Check(bench, 0 ,bench->search_list[i].pid)){
-                    //                        cout<< bench->search_list[i].pid <<"BloomFilter_Check :"<<endl;
-                    //                    }
-                    //                }
+            if(bench->search_multi){
+                bench->search_multi = false;
+                cout<<"cuda multi search"<<endl;
+                cout<<"cuda multi_find_count: "<<bench->multi_find_count<<endl;
+                for(int i=0;i<bench->multi_find_count;i++){
+                    cout << bench->search_multi_list[i].pid << "-" << bench->search_multi_list[i].target << "-"
+                         << bench->search_multi_list[i].end << endl;
+                    print_128(bench->search_single_list[i].value);
+                    cout<<endl;
                 }
 
                 //search memtable
                 struct timeval newstart = get_cur_time();
-                bench->search_memtable(bench->search_pid);
+                for(int i=0;i<bench->search_multi_length;i++){
+                    bench->search_memtable(bench->search_multi_pid[i]);
+                }
                 bench->pro.search_memtable_time += get_time_elapsed(newstart,false);
                 logt("search memtable",newstart);
 
-                bench->search_count = 0;                //init
-                bench->find_count = 0;
-                for(int i=0;i<bench->big_sorted_run_count;i++){
-                    if((bench->bg_run[i].timestamp_min<bench->valid_timestamp)&&(bench->valid_timestamp<bench->bg_run[i].timestamp_max)){
-                        bench->bg_run[i].search_in_disk(i,bench->search_pid);
-                    }
+                //search disk
+                for(int i=0;i<bench->search_multi_length;i++){
+                    bench->search_in_disk(bench->search_multi_pid[i], bench->valid_timestamp);
                 }
                 bench->pro.search_in_disk_time += get_time_elapsed(newstart,false);
                 logt("search in disk",newstart);
+            }
+            if(bench->search_single){                                   //search_single
+                bench->interrupted = false;                             //reset
+                bench->search_single = false;
+                bench->search_multi = true;
+                cout<<"cuda single search"<<endl;
+                cout<<"single_find_count: "<<bench->single_find_count<<endl;
+                bench->search_multi_length = bench->single_find_count;
+                for(int i=0;i<bench->single_find_count;i++){
+                    cout << bench->search_single_pid << "-" << bench->search_single_list[i].target << "-"
+                         << bench->search_single_list[i].end << endl;
+                    print_128(bench->search_single_list[i].value);
+                    cout<<endl;
+                    bench->search_multi_pid[i] = bench->search_single_list[i].target;
+                }
+
+                //search memtable
+                struct timeval newstart = get_cur_time();
+                bench->search_memtable(bench->search_single_pid);
+                bench->pro.search_memtable_time += get_time_elapsed(newstart,false);
+                logt("search memtable",newstart);
+
+                //search disk
+                bench->search_in_disk(bench->search_single_pid, bench->valid_timestamp);
+                bench->pro.search_in_disk_time += get_time_elapsed(newstart,false);
+                logt("search in disk",newstart);
                 pthread_mutex_unlock(&bench->mutex_i);
+                cout<<"final search_multi_length: "<<bench->search_multi_length<<endl;
             }
 
 //            if(bench->MemTable_count>0){

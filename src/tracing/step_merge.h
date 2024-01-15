@@ -26,7 +26,7 @@ public:
     uint SSTable_kv_capacity = 218454;              //44739243 * 5 / 1024 = 218454 (Round up)
 
     ~SSTable();
-    bool search_SSTable(uint pid);
+    bool search_SSTable(uint pid, bool search_multi, uint &search_multi_length, uint *search_multi_pid);
 };
 
 class sorted_run {                          //10G
@@ -43,7 +43,7 @@ public:
     void print_meta(){
         fprintf(stdout,"SSTable_count:%d timestamp_min:%d timestamp_max:%d\n",SSTable_count,timestamp_min,timestamp_max);
     }
-    bool search_in_disk(uint big_sort_id, uint pid);
+    //bool search_in_disk(uint big_sort_id, uint pid);
 };
 
 #endif

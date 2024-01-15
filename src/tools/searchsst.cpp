@@ -5,26 +5,26 @@
 using namespace std;
 
 int main(int argc, char **argv){
-    sorted_run *bg_run = new sorted_run;
-    bg_run->first_pid = new uint[bg_run->SSTable_count];
-    bg_run->sst = new SSTable[bg_run->SSTable_count];
-    for(int i=0;i<bg_run->SSTable_count;i++){
-        bg_run->sst[i].kv = new key_value[bg_run->sst->SSTable_kv_capacity];
-    }
-    ifstream read_meta;
-    read_meta.open("../store/first_pid_meta");
-    assert(read_meta.is_open());
-    for(int i=0;i<bg_run->SSTable_count;i++){
-        read_meta.read((char *)&bg_run->first_pid[i], sizeof(uint));
-        cout<<bg_run->first_pid[i]<<" ";
-    }
-    cout<<endl;
-    read_meta.close();
-    cout<<"before func"<<endl;
-    uint pid = 0;
-    if(bg_run->search_in_disk(0,500000)){
-        cout<<"finally find"<<endl;
-    }
+//    sorted_run *bg_run = new sorted_run;
+//    bg_run->first_pid = new uint[bg_run->SSTable_count];
+//    bg_run->sst = new SSTable[bg_run->SSTable_count];
+//    for(int i=0;i<bg_run->SSTable_count;i++){
+//        bg_run->sst[i].kv = new key_value[bg_run->sst->SSTable_kv_capacity];
+//    }
+//    ifstream read_meta;
+//    read_meta.open("../store/first_pid_meta");
+//    assert(read_meta.is_open());
+//    for(int i=0;i<bg_run->SSTable_count;i++){
+//        read_meta.read((char *)&bg_run->first_pid[i], sizeof(uint));
+//        cout<<bg_run->first_pid[i]<<" ";
+//    }
+//    cout<<endl;
+//    read_meta.close();
+//    cout<<"before func"<<endl;
+//    uint pid = 0;
+//    if(bg_run->search_in_disk(0,500000)){
+//        cout<<"finally find"<<endl;
+//    }
     return 0;
 }
 

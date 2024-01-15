@@ -74,10 +74,10 @@ public:
 	}
 
     box(__uint128_t value){                   //add
-        low[0] = uint_to_float(value/100000000/100000000/100000000%100000000);
-        low[1] = uint_to_float(value/100000000/100000000%100000000);
-        high[0] = uint_to_float(value/100000000%100000000);
-        high[1] = uint_to_float(value%100000000);
+        low[0] = uint_to_float((uint)((value >> 84) & ((1ULL << 28) - 1)));
+        low[1] = uint_to_float((uint)((value >> 56) & ((1ULL << 28) - 1)));
+        high[0] = uint_to_float((uint)((value >> 28) & ((1ULL << 28) - 1)));
+        high[1] = uint_to_float((uint)(value & ((1ULL << 28) - 1)));
     }
 
 	void update(Point p){

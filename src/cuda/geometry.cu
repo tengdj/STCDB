@@ -86,10 +86,7 @@ inline void print_point(Point *p){
 
 __device__
 __uint128_t box_to_128(box *b){
-    __uint128_t ret = (__uint128_t)float_to_uint(b->low[0]) * 100000000 * 100000000 * 100000000
-                      + (__uint128_t)float_to_uint(b->low[1]) * 100000000 * 100000000
-                      + (__uint128_t)float_to_uint(b->high[0]) * 100000000 + (__uint128_t)float_to_uint(b->high[1]);
-    return ret;
+    return ((__uint128_t)float_to_uint(b->low[0]) << 84) + ((__uint128_t)float_to_uint(b->low[1]) << 56) + ((__uint128_t)float_to_uint(b->high[0]) << 28) + ((__uint128_t)float_to_uint(b->high[1]));
 }
 
 
@@ -472,7 +469,6 @@ void cuda_profile_meetings(workbench *bench){
 
 __global__
 void cuda_identify_meetings(workbench *bench) {
-
     size_t bid = blockIdx.x * blockDim.x + threadIdx.x;
     if (bid >= bench->config->num_meeting_buckets) {
         return;
@@ -483,23 +479,43 @@ void cuda_identify_meetings(workbench *bench) {
     }
     // is still active
     if (bench->meeting_buckets[bid].end == bench->cur_time) {
-        if(bench->search_count>0) {
+        if(bench->search_single) {
             if (bench->cur_time - bench->meeting_buckets[bid].start >= bench->config->min_meet_time + 1) {
-                if (bench->search_pid == getpid1(bench->meeting_buckets[bid].key)) {
-                    uint meeting_idx = atomicAdd(&bench->find_count, 1);
-                    assert(bench->find_count < bench->search_count);
-                    bench->search_list[meeting_idx].target = getpid2(bench->meeting_buckets[bid].key);
-                    bench->search_list[meeting_idx].end = bench->meeting_buckets[bid].end;                  //real end
-                    bench->search_list[meeting_idx].value = (__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) * 100000000 * 100000000 * 100000000 * 100000000
-                                                   + (__uint128_t)box_to_128(&bench->meeting_buckets[bid].mbr);
+                if (bench->search_single_pid == getpid1(bench->meeting_buckets[bid].key)) {
+                    uint meeting_idx = atomicAdd(&bench->single_find_count, 1);
+                    assert(bench->single_find_count < bench->config->search_single_capacity);
+                    bench->search_single_list[meeting_idx].target = getpid2(bench->meeting_buckets[bid].key);
+                    bench->search_single_list[meeting_idx].end = bench->meeting_buckets[bid].end;                  //real end
+                    bench->search_single_list[meeting_idx].value = ((__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 112) + box_to_128(&bench->meeting_buckets[bid].mbr);
                 }
-                else if (bench->search_pid == getpid2(bench->meeting_buckets[bid].key)) {
-                    uint meeting_idx = atomicAdd(&bench->find_count, 1);
-                    assert(bench->find_count < bench->search_count);
-                    bench->search_list[meeting_idx].target = getpid1(bench->meeting_buckets[bid].key);
-                    bench->search_list[meeting_idx].end = bench->meeting_buckets[bid].end;                  //real end
-                    bench->search_list[meeting_idx].value = (__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) * 100000000 * 100000000 * 100000000 * 100000000
-                                                            + (__uint128_t)box_to_128(&bench->meeting_buckets[bid].mbr);
+                else if (bench->search_single_pid == getpid2(bench->meeting_buckets[bid].key)) {
+                    uint meeting_idx = atomicAdd(&bench->single_find_count, 1);
+                    assert(bench->single_find_count < bench->config->search_single_capacity);
+                    bench->search_single_list[meeting_idx].target = getpid1(bench->meeting_buckets[bid].key);
+                    bench->search_single_list[meeting_idx].end = bench->meeting_buckets[bid].end;                  //real end
+                    bench->search_single_list[meeting_idx].value = ((__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 112) + box_to_128(&bench->meeting_buckets[bid].mbr);
+                }
+            }
+        }
+        if(bench->search_multi) {
+            if (bench->cur_time - bench->meeting_buckets[bid].start >= bench->config->min_meet_time + 1) {
+                for(int i = 0;i<bench->search_multi_length;i++){
+                    if (bench->search_multi_pid[i] == getpid1(bench->meeting_buckets[bid].key)) {
+                        uint meeting_idx = atomicAdd(&bench->multi_find_count, 1);
+                        assert(bench->multi_find_count < bench->config->search_multi_capacity);
+                        bench->search_multi_list[meeting_idx].pid = bench->search_multi_pid[i];
+                        bench->search_multi_list[meeting_idx].target = getpid2(bench->meeting_buckets[bid].key);
+                        bench->search_multi_list[meeting_idx].end = bench->meeting_buckets[bid].end;                  //real end
+                        bench->search_multi_list[meeting_idx].value = ((__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 112) + box_to_128(&bench->meeting_buckets[bid].mbr);
+                    }
+                    if (bench->search_multi_pid[i] == getpid2(bench->meeting_buckets[bid].key)) {
+                        uint meeting_idx = atomicAdd(&bench->multi_find_count, 1);
+                        assert(bench->multi_find_count < bench->config->search_multi_capacity);
+                        bench->search_multi_list[meeting_idx].pid = bench->search_multi_pid[i];
+                        bench->search_multi_list[meeting_idx].target = getpid1(bench->meeting_buckets[bid].key);
+                        bench->search_multi_list[meeting_idx].end = bench->meeting_buckets[bid].end;                  //real end
+                        bench->search_multi_list[meeting_idx].value = ((__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 112) + box_to_128(&bench->meeting_buckets[bid].mbr);
+                    }
                 }
             }
         }
@@ -518,11 +534,8 @@ void cuda_identify_meetings(workbench *bench) {
                     pid = target;
                     target = swap;
                 }
-//                if(pid==0)                              //key of 0 is shorter, not easy to read. But for Correctness, reserve 0
-//                    continue;
-                bench->d_keys[meeting_idx] = (uint64_t)(bench->meeting_buckets[bid].end - bench->end_time_min) + (uint64_t)target*100000 + (uint64_t)pid*10000000*100000;         //pid-target-offset
-                bench->d_values[meeting_idx] = (__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) * 100000000 * 100000000 * 100000000 * 100000000
-                                               + (__uint128_t)box_to_128(&bench->meeting_buckets[bid].mbr);
+                bench->d_keys[meeting_idx] = (uint64_t)(bench->meeting_buckets[bid].end - bench->end_time_min) + ((uint64_t)target << 14) + ((uint64_t)pid << 39);          //2^25 = 33554422>10000000
+                bench->d_values[meeting_idx] = ((__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 112) + box_to_128(&bench->meeting_buckets[bid].mbr);
             }
         }
     }
@@ -531,17 +544,35 @@ void cuda_identify_meetings(workbench *bench) {
 }
 
 __global__
-void cuda_search_kv(workbench *bench){
+void cuda_search_single_kv(workbench *bench){
     uint kid = blockIdx.x*blockDim.x+threadIdx.x;
     if(kid>=bench->kv_count){
         return;
     }
-    if((uint)(bench->d_keys[kid]/10000000/100000) == bench->search_pid){              //all the same
-        uint meeting_idx = atomicAdd(&bench->find_count, 1);
-        assert(bench->find_count<bench->search_count);
-        bench->search_list[meeting_idx].target = (bench->d_keys[kid]/100000)%10000000;
-        bench->search_list[meeting_idx].end = bench->d_keys[kid] % 100000 + bench->end_time_min;
-        bench->search_list[meeting_idx].value = bench->d_values[kid];
+    if((uint)(bench->d_keys[kid] >> 39) == bench->search_single_pid){              //all the same
+        uint meeting_idx = atomicAdd(&bench->single_find_count, 1);
+        assert(bench->single_find_count<bench->config->search_single_capacity);
+        bench->search_single_list[meeting_idx].target = (bench->d_keys[kid] >> 14) & ((1ULL << 25) - 1);
+        bench->search_single_list[meeting_idx].end = (bench->d_keys[kid] & ((1ULL << 14) - 1)) + bench->end_time_min;
+        bench->search_single_list[meeting_idx].value = bench->d_values[kid];
+    }
+}
+
+__global__
+void cuda_search_multi_kv(workbench *bench){
+    uint kid = blockIdx.x*blockDim.x+threadIdx.x;
+    if(kid>=bench->kv_count){
+        return;
+    }
+    for(int i = 0;i<bench->search_multi_length;i++){
+        if((uint)(bench->d_keys[kid] >> 39) == bench->search_multi_pid[i]){              //all the same
+            uint meeting_idx = atomicAdd(&bench->multi_find_count, 1);
+            assert(bench->multi_find_count < bench->config->search_multi_capacity);
+            bench->search_multi_list[meeting_idx].pid = bench->search_multi_pid[i];
+            bench->search_multi_list[meeting_idx].target = (bench->d_keys[kid] >> 14) & ((1ULL << 25) - 1);
+            bench->search_multi_list[meeting_idx].end = (bench->d_keys[kid] & ((1ULL << 14) - 1)) + bench->end_time_min;
+            bench->search_multi_list[meeting_idx].value = bench->d_values[kid];
+        }
     }
 }
 
@@ -893,9 +924,15 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
     log("\t%.2f MB\td_values",1.0*size/1024/1024);
 
     //cuda search
-    h_bench.search_list = (search_info_unit *)gpu->allocate(bench->config->search_list_capacity*sizeof(search_info_unit));
-    size = bench->config->search_list_capacity*sizeof(search_info_unit);
-    log("\t%.2f MB\tsearch_list",1.0*size/1024/1024);
+    h_bench.search_single_list = (search_info_unit *)gpu->allocate(bench->config->search_single_capacity*sizeof(search_info_unit));
+    size = bench->config->search_single_capacity*sizeof(search_info_unit);
+    log("\t%.2f MB\tsearch_single_list",1.0*size/1024/1024);
+    h_bench.search_multi_pid = (uint *)gpu->allocate(bench->config->search_single_capacity*sizeof(uint));
+    size = bench->config->search_single_capacity*sizeof(uint);
+    log("\t%.2f MB\tsearch_single_list",1.0*size/1024/1024);
+    h_bench.search_multi_list = (search_info_unit *)gpu->allocate(bench->config->search_multi_capacity*sizeof(search_info_unit));
+    size = bench->config->search_single_capacity*sizeof(search_info_unit);
+    log("\t%.2f MB\tsearch_single_list",1.0*size/1024/1024);
 
     if(bench->config->bloom_filter) {
         //bloom filter
@@ -945,9 +982,21 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 	// setup the current time and points for this round
 	workbench h_bench(bench);
 	CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-    if(bench->search_count>0) {
-        h_bench.search_count = bench->search_count;
-        CUDA_SAFE_CALL(cudaMemcpy(h_bench.search_list, bench->search_list, bench->search_count * sizeof(search_info_unit),cudaMemcpyHostToDevice));
+    if(bench->search_single) {
+        h_bench.search_single = true;
+        h_bench.single_find_count = 0;
+    }
+    else {
+        h_bench.search_single = false;
+    }
+    if(bench->search_multi) {
+        h_bench.search_multi = true;
+        h_bench.multi_find_count = 0;
+        h_bench.search_multi_length = bench->search_multi_length;
+        CUDA_SAFE_CALL(cudaMemcpy(h_bench.search_multi_pid, bench->search_multi_pid, bench->search_multi_length * sizeof(search_info_unit),cudaMemcpyHostToDevice));
+    }
+    else {
+        h_bench.search_multi = false;
     }
 	h_bench.cur_time = bench->cur_time;
     h_bench.end_time_min = bench->end_time_min;
@@ -1101,6 +1150,18 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         //::copy(d_vector_values, d_vector_values+bench->kv_count, bench->h_values[bench->MemTable_count]);
 
         //bloom filter //bloom filter is useless, so code is not updated.
+
+        printf("cudaMemcpy kv right\n");
+        cout<<bench->h_keys[offset+bench->MemTable_count][10]<<endl;
+        print_128(bench->h_values[offset+bench->MemTable_count][10]);
+        printf("\n");
+        cout<<bench->h_keys[offset+bench->MemTable_count][11]<<endl;
+        print_128(bench->h_values[offset+bench->MemTable_count][11]);
+        printf("\n");
+        cout<<bench->h_keys[offset+bench->MemTable_count][12]<<endl;
+        print_128(bench->h_values[offset+bench->MemTable_count][12]);
+        printf("\n");
+        cout<<"10 11 12 finish"<<endl;
         if(bench->config->bloom_filter){
             BloomFilter_Add<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
             check_execution();
@@ -1198,14 +1259,25 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 	}
 
     /* 6. search kv info */
-    if(bench->search_count>0){;
-        cuda_search_kv<<<h_bench.kv_count/1024+1,1024>>>(d_bench);
+    if(bench->search_single){
+        cuda_search_single_kv<<<h_bench.kv_count/1024+1,1024>>>(d_bench);
         check_execution();
         cudaDeviceSynchronize();
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-        CUDA_SAFE_CALL(cudaMemcpy(bench->search_list, h_bench.search_list, bench->search_count*sizeof(search_info_unit), cudaMemcpyDeviceToHost));
-        bench->pro.cuda_search_kv_time += get_time_elapsed(start,false);
-        logt("search_kv ", start);
+        bench->single_find_count = h_bench.single_find_count;
+        CUDA_SAFE_CALL(cudaMemcpy(bench->search_single_list, h_bench.search_single_list, bench->single_find_count*sizeof(search_info_unit), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_search_single_kv_time += get_time_elapsed(start,false);
+        logt("search_single_kv ", start);
+    }
+    if(bench->search_multi){
+        cuda_search_multi_kv<<<h_bench.kv_count/1024+1,1024>>>(d_bench);
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->multi_find_count = h_bench.multi_find_count;
+        CUDA_SAFE_CALL(cudaMemcpy(bench->search_multi_list, h_bench.search_multi_list, bench->multi_find_count*sizeof(search_info_unit), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_search_multi_kv_time += get_time_elapsed(start,false);
+        logt("search_multi_kv ", start);
     }
 
 	/* 6. post-process, copy out data*/
