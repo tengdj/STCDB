@@ -222,7 +222,7 @@ bool workbench::search_memtable(uint pid){
             cursor++;
             temp_pid = h_keys[offset+i][cursor] >> 39;
             if (temp_pid == pid) {
-                cout<<h_keys[offset+i][cursor]<<endl;
+                cout<<h_keys[offset+i][cursor];
                 cout<<" :"<<(uint)(h_values[offset+i][cursor] >> 112)<<endl;
                 box temp_box(h_values[offset+i][cursor]);
                 temp_box.print();
@@ -242,7 +242,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
     for(int i=0;i<big_sorted_run_count;i++) {
         if ((bg_run[i].timestamp_min < timestamp)) {
             //(bg_run[i].timestamp_min < timestamp) && (timestamp < bg_run[i].timestamp_max)
-            cout<<"into disk"<<endl;
+            cout<<"big_sorted_run_num:"<<i<<endl;
             bg_run[i].sst = new SSTable[bg_run[i].SSTable_count];                   //maybe useful later, should not delete after this func
             ifstream read_sst;
 
@@ -307,6 +307,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                 read_sst.close();
                 if (cursor + 1 < bg_run[i].SSTable_count) {
                     if (bg_run[i].first_pid[cursor + 1] != pid) {               //must shut down in this cursor
+                        cout<<"case 1"<<endl;
                         uint index = 0;
                         while (index <= bg_run[i].sst[cursor].SSTable_kv_capacity - 1) {
                             temp_pid = bg_run[i].sst[cursor].kv[index].key >> 39;
@@ -335,6 +336,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                     uint index = 0;
                     while (index <= bg_run[i].sst[cursor].SSTable_kv_capacity - 1) {
                         temp_pid = bg_run[i].sst[cursor].kv[index].key >> 39;
+                        cout<<"temp_pid: "<<temp_pid<<endl;
                         if (temp_pid == pid) {
                             cout << bg_run[i].sst[cursor].kv[index].key << endl;
                             if(search_multi){
@@ -350,5 +352,6 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
             ret = true;
         }
     }
+    cout<<"finish disk search "<<pid<<endl;
     return ret;
 }

@@ -376,6 +376,7 @@ void* commandThreadFunction(void* arg) {
             break;
         } else {
             std::cout << "Unknown command: " << command << std::endl;
+            pthread_mutex_unlock(&bench->mutex_i);
         }
     }
     return NULL;
@@ -392,7 +393,7 @@ void tracer::process(){
 	for(int st=config->start_time;st<config->start_time+config->duration;st+=100){
         config->cur_duration = min((config->start_time+config->duration-st),(uint)100);
         if(config->load_data){
-            loadData(config->trace_path.c_str(),st,config->cur_duration);;
+            loadData(config->trace_path.c_str(),st,config->cur_duration);
         }
         else{
             generator->generate_trace(trace);
@@ -455,7 +456,7 @@ void tracer::process(){
                 for(int i=0;i<bench->multi_find_count;i++){
                     cout << bench->search_multi_list[i].pid << "-" << bench->search_multi_list[i].target << "-"
                          << bench->search_multi_list[i].end << endl;
-                    print_128(bench->search_single_list[i].value);
+                    print_128(bench->search_multi_list[i].value);
                     cout<<endl;
                 }
 
@@ -486,6 +487,8 @@ void tracer::process(){
                          << bench->search_single_list[i].end << endl;
                     print_128(bench->search_single_list[i].value);
                     cout<<endl;
+                    box temp_box(bench->search_single_list[i].value);
+                    temp_box.print();
                     bench->search_multi_pid[i] = bench->search_single_list[i].target;
                 }
 
@@ -541,6 +544,7 @@ void tracer::process(){
                 for(int i=0;i<bench->MemTable_count; i++){
                     for(int j=0;j<10;j++){
                         cout<<bench->h_keys[offset+i][j]<<endl;
+                        cout<<(uint)(bench->h_keys[offset+i][j] >> 39)<<endl;
                         print_128(bench->h_values[offset+i][j]);
                         cout<<endl;
                     }

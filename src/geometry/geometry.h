@@ -78,6 +78,7 @@ public:
         low[1] = uint_to_float((uint)((value >> 56) & ((1ULL << 28) - 1)));
         high[0] = uint_to_float((uint)((value >> 28) & ((1ULL << 28) - 1)));
         high[1] = uint_to_float((uint)(value & ((1ULL << 28) - 1)));
+        cout<<low[0]<<" "<<low[1]<<" "<<high[0]<<" "<<high[1]<<endl;
     }
 
 	void update(Point p){

@@ -565,7 +565,7 @@ void cuda_search_multi_kv(workbench *bench){
         return;
     }
     for(int i = 0;i<bench->search_multi_length;i++){
-        if((uint)(bench->d_keys[kid] >> 39) == bench->search_multi_pid[i]){              //all the same
+        if((uint)(bench->d_keys[kid] >> 39) == bench->search_multi_pid[i]){
             uint meeting_idx = atomicAdd(&bench->multi_find_count, 1);
             assert(bench->multi_find_count < bench->config->search_multi_capacity);
             bench->search_multi_list[meeting_idx].pid = bench->search_multi_pid[i];
@@ -1138,13 +1138,6 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_values[offset+bench->MemTable_count], h_bench.d_values, bench->config->kv_restriction * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("cudaMemcpy kv",start);
-//        printf("cudaMemcpy kv right\n");
-//        print_128(bench->h_keys[offset+bench->MemTable_count][10]);
-//        printf("\n");
-//        print_128(bench->h_keys[offset+bench->MemTable_count][11]);
-//        printf("\n");
-//        print_128(bench->h_keys[offset+bench->MemTable_count][12]);
-//        printf("\n");
 
         //thrust::copy(d_vector_keys, d_vector_keys+bench->kv_count, bench->h_keys[bench->MemTable_count]);     //wrong
         //::copy(d_vector_values, d_vector_values+bench->kv_count, bench->h_values[bench->MemTable_count]);
@@ -1152,9 +1145,17 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         //bloom filter //bloom filter is useless, so code is not updated.
 
         printf("cudaMemcpy kv right\n");
+        cout<<"bench->end_time_min:"<<bench->end_time_min<<endl;
         cout<<bench->h_keys[offset+bench->MemTable_count][10]<<endl;
+        cout<<"pid:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][10] >> 39)<<endl;
+        cout<<"target:"<<(uint)((bench->h_keys[offset+bench->MemTable_count][10] >> 14) & ((1ULL << 25) - 1))<<endl;
+        cout<<"end:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][10] & ((1ULL << 14) - 1))+bench->end_time_min<<endl;
         print_128(bench->h_values[offset+bench->MemTable_count][10]);
         printf("\n");
+        cout<<"duration:"<<(uint)(bench->h_values[offset+bench->MemTable_count][10] >> 112)<<endl;
+        box temp_box(bench->h_values[offset+bench->MemTable_count][10]);
+        temp_box.print();
+
         cout<<bench->h_keys[offset+bench->MemTable_count][11]<<endl;
         print_128(bench->h_values[offset+bench->MemTable_count][11]);
         printf("\n");
@@ -1205,16 +1206,17 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("cudaMemcpy kv",start);
         printf("cudaMemcpy kv right\n");
-        cout<<bench->h_keys[offset+bench->MemTable_count][10]<<endl;
-        print_128(bench->h_values[offset+bench->MemTable_count][10]);
-        printf("\n");
-        cout<<bench->h_keys[offset+bench->MemTable_count][11]<<endl;
-        print_128(bench->h_values[offset+bench->MemTable_count][11]);
-        printf("\n");
-        cout<<bench->h_keys[offset+bench->MemTable_count][12]<<endl;
-        print_128(bench->h_values[offset+bench->MemTable_count][12]);
-        printf("\n");
-        cout<<"10 11 12 finish"<<endl;
+//        cout<<bench->h_keys[offset+bench->MemTable_count][10]<<endl;
+//        cout<<"pid:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][10] >> 39)<<endl;
+//        print_128(bench->h_values[offset+bench->MemTable_count][10]);
+//        printf("\n");
+//        cout<<bench->h_keys[offset+bench->MemTable_count][11]<<endl;
+//        print_128(bench->h_values[offset+bench->MemTable_count][11]);
+//        printf("\n");
+//        cout<<bench->h_keys[offset+bench->MemTable_count][12]<<endl;
+//        print_128(bench->h_values[offset+bench->MemTable_count][12]);
+//        printf("\n");
+//        cout<<"10 11 12 finish"<<endl;
         bench->MemTable_count++;
     }
 
@@ -1270,11 +1272,13 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         logt("search_single_kv ", start);
     }
     if(bench->search_multi){
+        cout<<"before multi_find_count"<<h_bench.multi_find_count<<endl;
         cuda_search_multi_kv<<<h_bench.kv_count/1024+1,1024>>>(d_bench);
         check_execution();
         cudaDeviceSynchronize();
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
         bench->multi_find_count = h_bench.multi_find_count;
+        cout<<"after multi_find_count"<<h_bench.multi_find_count<<endl;
         CUDA_SAFE_CALL(cudaMemcpy(bench->search_multi_list, h_bench.search_multi_list, bench->multi_find_count*sizeof(search_info_unit), cudaMemcpyDeviceToHost));
         bench->pro.cuda_search_multi_kv_time += get_time_elapsed(start,false);
         logt("search_multi_kv ", start);
