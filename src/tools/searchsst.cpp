@@ -1,57 +1,70 @@
 #include "../geometry/Map.h"
-#include "../tracing/generator.h"
 #include "../tracing/trace.h"
 
 using namespace std;
 
+//SSTable::~SSTable(){
+//    delete []kv;
+//}
+//
+////range query
+//bool SSTable::search_SSTable(uint pid, bool search_multi, uint &search_multi_length, uint *search_multi_pid) {
+//    cout<<"into search_SSTable"<<endl;
+//    int find = -1;
+//    int low = 0;
+//    int high = SSTable_kv_capacity - 1;
+//    int mid;
+//    uint temp_pid;
+//    while (low <= high) {
+//        mid = (low + high) / 2;
+//        temp_pid = kv[mid].key >> 39;
+//        if ( temp_pid == pid){
+//            find = mid;
+//            break;
+//        }
+//        else if (temp_pid > pid){
+//            high = mid - 1;
+//        }
+//        else {
+//            low = mid + 1;
+//        }
+//    }
+//    if(find==-1){
+//        cout<<"cannot find"<<endl;
+//        return false;
+//    }
+//    cout<<"exactly find"<<endl;
+//    uint cursor = find;
+//    while(temp_pid==pid&&cursor>=1){
+//        cursor--;
+//        temp_pid = kv[cursor].key >> 39;
+//    }
+//    if(temp_pid==pid&&cursor==0){
+//        cout<<kv[0].key<<endl;
+//        if(search_multi){
+//            search_multi_pid[search_multi_length] = kv[0].key & ((1ULL << 25) - 1);
+//            search_multi_length++;
+//        }
+//    }
+//    while(cursor+1<SSTable_kv_capacity){
+//        cursor++;
+//        temp_pid = kv[cursor].key >> 39;
+//        if(temp_pid==pid){
+//            cout<<kv[cursor].key<<endl;
+//            if(search_multi){
+//                search_multi_pid[search_multi_length] = kv[cursor].key & ((1ULL << 25) - 1);
+//                search_multi_length++;
+//            }
+//        }
+//    }
+//    cout<<"find !"<<endl;
+//    return true;
+//}
+
+
 int main(int argc, char **argv){
-//    sorted_run *bg_run = new sorted_run;
-//    bg_run->first_pid = new uint[bg_run->SSTable_count];
-//    bg_run->sst = new SSTable[bg_run->SSTable_count];
-//    for(int i=0;i<bg_run->SSTable_count;i++){
-//        bg_run->sst[i].kv = new key_value[bg_run->sst->SSTable_kv_capacity];
-//    }
-//    ifstream read_meta;
-//    read_meta.open("../store/first_pid_meta");
-//    assert(read_meta.is_open());
-//    for(int i=0;i<bg_run->SSTable_count;i++){
-//        read_meta.read((char *)&bg_run->first_pid[i], sizeof(uint));
-//        cout<<bg_run->first_pid[i]<<" ";
-//    }
-//    cout<<endl;
-//    read_meta.close();
-//    cout<<"before func"<<endl;
-//    uint pid = 0;
-//    if(bg_run->search_in_disk(0,500000)){
-//        cout<<"finally find"<<endl;
-//    }
+    cout<<sizeof(key_value)<<endl;
+    cout<<sizeof(uint64_t)<<endl;
+    cout<<sizeof(__uint128_t)<<endl;
     return 0;
 }
-
-//bench->bg_run[bench->big_sorted_run_count]->sst = new SSTable[bg_run[0]->SSTable_count];
-//search_in_disk(&bench->bg_run[bench->big_sorted_run_count],pid));
-
-
-//#include "../geometry/Map.h"
-//#include "../tracing/generator.h"
-//#include "../tracing/trace.h"
-//
-//using namespace std;
-//
-//int main(int argc, char **argv){
-//
-//    generator_configuration config = get_generator_parameters(argc, argv);
-//    Map *m = new Map(config.map_path);
-//    //m->print_region();
-//    trace_generator *gen = new trace_generator(&config, m);
-//    Point *traces = new Point[config.num_objects*100];
-//    tracer *t = new tracer(&config, *m->getMBR(), traces, gen);
-//    cout<<"before process"<<endl;
-//    t->searchsst_process();
-//
-//    delete []traces;
-//    delete gen;
-//    delete t;
-//    delete m;
-//    return 0;
-//}

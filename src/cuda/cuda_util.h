@@ -63,7 +63,6 @@ inline uint getpid2(size_t z){
     size_t w = floor((sqrt(8.0 * z + 1) - 1)/2);
     size_t t = (w*w + w) / 2;
     uint y = (uint)(z - t);
-    //uint x = (uint)(w - y);
     return y;
 }
 

@@ -17,13 +17,13 @@
 typedef struct key_value{
     uint64_t key;
     __uint128_t value;
-}key_value;
+}key_value;                         //sizeof(key_value)==32, beacuse 8+16=24, but 24<2*16=32
 
 class SSTable{
 
 public:
     key_value *kv = NULL;
-    uint SSTable_kv_capacity = 218454;              //44739243 * 5 / 1024 = 218454 (Round up)
+    uint SSTable_kv_capacity = 327680;              //67108864 * 5 / 1024 = 327,680 (Round up)
 
     ~SSTable();
     bool search_SSTable(uint pid, bool search_multi, uint &search_multi_length, uint *search_multi_pid);

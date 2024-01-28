@@ -214,7 +214,7 @@ bool workbench::search_memtable(uint pid){
             box temp_box(h_values[offset+i][0]);
             temp_box.print();
             if(search_multi){
-                search_multi_pid[search_multi_length] = (h_keys[offset+i][0] >> 14) & ((1ULL << 25) - 1);
+                search_multi_pid[search_multi_length] = h_keys[offset+i][0] & ((1ULL << 25) - 1);
                 search_multi_length++;
             }
         }
@@ -227,7 +227,7 @@ bool workbench::search_memtable(uint pid){
                 box temp_box(h_values[offset+i][cursor]);
                 temp_box.print();
                 if(search_multi) {
-                    search_multi_pid[search_multi_length] = (h_keys[offset + i][cursor] >> 14) & ((1ULL << 25) - 1);
+                    search_multi_pid[search_multi_length] = h_keys[offset + i][cursor] & ((1ULL << 25) - 1);
                     search_multi_length++;
                 }
             }
@@ -244,6 +244,9 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
             //(bg_run[i].timestamp_min < timestamp) && (timestamp < bg_run[i].timestamp_max)
             cout<<"big_sorted_run_num:"<<i<<endl;
             bg_run[i].sst = new SSTable[bg_run[i].SSTable_count];                   //maybe useful later, should not delete after this func
+            for(uint j=0;j<bg_run[i].SSTable_count;j++){
+                bg_run[i].sst[j].SSTable_kv_capacity = SSTable_kv_capacity;
+            }
             ifstream read_sst;
 
             //high level binary search
@@ -314,7 +317,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                             if (temp_pid == pid) {
                                 cout << bg_run[i].sst[cursor].kv[index].key << endl;
                                 if(search_multi){
-                                    search_multi_pid[search_multi_length] = (bg_run[i].sst[cursor].kv[index].key >> 14) & ((1ULL << 25) - 1);
+                                    search_multi_pid[search_multi_length] = bg_run[i].sst[cursor].kv[index].key & ((1ULL << 25) - 1);
                                     search_multi_length++;
                                 }
                             } else break;
@@ -326,7 +329,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                         for (uint j = 0; j < bg_run[i].sst[cursor].SSTable_kv_capacity; j++) {
                             cout << bg_run[i].sst[cursor].kv[j].key << endl;
                             if(search_multi){
-                                search_multi_pid[search_multi_length] = (bg_run[i].sst[cursor].kv[j].key >> 14) & ((1ULL << 25) - 1);
+                                search_multi_pid[search_multi_length] = bg_run[i].sst[cursor].kv[j].key & ((1ULL << 25) - 1);
                                 search_multi_length++;
                             }
                         }
@@ -340,7 +343,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                         if (temp_pid == pid) {
                             cout << bg_run[i].sst[cursor].kv[index].key << endl;
                             if(search_multi){
-                                search_multi_pid[search_multi_length] = (bg_run[i].sst[cursor].kv[index].key >> 14) & ((1ULL << 25) - 1);
+                                search_multi_pid[search_multi_length] = bg_run[i].sst[cursor].kv[index].key & ((1ULL << 25) - 1);
                                 search_multi_length++;
                             }
                         } else break;

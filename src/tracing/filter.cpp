@@ -68,6 +68,7 @@ workbench *partitioner::build_schema(Point *points, size_t num_objects){
              << " bench->dwFilterBits :" << bench->dwFilterBits << " bench->dwHashFuncs :" << bench->dwHashFuncs
              << " bench->dwFilterSize :" << bench->dwFilterSize << endl;
     }
+    bench->SSTable_kv_capacity = bench->config->kv_restriction*bench->config->MemTable_capacity/2/bench->config->SSTable_count;     //436906
 
 	bench->claim_space();
 	logt("claim %.3f MB memory space",start, bench->space_claimed()/1024.0/1024.0);

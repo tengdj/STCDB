@@ -534,7 +534,7 @@ void cuda_identify_meetings(workbench *bench) {
                     pid = target;
                     target = swap;
                 }
-                bench->d_keys[meeting_idx] = (uint64_t)(bench->meeting_buckets[bid].end - bench->end_time_min) + ((uint64_t)target << 14) + ((uint64_t)pid << 39);          //2^25 = 33554422>10000000
+                bench->d_keys[meeting_idx] = (uint64_t)target + ((uint64_t)(bench->meeting_buckets[bid].end - bench->end_time_min) << 25) + ((uint64_t)pid << 39);          //64 = 25 + 14 + 25
                 bench->d_values[meeting_idx] = ((__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 112) + box_to_128(&bench->meeting_buckets[bid].mbr);
             }
         }
@@ -552,8 +552,8 @@ void cuda_search_single_kv(workbench *bench){
     if((uint)(bench->d_keys[kid] >> 39) == bench->search_single_pid){              //all the same
         uint meeting_idx = atomicAdd(&bench->single_find_count, 1);
         assert(bench->single_find_count<bench->config->search_single_capacity);
-        bench->search_single_list[meeting_idx].target = (bench->d_keys[kid] >> 14) & ((1ULL << 25) - 1);
-        bench->search_single_list[meeting_idx].end = (bench->d_keys[kid] & ((1ULL << 14) - 1)) + bench->end_time_min;
+        bench->search_single_list[meeting_idx].end = ((bench->d_keys[kid] >> 25) & ((1ULL << 14) - 1)) + bench->end_time_min;
+        bench->search_single_list[meeting_idx].target = bench->d_keys[kid] & ((1ULL << 25) - 1);
         bench->search_single_list[meeting_idx].value = bench->d_values[kid];
     }
 }
@@ -569,8 +569,8 @@ void cuda_search_multi_kv(workbench *bench){
             uint meeting_idx = atomicAdd(&bench->multi_find_count, 1);
             assert(bench->multi_find_count < bench->config->search_multi_capacity);
             bench->search_multi_list[meeting_idx].pid = bench->search_multi_pid[i];
-            bench->search_multi_list[meeting_idx].target = (bench->d_keys[kid] >> 14) & ((1ULL << 25) - 1);
-            bench->search_multi_list[meeting_idx].end = (bench->d_keys[kid] & ((1ULL << 14) - 1)) + bench->end_time_min;
+            bench->search_multi_list[meeting_idx].end = ((bench->d_keys[kid] >> 25) & ((1ULL << 14) - 1)) + bench->end_time_min;
+            bench->search_multi_list[meeting_idx].target = bench->d_keys[kid] & ((1ULL << 25) - 1);
             bench->search_multi_list[meeting_idx].value = bench->d_values[kid];
         }
     }
@@ -1148,8 +1148,8 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         cout<<"bench->end_time_min:"<<bench->end_time_min<<endl;
         cout<<bench->h_keys[offset+bench->MemTable_count][10]<<endl;
         cout<<"pid:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][10] >> 39)<<endl;
-        cout<<"target:"<<(uint)((bench->h_keys[offset+bench->MemTable_count][10] >> 14) & ((1ULL << 25) - 1))<<endl;
-        cout<<"end:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][10] & ((1ULL << 14) - 1))+bench->end_time_min<<endl;
+        cout<<"end:"<<(uint)((bench->h_keys[offset+bench->MemTable_count][10] >> 25) & ((1ULL << 14) - 1))+bench->end_time_min<<endl;
+        cout<<"target:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][10] & ((1ULL << 25) - 1))<<endl;
         print_128(bench->h_values[offset+bench->MemTable_count][10]);
         printf("\n");
         cout<<"duration:"<<(uint)(bench->h_values[offset+bench->MemTable_count][10] >> 112)<<endl;

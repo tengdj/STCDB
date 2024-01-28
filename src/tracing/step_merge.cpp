@@ -46,7 +46,7 @@ bool SSTable::search_SSTable(uint pid, bool search_multi, uint &search_multi_len
     if(temp_pid==pid&&cursor==0){
         cout<<kv[0].key<<endl;
         if(search_multi){
-            search_multi_pid[search_multi_length] = (kv[0].key >> 14) & ((1ULL << 25) - 1);
+            search_multi_pid[search_multi_length] = kv[0].key & ((1ULL << 25) - 1);
             search_multi_length++;
         }
     }
@@ -56,7 +56,7 @@ bool SSTable::search_SSTable(uint pid, bool search_multi, uint &search_multi_len
         if(temp_pid==pid){
             cout<<kv[cursor].key<<endl;
             if(search_multi){
-                search_multi_pid[search_multi_length] = (kv[cursor].key >> 14) & ((1ULL << 25) - 1);
+                search_multi_pid[search_multi_length] = kv[cursor].key & ((1ULL << 25) - 1);
                 search_multi_length++;
             }
         }
