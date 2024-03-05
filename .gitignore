@@ -50,6 +50,5 @@ meetings
 cmake-build-debug
 oldsrc
 store
-core*
 right_store
 .vs
