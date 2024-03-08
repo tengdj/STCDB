@@ -430,6 +430,9 @@ void cuda_refinement_unroll(workbench *bench, uint offset){
 					bench->meeting_buckets[slot].key = key;
 					bench->meeting_buckets[slot].start = bench->cur_time;
 					bench->meeting_buckets[slot].end = bench->cur_time;
+                    int offsety = (bench->points[pid1].y - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 128;
+                    int offsetx = (bench->points[pid1].x - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 128;
+                    bench->meeting_buckets[slot].lid = 128 * offsety + offsetx;
 					break;
 				}
 				slot = (slot + 1)%bench->config->num_meeting_buckets;
@@ -534,7 +537,7 @@ void cuda_identify_meetings(workbench *bench) {
                     pid = target;
                     target = swap;
                 }
-                bench->d_keys[meeting_idx] = (uint64_t)target + ((uint64_t)(bench->meeting_buckets[bid].end - bench->end_time_min) << 25) + ((uint64_t)pid << 39);          //64 = 25 + 14 + 25
+                bench->d_keys[meeting_idx] = ((uint64_t)bench->meeting_buckets[bid].lid << 50) + ((uint64_t)pid << 25) + (uint64_t)target;              //64 = 14 + 25 +25;
                 bench->d_values[meeting_idx] = ((__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 112) + box_to_128(&bench->meeting_buckets[bid].mbr);
             }
         }

@@ -275,6 +275,7 @@ void Map::loadFrom(const char *path) {
     connected.clear();
     in.close();
     getMBR();
+    mbr->print();
     logt("loaded %d nodes %d streets from %s",start_time,nodes.size(), streets.size(), path);
 }
 

@@ -62,6 +62,7 @@ typedef struct meeting_unit{
 //    unsigned short end;
     uint start;       //2023.9.21
     uint end;
+    uint lid;           //location 2024.3.6
     //Point midpoint;            //2023.7.17
     box mbr;                     //7.24 7.26
     bool isEmpty(){
