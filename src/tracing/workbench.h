@@ -143,7 +143,7 @@ public:
 	meeting_unit *meeting_buckets = NULL;
 
 	size_t num_taken_buckets = 0;
-	size_t num_active_meetings = 0;
+	uint num_active_meetings = 0;
 
 //	// the space for the valid meeting information now
 //	meeting_unit *meetings = NULL;

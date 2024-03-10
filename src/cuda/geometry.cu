@@ -466,6 +466,42 @@ void cuda_profile_meetings(workbench *bench){
 	}
 }
 
+__global__
+void cuda_add_active(workbench *bench) {
+    size_t bid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (bid >= bench->config->num_meeting_buckets) {
+        return;
+    }
+    // empty
+    if (bench->meeting_buckets[bid].key == ULL_MAX) {
+        return;
+    }
+    if (bench->meeting_buckets[bid].end == bench->cur_time) {
+        for (int k = 0; k < 2; k++) {
+            uint meeting_idx = atomicAdd(&bench->kv_count, 1);
+            assert(meeting_idx < bench->config->kv_capacity);
+            if (meeting_idx < bench->config->kv_capacity) {                        //always true
+                uint pid, target;
+                pid = getpid1(bench->meeting_buckets[bid].key);
+                target = getpid2(bench->meeting_buckets[bid].key);
+                if (k == 1) {
+                    uint swap = pid;
+                    pid = target;
+                    target = swap;
+                }
+                bench->d_keys[meeting_idx] =
+                        (uint64_t) target + ((uint64_t)(bench->meeting_buckets[bid].end - bench->end_time_min) << 25) +
+                        ((uint64_t) pid << 39);          //64 = 25 + 14 + 25
+                bench->d_values[meeting_idx] =
+                        ((__uint128_t) (bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 112) +
+                        box_to_128(&bench->meeting_buckets[bid].mbr);
+            }
+        }
+    }
+
+    //bench->meeting_buckets[bid].start = bench->cur_time;
+    return;
+}
 
 __global__
 void cuda_identify_meetings(workbench *bench) {
@@ -479,6 +515,7 @@ void cuda_identify_meetings(workbench *bench) {
     }
     // is still active
     if (bench->meeting_buckets[bid].end == bench->cur_time) {
+        atomicAdd(&bench->num_active_meetings, 1);
         if(bench->search_single) {
             if (bench->cur_time - bench->meeting_buckets[bid].start >= bench->config->min_meet_time + 1) {
                 if (bench->search_single_pid == getpid1(bench->meeting_buckets[bid].key)) {
@@ -1117,7 +1154,9 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 	//logt("meeting identify: %d taken %d active %d new meetings found", start, h_bench.num_taken_buckets, h_bench.num_active_meetings, h_bench.meeting_counter);
 
     //4.5 cuda sort
-    if(h_bench.kv_count>bench->config->kv_restriction){
+    if(h_bench.kv_count+h_bench.num_active_meetings>bench->config->kv_restriction){
+        cuda_add_active<<<bench->config->num_meeting_buckets/1024+1,1024>>>(d_bench);
+
         // wrap raw pointer with a device_ptr
         thrust::device_ptr<uint64_t> d_vector_keys = thrust::device_pointer_cast(h_bench.d_keys);
         thrust::device_ptr<__uint128_t> d_vector_values = thrust::device_pointer_cast(h_bench.d_values);
@@ -1175,13 +1214,15 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         bench->MemTable_count++;
 
         //init
-        int overflow = h_bench.kv_count - bench->config->kv_restriction;
-        CUDA_SAFE_CALL(cudaMemcpy(h_bench.d_keys, h_bench.d_keys + bench->config->kv_restriction, overflow * sizeof(uint64_t), cudaMemcpyDeviceToDevice));              //for the overflow part
-        CUDA_SAFE_CALL(cudaMemcpy(h_bench.d_values, h_bench.d_values + bench->config->kv_restriction, overflow * sizeof(__uint128_t), cudaMemcpyDeviceToDevice));
-        h_bench.kv_count = overflow;
-        CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));                       //update kv_count, other effect ???
-        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
-        logt("init after sort",start);
+        h_bench.kv_count = 0;
+
+//        int overflow = h_bench.kv_count - bench->config->kv_restriction;
+//        CUDA_SAFE_CALL(cudaMemcpy(h_bench.d_keys, h_bench.d_keys + bench->config->kv_restriction, overflow * sizeof(uint64_t), cudaMemcpyDeviceToDevice));              //for the overflow part
+//        CUDA_SAFE_CALL(cudaMemcpy(h_bench.d_values, h_bench.d_values + bench->config->kv_restriction, overflow * sizeof(__uint128_t), cudaMemcpyDeviceToDevice));
+//        h_bench.kv_count = overflow;
+//        CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));                       //update kv_count, other effect ???
+//        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+//        logt("init after sort",start);
     }
 
     if(bench->crash_consistency){
