@@ -53,3 +53,7 @@ store
 core*
 right_store
 .vs
+2G3600/
+2Gright_meta/
+script/experiment.sh
+script/script.py

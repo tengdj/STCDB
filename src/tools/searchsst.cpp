@@ -63,8 +63,21 @@ using namespace std;
 
 
 int main(int argc, char **argv){
-    cout<<sizeof(key_value)<<endl;
-    cout<<sizeof(uint64_t)<<endl;
-    cout<<sizeof(__uint128_t)<<endl;
+    configuration config;
+    workbench *bench = new workbench(&config);
+
+    bench->big_sorted_run_count = 1;
+    bench->bg_run = new sorted_run[2];
+    ifstream read_sst;
+    string filename = "../store/SSTable_0-meta";
+    read_sst.open(filename);
+    read_sst.read((char *)&bench->bg_run[0].timestamp_min,sizeof(uint));
+    read_sst.read((char *)&bench->bg_run[0].timestamp_max,sizeof(uint));
+    read_sst.read((char *)&bench->bg_run[0].SSTable_count,sizeof(uint));
+    bench->bg_run[0].first_pid = new uint[bench->bg_run[0].SSTable_count];
+    read_sst.read((char *)bench->bg_run[0].first_pid, sizeof(uint)*bench->bg_run[0].SSTable_count);
+    for(int i = 0;i<100; i++){
+        bench->search_in_disk(get_rand_number(9000000),100);
+    }
     return 0;
 }

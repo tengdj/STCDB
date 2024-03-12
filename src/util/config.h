@@ -244,6 +244,8 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
 
             ("reachable_distance,r", po::value<double>(&config.reach_distance), "reachable distance (in meters)")
             ("trace_path,t", po::value<string>(&config.trace_path), "path to the trace file")
+
+            ("memTable_capacity", po::value<uint>(&config.MemTable_capacity), "MemTable_capacity/2 is the dumping threshold")
             ;
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);

@@ -22,6 +22,7 @@ bool SSTable::search_SSTable(uint pid, bool search_multi, uint &search_multi_len
     while (low <= high) {
         mid = (low + high) / 2;
         temp_pid = kv[mid].key >> 39;
+        cout<<"temp_pid:"<<temp_pid<<endl;
         if ( temp_pid == pid){
             find = mid;
             break;

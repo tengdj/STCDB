@@ -272,6 +272,15 @@ void *sst_dump(void *arg){
     delete[] key_index;
     bench->bg_run[old_big].print_meta();
     //logt("merge sort and flush", bg_start);
+
+    //dump meta
+    SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-meta", ios::out | ios::trunc);
+    SSTable_of.write((char *)&bench->bg_run[old_big].timestamp_min, sizeof(uint));
+    SSTable_of.write((char *)&bench->bg_run[old_big].timestamp_max, sizeof(uint));
+    SSTable_of.write((char *)&bench->bg_run[old_big].SSTable_count, sizeof(uint));
+    SSTable_of.write((char *)bench->bg_run[old_big].first_pid, sizeof(uint)*bench->bg_run[old_big].SSTable_count);
+    SSTable_of.flush();
+    SSTable_of.close();
     return NULL;
 }
 
@@ -353,6 +362,15 @@ void *crash_sst_dump(void *arg){
     }
     delete[] key_index;
     bench->bg_run[old_big].print_meta();
+
+    //dump meta
+    SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-meta", ios::out | ios::trunc);
+    SSTable_of.write((char *)&bench->bg_run[old_big].timestamp_min, sizeof(uint));
+    SSTable_of.write((char *)&bench->bg_run[old_big].timestamp_max, sizeof(uint));
+    SSTable_of.write((char *)&bench->bg_run[old_big].SSTable_count, sizeof(uint));
+    SSTable_of.write((char *)&bench->bg_run[old_big].first_pid, sizeof(uint)*bench->bg_run[old_big].SSTable_count);
+    SSTable_of.flush();
+    SSTable_of.close();
     return NULL;
 }
 
@@ -385,6 +403,7 @@ void process_with_gpu(workbench *bench,workbench *d_bench, gpu_info *gpu);
 #endif
 
 void tracer::process(){
+    cout<<"memTable_capacity"<<config->MemTable_capacity<<endl;
 	struct timeval start = get_cur_time();
     std::cout << "Running main program..." << std::endl;
 	for(int st=config->start_time;st<config->start_time+config->duration;st+=100){

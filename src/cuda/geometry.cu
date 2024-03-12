@@ -479,7 +479,11 @@ void cuda_add_active(workbench *bench) {
     if (bench->meeting_buckets[bid].end == bench->cur_time) {
         for (int k = 0; k < 2; k++) {
             uint meeting_idx = atomicAdd(&bench->kv_count, 1);
-            assert(meeting_idx < bench->config->kv_capacity);
+            if(meeting_idx >= bench->config->kv_capacity){
+                printf("%d\n",meeting_idx);
+                return;
+            }
+            //assert(meeting_idx < bench->config->kv_capacity);
             if (meeting_idx < bench->config->kv_capacity) {                        //always true
                 uint pid, target;
                 pid = getpid1(bench->meeting_buckets[bid].key);
@@ -489,11 +493,9 @@ void cuda_add_active(workbench *bench) {
                     pid = target;
                     target = swap;
                 }
-                bench->d_keys[meeting_idx] =
-                        (uint64_t) target + ((uint64_t)(bench->meeting_buckets[bid].end - bench->end_time_min) << 25) +
+                bench->d_keys[meeting_idx] = (uint64_t) target + ((uint64_t)(bench->meeting_buckets[bid].end - bench->end_time_min) << 25) +
                         ((uint64_t) pid << 39);          //64 = 25 + 14 + 25
-                bench->d_values[meeting_idx] =
-                        ((__uint128_t) (bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 112) +
+                bench->d_values[meeting_idx] = ((__uint128_t) (bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 112) +
                         box_to_128(&bench->meeting_buckets[bid].mbr);
             }
         }
@@ -1154,8 +1156,12 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 	//logt("meeting identify: %d taken %d active %d new meetings found", start, h_bench.num_taken_buckets, h_bench.num_active_meetings, h_bench.meeting_counter);
 
     //4.5 cuda sort
-    if(h_bench.kv_count+h_bench.num_active_meetings>bench->config->kv_restriction){
+    if(h_bench.kv_count+h_bench.num_active_meetings*2>bench->config->kv_restriction){
+        cout<<"h_bench.kv_count"<<h_bench.kv_count<<" num_active_meetings"<<h_bench.num_active_meetings<<endl;
         cuda_add_active<<<bench->config->num_meeting_buckets/1024+1,1024>>>(d_bench);
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
 
         // wrap raw pointer with a device_ptr
         thrust::device_ptr<uint64_t> d_vector_keys = thrust::device_pointer_cast(h_bench.d_keys);
@@ -1220,7 +1226,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 //        CUDA_SAFE_CALL(cudaMemcpy(h_bench.d_keys, h_bench.d_keys + bench->config->kv_restriction, overflow * sizeof(uint64_t), cudaMemcpyDeviceToDevice));              //for the overflow part
 //        CUDA_SAFE_CALL(cudaMemcpy(h_bench.d_values, h_bench.d_values + bench->config->kv_restriction, overflow * sizeof(__uint128_t), cudaMemcpyDeviceToDevice));
 //        h_bench.kv_count = overflow;
-//        CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));                       //update kv_count, other effect ???
+        CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));                       //update kv_count, other effect ???
 //        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
 //        logt("init after sort",start);
     }

@@ -240,7 +240,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
     cout<<"disk search "<<pid<<endl;
     bool ret = false;
     for(int i=0;i<big_sorted_run_count;i++) {
-        if ((bg_run[i].timestamp_min < timestamp)) {
+        if ((bg_run[i].timestamp_min < timestamp)&&(bg_run[i].timestamp_max > timestamp)) {
             //(bg_run[i].timestamp_min < timestamp) && (timestamp < bg_run[i].timestamp_max)
             cout<<"big_sorted_run_num:"<<i<<endl;
             bg_run[i].sst = new SSTable[bg_run[i].SSTable_count];                   //maybe useful later, should not delete after this func
