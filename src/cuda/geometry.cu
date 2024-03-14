@@ -395,6 +395,17 @@ void cuda_refinement(workbench *bench){
                     bench->meeting_buckets[slot].mbr.high[1] = -100000.0;
                     mbr_update(bench->meeting_buckets[slot].mbr, p1);
                     mbr_update(bench->meeting_buckets[slot].mbr, p2);
+
+                    
+                    int offsetx = (bench->points[pid1].x - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 64;
+                    int offsety = (bench->points[pid1].y - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 64;
+
+                    if(pid1<pid2){
+                        bench->meeting_buckets[slot].wid = zOrderFill(offsetx,offsety);
+                    }
+                    else{
+                        bench->meeting_buckets[slot].wid = zOrderFill(offsetx,offsety);
+                    }
                     break;
                 }
                 slot = (slot + 1)%bench->config->num_meeting_buckets;
@@ -618,20 +629,25 @@ void mbr_bitmap(workbench *bench){
     if(kid>=bench->config->kv_restriction){
         return;
     }
+    uint low0,low1,high0,high1;
 
-    uint pdwHashPos;
-    uint64_t hash1, hash2;
-    uint key = bench->d_keys[kid]/100000000 / 100000000 / 100000000;
-    for(int i=0;i<bench->dwHashFuncs; i++){
-        hash1 = d_MurmurHash2_x64((const void *)&key, sizeof(uint), bench->dwSeed);            // 双重散列封装，k个函数函数, 比如要20个
-        hash2 = d_MurmurHash2_x64((const void *)&key, sizeof(uint), MIX_UINT64(hash1));
-        pdwHashPos = (hash1 + i*hash2) % bench->dwFilterBits;
-        bench->d_pstFilter[pdwHashPos/8] |= (1<<(pdwHashPos%8));
-    }
+
     low[0] = uint_to_float((uint)((value >> 84) & ((1ULL << 28) - 1)));
     low[1] = uint_to_float((uint)((value >> 56) & ((1ULL << 28) - 1)));
     high[0] = uint_to_float((uint)((value >> 28) & ((1ULL << 28) - 1)));
     high[1] = uint_to_float((uint)(value & ((1ULL << 28) - 1)));
+
+    int offsetx = (bench->points[pid1].x - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 64;
+    int offsety = (bench->points[pid1].y - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 64;
+    //4
+
+    //还得取到对应的2M里面的
+    uint bitmapid = kid/65536;          //2GB/1024/32MB = 65536;
+    for(int i= ;i<offsetx;i++){
+        for(int j=  ;j<offsety;j++){
+
+        }
+    }
 }
 
 /*
@@ -1208,7 +1224,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         cout<<"10 11 12 finish"<<endl;
 
         if(true){           //mbr bit map
-            BloomFilter_Add<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
+            mbr_bitmap<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
             check_execution();
             cudaDeviceSynchronize();
             CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));

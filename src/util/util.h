@@ -506,6 +506,7 @@ const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
         }
     }
 
+    __host__ __device__
     inline float uint_to_float(uint f) {
         float ret = (float)f/100000;
         ret -= 180;
