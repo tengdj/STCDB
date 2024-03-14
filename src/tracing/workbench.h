@@ -62,7 +62,7 @@ typedef struct meeting_unit{
 //    unsigned short end;
     uint start;       //2023.9.21
     uint end;
-    uint lid;           //location 2024.3.6
+    uint wid;           //where 2024.3.13
     //Point midpoint;            //2023.7.17
     box mbr;                     //7.24 7.26
     bool isEmpty(){
@@ -184,6 +184,11 @@ public:
     //uint search_count = 0;
     uint single_find_count = 0;
     uint multi_find_count = 0;
+
+    //space for where id
+    unsigned char ** bitmap = NULL;                 //1024  256*256
+
+
 
     pthread_mutex_t mutex_i;
     bool interrupted = false;

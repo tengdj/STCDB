@@ -89,6 +89,15 @@ __uint128_t box_to_128(box *b){
     return ((__uint128_t)float_to_uint(b->low[0]) << 84) + ((__uint128_t)float_to_uint(b->low[1]) << 56) + ((__uint128_t)float_to_uint(b->high[0]) << 28) + ((__uint128_t)float_to_uint(b->high[1]));
 }
 
+__device__
+unsigned int zOrderFill(unsigned int x, unsigned int y) {           //why uint?
+    unsigned int morton = 0;
+    for (int i = 0; i < sizeof(unsigned int) * 4; ++i) {
+        morton |= ((x & 1U << i) << i) | ((y & 1U << i) << (i + 1));
+    }
+    return morton;
+}
+
 
 /*
  *
@@ -430,9 +439,15 @@ void cuda_refinement_unroll(workbench *bench, uint offset){
 					bench->meeting_buckets[slot].key = key;
 					bench->meeting_buckets[slot].start = bench->cur_time;
 					bench->meeting_buckets[slot].end = bench->cur_time;
-                    int offsety = (bench->points[pid1].y - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 128;
-                    int offsetx = (bench->points[pid1].x - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 128;
-                    bench->meeting_buckets[slot].lid = 128 * offsety + offsetx;
+                    int offsetx = (bench->points[pid1].x - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 64;
+                    int offsety = (bench->points[pid1].y - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 64;
+
+                    if(pid1<pid2){
+                        bench->meeting_buckets[slot].wid = zOrderFill(offsetx,offsety);
+                    }
+                    else{
+                        bench->meeting_buckets[slot].wid = zOrderFill(offsetx,offsety);
+                    }
 					break;
 				}
 				slot = (slot + 1)%bench->config->num_meeting_buckets;
@@ -595,6 +610,28 @@ void BloomFilter_Add(workbench *bench){
         pdwHashPos = (hash1 + i*hash2) % bench->dwFilterBits;
         bench->d_pstFilter[pdwHashPos/8] |= (1<<(pdwHashPos%8));
     }
+}
+
+__global__
+void mbr_bitmap(workbench *bench){
+    uint kid = blockIdx.x*blockDim.x+threadIdx.x;
+    if(kid>=bench->config->kv_restriction){
+        return;
+    }
+
+    uint pdwHashPos;
+    uint64_t hash1, hash2;
+    uint key = bench->d_keys[kid]/100000000 / 100000000 / 100000000;
+    for(int i=0;i<bench->dwHashFuncs; i++){
+        hash1 = d_MurmurHash2_x64((const void *)&key, sizeof(uint), bench->dwSeed);            // 双重散列封装，k个函数函数, 比如要20个
+        hash2 = d_MurmurHash2_x64((const void *)&key, sizeof(uint), MIX_UINT64(hash1));
+        pdwHashPos = (hash1 + i*hash2) % bench->dwFilterBits;
+        bench->d_pstFilter[pdwHashPos/8] |= (1<<(pdwHashPos%8));
+    }
+    low[0] = uint_to_float((uint)((value >> 84) & ((1ULL << 28) - 1)));
+    low[1] = uint_to_float((uint)((value >> 56) & ((1ULL << 28) - 1)));
+    high[0] = uint_to_float((uint)((value >> 28) & ((1ULL << 28) - 1)));
+    high[1] = uint_to_float((uint)(value & ((1ULL << 28) - 1)));
 }
 
 /*
@@ -937,6 +974,9 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
     size = bench->config->search_single_capacity*sizeof(search_info_unit);
     log("\t%.2f MB\tsearch_single_list",1.0*size/1024/1024);
 
+    //bitmap
+
+
     if(bench->config->bloom_filter) {
         //bloom filter
         h_bench.d_pstFilter = (unsigned char *) gpu->allocate(bench->dwFilterSize);
@@ -1166,6 +1206,18 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         print_128(bench->h_values[offset+bench->MemTable_count][12]);
         printf("\n");
         cout<<"10 11 12 finish"<<endl;
+
+        if(true){           //mbr bit map
+            BloomFilter_Add<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
+            check_execution();
+            cudaDeviceSynchronize();
+            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+            //logt("bloom filter ", start);
+            CUDA_SAFE_CALL(cudaMemcpy(bench->pstFilter[bench->MemTable_count], h_bench.d_pstFilter, bench->dwFilterSize, cudaMemcpyDeviceToHost));      //offset not change
+            cudaMemset(h_bench.d_pstFilter, 0, bench->dwFilterSize);
+        }
+
+
         if(bench->config->bloom_filter){
             BloomFilter_Add<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
             check_execution();
@@ -1175,6 +1227,8 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
             CUDA_SAFE_CALL(cudaMemcpy(bench->pstFilter[bench->MemTable_count], h_bench.d_pstFilter, bench->dwFilterSize, cudaMemcpyDeviceToHost));      //offset not change
             cudaMemset(h_bench.d_pstFilter, 0, bench->dwFilterSize);
         }
+
+
         bench->MemTable_count++;
 
         //init
