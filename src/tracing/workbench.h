@@ -186,8 +186,10 @@ public:
     uint multi_find_count = 0;
 
     //space for where id
-    unsigned char ** bitmap = NULL;                 //1024  256*256
-
+    unsigned char * d_bitmaps = NULL;                 //1024  256*256
+    unsigned char * h_bitmaps = NULL;
+    uint bit_count = 0;         //256*256=65536  SSTable_count bitmap
+    uint bitmaps_size = 0;
 
 
 

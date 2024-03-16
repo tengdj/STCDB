@@ -68,6 +68,14 @@ workbench *partitioner::build_schema(Point *points, size_t num_objects){
              << " bench->dwFilterBits :" << bench->dwFilterBits << " bench->dwHashFuncs :" << bench->dwHashFuncs
              << " bench->dwFilterSize :" << bench->dwFilterSize << endl;
     }
+    if(true){
+        bench->bit_count = 256*256;
+        bench->bitmaps_size = bench->bit_count/8*bench->config->SSTable_count;
+
+
+
+    }
+
     bench->SSTable_kv_capacity = bench->config->kv_restriction*bench->config->MemTable_capacity/2/bench->config->SSTable_count;     //327680
 
 	bench->claim_space();

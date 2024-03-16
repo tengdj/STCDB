@@ -168,6 +168,11 @@ void workbench::claim_space(){
         bg_run[i].SSTable_count = config->SSTable_count;
     }
 
+    if(true){
+        size = bitmaps_size;
+        h_bitmaps = (unsigned char *) allocate((size));
+    }
+
 }
 
 bool workbench::search_memtable(uint pid){

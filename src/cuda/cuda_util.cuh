@@ -10,6 +10,7 @@
 
 #include <cuda.h>
 #include "../util/util.h"
+#include <cuda_runtime.h>
 
 
 
@@ -122,6 +123,23 @@ inline uint float_to_uint(float xy) {
 //    return ret;
     xy += 180;
     return (uint)(xy*100000);
+}
+
+__host__ __device__
+inline float uint_to_float(uint f) {
+    float ret = (float)f/100000;
+    ret -= 180;
+    return ret;
+}
+
+__host__ __device__
+inline void decodeZOrder(uint64_t z, uint& x, uint& y) {
+    x = 0;
+    y = 0;
+    for (uint64_t i = 0; i < 64; ++i) {
+        x |= ((z & (1ULL << (2 * i))) >> i);
+        y |= ((z & (1ULL << (2 * i + 1))) >> (i + 1));
+    }
 }
 
 #endif /* CUDA_UTIL_H_ */

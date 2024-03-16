@@ -1,6 +1,6 @@
 #include <cuda.h>
 #include "mygpu.h"
-#include "cuda_util.h"
+#include "cuda_util.cuh"
 #include "../geometry/geometry.h"
 #include "../util/query_context.h"
 #include "../tracing/partitioner.h"
@@ -97,7 +97,6 @@ unsigned int zOrderFill(unsigned int x, unsigned int y) {           //why uint?
     }
     return morton;
 }
-
 
 /*
  *
@@ -213,7 +212,6 @@ void cuda_pack_lookup(workbench *bench){
 
 __global__
 void cuda_filtering(workbench *bench, int start_idx, int batch_size, bool include_contain){
-
 	int cur_idx = blockIdx.x*blockDim.x+threadIdx.x;
 	int idx = cur_idx + start_idx;
 	if(cur_idx>=batch_size){
@@ -563,7 +561,7 @@ void cuda_identify_meetings(workbench *bench) {
                     pid = target;
                     target = swap;
                 }
-                bench->d_keys[meeting_idx] = ((uint64_t)bench->meeting_buckets[bid].lid << 50) + ((uint64_t)pid << 25) + (uint64_t)target;              //64 = 14 + 25 +25;
+                bench->d_keys[meeting_idx] = (uint64_t)target + ((uint64_t)(bench->meeting_buckets[bid].end - bench->end_time_min) << 25) + ((uint64_t)pid << 39);          //64 = 25 + 14 + 25
                 bench->d_values[meeting_idx] = ((__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 112) + box_to_128(&bench->meeting_buckets[bid].mbr);
             }
         }
@@ -629,23 +627,26 @@ void mbr_bitmap(workbench *bench){
     if(kid>=bench->config->kv_restriction){
         return;
     }
-    uint low0,low1,high0,high1;
+//    uint low0,low1,high0,high1;
+//    float f_low0,f_low1,f_high0,f_high1;
 
+    float f_low0 = uint_to_float((uint)((bench->d_values[kid] >> 84) & ((1ULL << 28) - 1)));
+    float f_low1 = uint_to_float((uint)((bench->d_values[kid] >> 56) & ((1ULL << 28) - 1)));
+    float f_high0 = uint_to_float((uint)((bench->d_values[kid] >> 28) & ((1ULL << 28) - 1)));
+    float f_high1 = uint_to_float((uint)(bench->d_values[kid] & ((1ULL << 28) - 1)));
 
-    low[0] = uint_to_float((uint)((value >> 84) & ((1ULL << 28) - 1)));
-    low[1] = uint_to_float((uint)((value >> 56) & ((1ULL << 28) - 1)));
-    high[0] = uint_to_float((uint)((value >> 28) & ((1ULL << 28) - 1)));
-    high[1] = uint_to_float((uint)(value & ((1ULL << 28) - 1)));
-
-    int offsetx = (bench->points[pid1].x - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 64;
-    int offsety = (bench->points[pid1].y - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 64;
+    int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 256;
+    int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
+    int high0 = (bench->mbr.high[0] - f_high0)/(bench->mbr.high[0] - bench->mbr.low[0]) * 256;
+    int high1 = (bench->mbr.high[1] - f_high1)/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
     //4
 
-    //还得取到对应的2M里面的
-    uint bitmapid = kid/65536;          //2GB/1024/32MB = 65536;
-    for(int i= ;i<offsetx;i++){
-        for(int j=  ;j<offsety;j++){
-
+    uint bitmap_id = kid/(bench->bit_count/8);          //256*256/8 = 8192B 1B=1char
+    uint bit_pos = 0;
+    for(int i=low0;i<=high0;i++){
+        for(int j=low1;j<=high1;j++){
+            bit_pos = zOrderFill(i,j);
+            bench->d_bitmaps[bitmap_id*(bench->bit_count/8)+bit_pos/8] |= (1<<(bit_pos%8));
         }
     }
 }
@@ -990,15 +991,21 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
     size = bench->config->search_single_capacity*sizeof(search_info_unit);
     log("\t%.2f MB\tsearch_single_list",1.0*size/1024/1024);
 
-    //bitmap
-
-
     if(bench->config->bloom_filter) {
         //bloom filter
         h_bench.d_pstFilter = (unsigned char *) gpu->allocate(bench->dwFilterSize);
         size = bench->dwFilterSize;
         log("\t%.2f MB\td_pstFilter", 1.0 * size / 1024 / 1024);
         cudaMemset(h_bench.d_pstFilter, 0, bench->dwFilterSize);
+    }
+
+    //bitmap
+    if(true) {
+        //bloom filter
+        h_bench.d_bitmaps = (unsigned char *) gpu->allocate(bench->bitmaps_size);
+        size = bench->bitmaps_size;
+        log("\t%.2f MB\td_bitmaps", 1.0 * size / 1024 / 1024);
+        cudaMemset(h_bench.d_bitmaps, 0, size);
     }
 
 	h_bench.part_counter = (uint *)gpu->allocate(one_dim*one_dim*sizeof(uint));
@@ -1229,8 +1236,8 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
             cudaDeviceSynchronize();
             CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
             //logt("bloom filter ", start);
-            CUDA_SAFE_CALL(cudaMemcpy(bench->pstFilter[bench->MemTable_count], h_bench.d_pstFilter, bench->dwFilterSize, cudaMemcpyDeviceToHost));      //offset not change
-            cudaMemset(h_bench.d_pstFilter, 0, bench->dwFilterSize);
+            CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps, h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));      //offset not change
+            cudaMemset(h_bench.d_bitmaps, 0, bench->bitmaps_size);
         }
 
 
@@ -1243,7 +1250,6 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
             CUDA_SAFE_CALL(cudaMemcpy(bench->pstFilter[bench->MemTable_count], h_bench.d_pstFilter, bench->dwFilterSize, cudaMemcpyDeviceToHost));      //offset not change
             cudaMemset(h_bench.d_pstFilter, 0, bench->dwFilterSize);
         }
-
 
         bench->MemTable_count++;
 

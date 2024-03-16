@@ -5,7 +5,7 @@
  *      Author: teng
  */
 
-#include "cuda_util.h"
+#include "cuda_util.cuh"
 #include "../geometry/geometry.h"
 
 #include <thrust/host_vector.h>
