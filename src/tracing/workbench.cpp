@@ -125,16 +125,16 @@ void workbench::claim_space(){
 //		meeting_buckets[i].key = ULL_MAX;
 //	}
 
-    size = config->MemTable_capacity * sizeof(uint64_t *);                 //sort
-    h_keys = (uint64_t **)allocate(size);
+    size = config->MemTable_capacity * sizeof(__uint128_t *);                 //sort
+    h_keys = (__uint128_t **)allocate(size);
     //log("\t%.2f MB\tmeeting bucket space",size/1024.0/1024.0);
 
     size = config->MemTable_capacity * sizeof(__uint128_t *);
     h_values = (__uint128_t **)allocate(size);
 
     for(int i=0;i<config->MemTable_capacity; i++){
-        size = config->kv_capacity*sizeof(uint64_t);
-        h_keys[i] = (uint64_t *)allocate(size);
+        size = config->kv_capacity*sizeof(__uint128_t);
+        h_keys[i] = (__uint128_t *)allocate(size);
         log("\t%.2f MB\ta element of h_keys",size/1024.0/1024.0);
 
         size = config->kv_capacity*sizeof(__uint128_t);
@@ -157,7 +157,7 @@ void workbench::claim_space(){
         for (int i = 0; i < config->MemTable_capacity; i++) {
             size = dwFilterSize;
             pstFilter[i] = (unsigned char *) allocate(size);
-            log("\t%.2f MB\ta pstFilter", size / 1024.0 / 1024.0);
+            log("\t%.2f MB\t pstFilter", size / 1024.0 / 1024.0);
             memset(pstFilter[i], 0, dwFilterSize);
         }
     }
@@ -170,7 +170,11 @@ void workbench::claim_space(){
 
     if(true){
         size = bitmaps_size;
-        h_bitmaps = (unsigned char *) allocate((size));
+        h_bitmaps = (unsigned char *) allocate(size);
+        log("\t%.2f MB\t h_bitmaps", size / 1024.0 / 1024.0);
+        size = config->num_objects*sizeof(uint);
+        h_wids = (uint *) allocate(size);
+        log("\t%.2f MB\t h_wids", size / 1024.0 / 1024.0);
     }
 
 }
@@ -214,7 +218,7 @@ bool workbench::search_memtable(uint pid){
             temp_pid = h_keys[offset+i][cursor] >> 39;
         }
         if (temp_pid == pid && cursor == 0) {
-            cout<<h_keys[offset+i][0];
+            print_128(h_keys[offset+i][0]);
             cout<<" :"<<(uint)(h_values[offset+i][0] >> 112)<<endl;
             box temp_box(h_values[offset+i][0]);
             temp_box.print();
@@ -227,7 +231,8 @@ bool workbench::search_memtable(uint pid){
             cursor++;
             temp_pid = h_keys[offset+i][cursor] >> 39;
             if (temp_pid == pid) {
-                cout<<h_keys[offset+i][cursor];
+                //cout<<h_keys[offset+i][cursor];
+                print_128(h_keys[offset+i][cursor]);
                 cout<<" :"<<(uint)(h_values[offset+i][cursor] >> 112)<<endl;
                 box temp_box(h_values[offset+i][cursor]);
                 temp_box.print();

@@ -220,7 +220,7 @@ void *sst_dump(void *arg){
     key_value *temp_kvs = new key_value[bench->SSTable_kv_capacity];
     uint *key_index = new uint[bench->config->MemTable_capacity/2]{0};
     int finish = 0;
-    uint64_t temp_key;
+    __uint128_t temp_key;
     uint taken_id = 0;
     struct timeval bg_start = get_cur_time();
     while(finish<bench->config->MemTable_capacity/2){
@@ -301,7 +301,7 @@ void *crash_sst_dump(void *arg){
     key_value *temp_kvs = new key_value[bench->SSTable_kv_capacity];
     uint *key_index = new uint[bench->config->MemTable_capacity/2]{0};
     int finish = 0;
-    uint64_t temp_key;
+    __uint128_t temp_key;
     uint taken_id = 0;
     struct timeval bg_start = get_cur_time();
     while(finish<bench->MemTable_count){
@@ -540,7 +540,7 @@ void tracer::process(){
                 }
                 for(int i=0;i<bench->MemTable_count; i++){
                     for(int j=0;j<10;j++){
-                        cout<<bench->h_keys[offset+i][j]<<endl;
+                        print_128(bench->h_keys[offset+i][j]);
                         cout<<(uint)(bench->h_keys[offset+i][j] >> 39)<<endl;
                         print_128(bench->h_values[offset+i][j]);
                         cout<<endl;
@@ -566,6 +566,7 @@ void tracer::process(){
                         bit_points.push_back(bit_p);
                     }
                 }
+                cout<<"bit_points.size():"<<bit_points.size()<<endl;
                 print_points(bit_points);
 
 //                uint offset = 0;

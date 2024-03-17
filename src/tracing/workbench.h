@@ -62,7 +62,7 @@ typedef struct meeting_unit{
 //    unsigned short end;
     uint start;       //2023.9.21
     uint end;
-    uint wid;           //where 2024.3.13
+    //uint wid;           //where 2024.3.13
     //Point midpoint;            //2023.7.17
     box mbr;                     //7.24 7.26
     bool isEmpty(){
@@ -152,12 +152,12 @@ public:
 //	uint meeting_counter = 0;
 
     //for space for cuda sort
-    uint64_t *d_keys = NULL;
+    __uint128_t *d_keys = NULL;
     __uint128_t *d_values = NULL;
     uint kv_count = 0;
 
     //space for MemTable
-    uint64_t **h_keys = NULL;
+    __uint128_t **h_keys = NULL;
     __uint128_t **h_values = NULL;
     uint MemTable_count = 0;
 
@@ -190,6 +190,8 @@ public:
     unsigned char * h_bitmaps = NULL;
     uint bit_count = 0;         //256*256=65536  SSTable_count bitmap
     uint bitmaps_size = 0;
+    uint * d_wids = NULL;
+    uint * h_wids = NULL;
 
 
 
