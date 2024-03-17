@@ -202,6 +202,9 @@ public:
     //big sorted run
     sorted_run *bg_run = NULL;
     uint big_sorted_run_count = 0;
+    uint start_time_min = 0;
+    uint start_time_max = 0;
+
     uint end_time_min = 0;
     uint end_time_max = 0;
     uint SSTable_kv_capacity = 0;

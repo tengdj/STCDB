@@ -88,6 +88,7 @@ void tracer::dumpTo(const char *path) {
 	wf.write((char *)&config->duration, sizeof(config->duration));
 	wf.write((char *)&mbr, sizeof(mbr));
 	size_t num_points = config->duration*config->num_objects;
+    cout<<"config->duration:"<<config->duration<<endl;
 	wf.write((char *)trace, sizeof(Point)*num_points);
 	wf.close();
 	logt("dumped to %s",start_time,path);
@@ -400,6 +401,8 @@ void tracer::process(){
 			bench = part->build_schema(trace, config->num_objects);
 			bench->mbr = mbr;
             bench->end_time_min = config->start_time + config->min_meet_time;           //first min time
+            bench->start_time_min = (1ULL<<32) -1;
+            bench->start_time_max = 0;
 
             //command
             pthread_t command_thread;
@@ -553,6 +556,7 @@ void tracer::process(){
             }
             else if(bench->MemTable_count==bench->config->MemTable_capacity/2) {    //0<=MemTable_count<=MemTable_capacity/2
                 bench->end_time_max = bench->cur_time;              //old max
+                cout<<"start_time_min:"<<bench->start_time_min<<"start_time_max:"<<bench->start_time_max<<"bench->end_time_max:"<<bench->end_time_max<<endl;
 
                 bench->MemTable_count = 0;
                 vector<Point *> bit_points;
@@ -569,26 +573,28 @@ void tracer::process(){
                 cout<<"bit_points.size():"<<bit_points.size()<<endl;
                 print_points(bit_points);
 
-//                uint offset = 0;
+                uint offset = 0;
 //                if(bench->big_sorted_run_count%2==1){
 //                    offset = bench->config->MemTable_capacity/2;
 //                }
-//                for(int i=0;i<bench->config->MemTable_capacity/2; i++){
-//                    for(int j=0;j<10;j++){
-//                        cout<<bench->h_keys[offset+i][j]<<endl;
-//                        print_128(bench->h_values[offset+i][j]);
-//                        cout<<endl;
-//                    }
-//                    cout<<endl;
-//                }
-//                cout << "dump begin time: " << bench->cur_time << endl;
+                for(int i=0;i<bench->config->MemTable_capacity/2; i++){
+                    for(int j=0;j<10;j++){
+                        print_128(bench->h_keys[offset+i][j]);
+                        cout<<endl;
+                        print_128(bench->h_values[offset+i][j]);
+                        cout<<endl;
+                    }
+                    cout<<endl;
+                }
+                cout << "dump begin time: " << bench->cur_time << endl;
 //                pthread_t bg_thread;
 //                int ret;
 //                if ((ret = pthread_create(&bg_thread, NULL, sst_dump, (void *) bench)) != 0) {
 //                    fprintf(stderr, "pthread_create:%s\n", strerror(ret));
 //                }
 //                pthread_detach(bg_thread);
-//                //bool findit = searchkv_in_all_place(bench, 2);
+
+                //bool findit = searchkv_in_all_place(bench, 2);
             }
 
 			if(config->analyze_grid||config->profile){

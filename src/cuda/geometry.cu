@@ -394,17 +394,6 @@ void cuda_refinement(workbench *bench){
                     mbr_update(bench->meeting_buckets[slot].mbr, p1);
                     mbr_update(bench->meeting_buckets[slot].mbr, p2);
 
-                    
-//                    int offsetx = (bench->points[pid1].x - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 64;
-//                    int offsety = (bench->points[pid1].y - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 64;
-//
-//                    if(pid1<pid2){
-//                        bench->meeting_buckets[slot].wid = zOrderFill(offsetx,offsety);
-//                    }
-//                    else{
-//                        bench->meeting_buckets[slot].wid = zOrderFill(offsetx,offsety);
-//                    }
-
                     break;
                 }
                 slot = (slot + 1)%bench->config->num_meeting_buckets;
@@ -449,15 +438,6 @@ void cuda_refinement_unroll(workbench *bench, uint offset){
 					bench->meeting_buckets[slot].key = key;
 					bench->meeting_buckets[slot].start = bench->cur_time;
 					bench->meeting_buckets[slot].end = bench->cur_time;
-//                    int offsetx = (bench->points[pid1].x - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 64;
-//                    int offsety = (bench->points[pid1].y - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 64;
-//                    if(pid1<pid2){
-//                        bench->meeting_buckets[slot].wid = zOrderFill(offsetx,offsety);
-//                    }
-//                    else{
-//                        bench->meeting_buckets[slot].wid = zOrderFill(offsetx,offsety);
-//                    }
-
 					break;
 				}
 				slot = (slot + 1)%bench->config->num_meeting_buckets;
@@ -551,6 +531,13 @@ void cuda_identify_meetings(workbench *bench) {
     }
     uint wid = 0;
     if (bench->cur_time - bench->meeting_buckets[bid].start >= bench->config->min_meet_time + 1) {
+        if(bench->start_time_min > bench->meeting_buckets[bid].start){
+            atomicMin(&bench->start_time_min,bench->meeting_buckets[bid].start);
+        }
+        if(bench->end_time_max < bench->meeting_buckets[bid].start){
+            atomicMax(&bench->start_time_max,bench->meeting_buckets[bid].start);
+        }
+
         uint pid, target;
         pid = getpid1(bench->meeting_buckets[bid].key);
         target = getpid2(bench->meeting_buckets[bid].key);
@@ -566,17 +553,17 @@ void cuda_identify_meetings(workbench *bench) {
         for (int k = 0; k < 2; k++) {
             uint meeting_idx = atomicAdd(&bench->kv_count, 1);
             assert(meeting_idx < bench->config->kv_capacity);
-                if(k==1){
-                    uint swap = pid;
-                    pid = target;
-                    target = swap;
-                }
-                bench->d_keys[meeting_idx] = ((__uint128_t)wid << 96) + ((__uint128_t)pid << 64) + ((__uint128_t)bench->meeting_buckets[bid].end << 32) + ((__uint128_t)target);          //64 = 25 + 14 + 25
-                bench->d_values[meeting_idx] = temp_value;
-                uint old_mid0 = 0;
-                uint old_mid1 = 0;
-                decodeZOrder(bench->d_wids[pid],old_mid0,old_mid1);
-                bench->d_wids[pid] = zOrderFill(old_mid0+mid0/2, old_mid1+mid1/2);
+            if(k==1){
+                uint swap = pid;
+                pid = target;
+                target = swap;
+            }
+            bench->d_keys[meeting_idx] = ((__uint128_t)wid << 96) + ((__uint128_t)pid << 64) + ((__uint128_t)bench->meeting_buckets[bid].end << 32) + ((__uint128_t)target);          //64 = 25 + 14 + 25
+            bench->d_values[meeting_idx] = temp_value;
+            uint old_mid0 = 0;
+            uint old_mid1 = 0;
+            decodeZOrder(bench->d_wids[pid],old_mid0,old_mid1);
+            bench->d_wids[pid] = zOrderFill(old_mid0+mid0/2, old_mid1+mid1/2);
         }
     }
     // reset the bucket
@@ -1211,6 +1198,10 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 
     //4.5 cuda sort
     if(h_bench.kv_count>bench->config->kv_restriction){
+        bench->start_time_min = h_bench.start_time_min;
+        bench->start_time_max = h_bench.start_time_max;
+        h_bench.start_time_min = (1ULL<<32) -1;
+        h_bench.start_time_max = 0;
         if(true){
             write_wid<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
             check_execution();
@@ -1250,25 +1241,27 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         print_128(bench->h_keys[offset+bench->MemTable_count][10]);
         printf("\n");
         print_128(bench->h_values[offset+bench->MemTable_count][10]);
-//        printf("cudaMemcpy kv right\n");
-//        cout<<"bench->end_time_min:"<<bench->end_time_min<<endl;
-//        cout<<bench->h_keys[offset+bench->MemTable_count][10]<<endl;
-//        cout<<"pid:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][10] >> 39)<<endl;
-//        cout<<"end:"<<(uint)((bench->h_keys[offset+bench->MemTable_count][10] >> 25) & ((1ULL << 14) - 1))+bench->end_time_min<<endl;
-//        cout<<"target:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][10] & ((1ULL << 25) - 1))<<endl;
-//        print_128(bench->h_values[offset+bench->MemTable_count][10]);
-//        printf("\n");
-//        cout<<"duration:"<<(uint)(bench->h_values[offset+bench->MemTable_count][10] >> 112)<<endl;
-//        box temp_box(bench->h_values[offset+bench->MemTable_count][10]);
-//        temp_box.print();
-//
-//        cout<<bench->h_keys[offset+bench->MemTable_count][11]<<endl;
-//        print_128(bench->h_values[offset+bench->MemTable_count][11]);
-//        printf("\n");
-//        cout<<bench->h_keys[offset+bench->MemTable_count][12]<<endl;
-//        print_128(bench->h_values[offset+bench->MemTable_count][12]);
-//        printf("\n");
-//        cout<<"10 11 12 finish"<<endl;
+        printf("\n");
+        printf("cudaMemcpy kv right\n");
+        cout<<"bench->end_time_min:"<<bench->end_time_min<<endl;
+        cout<<"wid:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][10] >> 96)<<endl;
+        cout<<"pid:"<<(uint)((bench->h_keys[offset+bench->MemTable_count][10] >> 64) & ((1ULL << 32) - 1))<<endl;
+        cout<<"end:"<<(uint)((bench->h_keys[offset+bench->MemTable_count][10] >> 32) & ((1ULL << 32) - 1))<<endl;
+        cout<<"target:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][10] & ((1ULL << 32) - 1))<<endl;
+        printf("\n");
+        cout<<"duration:"<<(uint)(bench->h_values[offset+bench->MemTable_count][10] >> 112)<<endl;
+        box temp_box(bench->h_values[offset+bench->MemTable_count][10]);
+        temp_box.print();
+
+        print_128(bench->h_keys[offset+bench->MemTable_count][11]);
+        printf("\n");
+        print_128(bench->h_values[offset+bench->MemTable_count][11]);
+        printf("\n");
+        print_128(bench->h_keys[offset+bench->MemTable_count][12]);
+        printf("\n");
+        print_128(bench->h_values[offset+bench->MemTable_count][12]);
+        printf("\n");
+        cout<<"10 11 12 finish"<<endl;
 
         if(true){           //mbr bit map
             mbr_bitmap<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
