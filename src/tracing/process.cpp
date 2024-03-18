@@ -560,8 +560,8 @@ void tracer::process(){
 
                 bench->MemTable_count = 0;
                 vector<Point *> bit_points;
-                for(uint i=0;i<bench->bit_count;i++){
-                    if(bench->h_bitmaps[i/8] & (1<<(i%8))){
+                for(uint i=0;i<6000;i++){
+                    if(bench->h_bitmaps[+i/8] & (1<<(i%8))){
                         Point *bit_p = new Point;
                         uint x=0,y=0;
                         decodeZOrder(i,x,y);
@@ -579,10 +579,7 @@ void tracer::process(){
 //                }
                 for(int i=0;i<bench->config->MemTable_capacity/2; i++){
                     for(int j=0;j<10;j++){
-                        print_128(bench->h_keys[offset+i][j]);
-                        cout<<endl;
-                        print_128(bench->h_values[offset+i][j]);
-                        cout<<endl;
+                        cout<<"wid:"<<(uint)(bench->h_keys[offset+i][j] >> 96)<<endl;
                     }
                     cout<<endl;
                 }

@@ -90,12 +90,9 @@ __uint128_t box_to_128(box *b){
 }
 
 __device__
-unsigned int zOrderFill(unsigned int x, unsigned int y) {           //why uint?
-    unsigned int morton = 0;
-    for (int i = 0; i < sizeof(unsigned int) * 4; ++i) {
-        morton |= ((x & 1U << i) << i) | ((y & 1U << i) << (i + 1));
-    }
-    return morton;
+unsigned int zOrderFill(unsigned int x, unsigned int y) {
+    unsigned int z = x + y*256;
+    return z;
 }
 
 /*
@@ -545,8 +542,8 @@ void cuda_identify_meetings(workbench *bench) {
 
         uint low0 = (bench->meeting_buckets[bid].mbr.low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 256;
         uint low1 = (bench->meeting_buckets[bid].mbr.low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
-        uint high0 = (bench->mbr.high[0] - bench->meeting_buckets[bid].mbr.high[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 256;
-        uint high1 = (bench->mbr.high[1] - bench->meeting_buckets[bid].mbr.high[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
+        uint high0 = (bench->meeting_buckets[bid].mbr.high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 256;
+        uint high1 = (bench->meeting_buckets[bid].mbr.high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
         uint mid0 = low0/2+high0/2;
         uint mid1 = low1/2+high1/2;
 
@@ -563,7 +560,10 @@ void cuda_identify_meetings(workbench *bench) {
             uint old_mid0 = 0;
             uint old_mid1 = 0;
             decodeZOrder(bench->d_wids[pid],old_mid0,old_mid1);
-            bench->d_wids[pid] = zOrderFill(old_mid0+mid0/2, old_mid1+mid1/2);
+            uint new_mid0 = (old_mid0*bench->same_pid_count[pid] + mid0) / (bench->same_pid_count[pid] + 1);                //centroid
+            uint new_mid1 = (old_mid1*bench->same_pid_count[pid] + mid1) / (bench->same_pid_count[pid] + 1);
+            bench->d_wids[pid] = zOrderFill(new_mid0, new_mid1);
+            bench->same_pid_count[pid]++;
         }
     }
     // reset the bucket
@@ -606,10 +606,10 @@ void cuda_search_multi_kv(workbench *bench){
 __global__
 void write_wid(workbench *bench){
     uint kid = blockIdx.x*blockDim.x+threadIdx.x;
-    if(kid>=bench->config->kv_restriction){
+    if(kid>=bench->kv_count){
         return;
     }
-    uint pid = ((bench->d_keys[kid] >> 64) & ((1ULL << 32) - 1));
+    uint pid = (bench->d_keys[kid] >> 64) & ((1ULL << 32) - 1);
     bench->d_keys[kid] += ((__uint128_t)bench->d_wids[pid] << 96);
 }
 
@@ -632,6 +632,17 @@ void BloomFilter_Add(workbench *bench){
 }
 
 __global__
+void wid_bitmap(workbench *bench){
+    uint kid = blockIdx.x*blockDim.x+threadIdx.x;
+    if(kid>=bench->config->kv_restriction){
+        return;
+    }
+    uint wid = bench->d_keys[kid] >> 96;
+    uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);           //kid/65536
+    bench->d_bitmaps[bitmap_id*(bench->bit_count/8)+wid/8] |= (1<<(wid%8));
+}
+
+__global__
 void mbr_bitmap(workbench *bench){
     uint kid = blockIdx.x*blockDim.x+threadIdx.x;
     if(kid>=bench->config->kv_restriction){
@@ -647,11 +658,12 @@ void mbr_bitmap(workbench *bench){
 
     uint low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 256;
     uint low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
-    uint high0 = (bench->mbr.high[0] - f_high0)/(bench->mbr.high[0] - bench->mbr.low[0]) * 256;
-    uint high1 = (bench->mbr.high[1] - f_high1)/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
+    uint high0 = (f_high0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 256;
+    uint high1 = (f_high1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
     //4
 
-    uint bitmap_id = kid/(bench->bit_count/8);          //256*256/8 = 8192B 1B=1char
+    //uint bitmap_id = kid/(bench->bit_count/8);          //256*256/8 = 8192B 1B=1char    ???????
+    uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);           //kid/65536
     uint bit_pos = 0;
     for(uint i=low0;i<=high0;i++){
         for(uint j=low1;j<=high1;j++){
@@ -1020,6 +1032,10 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
         h_bench.d_wids = (uint *)gpu->allocate(bench->config->num_objects*sizeof(uint));
         size = bench->config->num_objects*sizeof(uint);
         log("\t%.2f MB\td_wids", 1.0 * size / 1024 / 1024);
+
+        h_bench.same_pid_count = (short *)gpu->allocate(bench->config->num_objects * sizeof(short));
+        size = bench->config->num_objects*sizeof(short);
+        log("\t%.2f MB\tsame_name_count", 1.0 * size / 1024 / 1024);
     }
 
 	h_bench.part_counter = (uint *)gpu->allocate(one_dim*one_dim*sizeof(uint));
@@ -1202,15 +1218,16 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         bench->start_time_max = h_bench.start_time_max;
         h_bench.start_time_min = (1ULL<<32) -1;
         h_bench.start_time_max = 0;
-        if(true){
-            write_wid<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
-            check_execution();
-            cudaDeviceSynchronize();
-            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-            //logt("bloom filter ", start);
-            CUDA_SAFE_CALL(cudaMemcpy(bench->h_wids, h_bench.d_wids, bench->config->num_objects*sizeof(uint), cudaMemcpyDeviceToHost));      //offset not change
-            cudaMemset(h_bench.d_wids, 0, bench->config->num_objects*sizeof(uint));
-        }
+//        if(true){
+//            write_wid<<<h_bench.kv_count / 1024 + 1,1024>>>(d_bench);
+//            check_execution();
+//            cudaDeviceSynchronize();
+//            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+//            //logt("bloom filter ", start);
+//            CUDA_SAFE_CALL(cudaMemcpy(bench->h_wids, h_bench.d_wids, bench->config->num_objects*sizeof(uint), cudaMemcpyDeviceToHost));      //offset not change
+//            cudaMemset(h_bench.d_wids, 0, bench->config->num_objects*sizeof(uint));
+//            cudaMemset(h_bench.same_pid_count, 0, bench->config->num_objects * sizeof(short));
+//        }
 
         // wrap raw pointer with a device_ptr
         thrust::device_ptr<__uint128_t> d_vector_keys = thrust::device_pointer_cast(h_bench.d_keys);
@@ -1253,15 +1270,14 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         box temp_box(bench->h_values[offset+bench->MemTable_count][10]);
         temp_box.print();
 
-        print_128(bench->h_keys[offset+bench->MemTable_count][11]);
-        printf("\n");
-        print_128(bench->h_values[offset+bench->MemTable_count][11]);
-        printf("\n");
-        print_128(bench->h_keys[offset+bench->MemTable_count][12]);
-        printf("\n");
-        print_128(bench->h_values[offset+bench->MemTable_count][12]);
-        printf("\n");
-        cout<<"10 11 12 finish"<<endl;
+        for(uint i = 0; i<65536; i++){
+            cout<<"wid:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][i] >> 96)<<endl;
+        }
+        cout<<"next bitmap"<<endl;
+        for(uint i = 65536; i<70000; i++){
+            cout<<"wid:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][i] >> 96)<<endl;
+        }
+
 
         if(true){           //mbr bit map
             mbr_bitmap<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
@@ -1272,6 +1288,16 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
             CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps, h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));      //offset not change
             cudaMemset(h_bench.d_bitmaps, 0, bench->bitmaps_size);
         }
+
+//        if(true){           //wid bit map
+//            wid_bitmap<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
+//            check_execution();
+//            cudaDeviceSynchronize();
+//            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+//            //logt("bloom filter ", start);
+//            CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps, h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));      //offset not change
+//            cudaMemset(h_bench.d_bitmaps, 0, bench->bitmaps_size);
+//        }
 
 
         if(bench->config->bloom_filter){

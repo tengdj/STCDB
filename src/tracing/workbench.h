@@ -192,7 +192,7 @@ public:
     uint bitmaps_size = 0;
     uint * d_wids = NULL;
     uint * h_wids = NULL;
-
+    short * same_pid_count = NULL;
 
 
     pthread_mutex_t mutex_i;

@@ -133,13 +133,9 @@ inline float uint_to_float(uint f) {
 }
 
 __host__ __device__
-inline void decodeZOrder(uint64_t z, uint& x, uint& y) {
-    x = 0;
-    y = 0;
-    for (uint64_t i = 0; i < 64; ++i) {
-        x |= ((z & (1ULL << (2 * i))) >> i);
-        y |= ((z & (1ULL << (2 * i + 1))) >> (i + 1));
-    }
+inline void decodeZOrder(unsigned int z, unsigned int& x, unsigned int& y) {
+    x = z % 256;
+    y = z / 256;
 }
 
 #endif /* CUDA_UTIL_H_ */

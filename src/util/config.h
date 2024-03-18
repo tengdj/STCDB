@@ -49,8 +49,8 @@ public:
     //added
     bool load_data = true;
 
-    uint kv_capacity = 70000000;            //70000000
-    uint kv_restriction = 67108864;                  //2*1024*1024*1024/32 = 67108864
+    uint kv_capacity = 10000000;            //70000000
+    uint kv_restriction = 6710886;                  //2*1024*1024*1024/32 = 67108864
     uint MemTable_capacity = 10;             //5*2
 
     uint big_sorted_run_capacity = 100;
