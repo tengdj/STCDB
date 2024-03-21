@@ -152,12 +152,12 @@ public:
 //	uint meeting_counter = 0;
 
     //for space for cuda sort
-    __uint128_t *d_keys = NULL;
+    uint64_t *d_keys = NULL;
     __uint128_t *d_values = NULL;
     uint kv_count = 0;
 
     //space for MemTable
-    __uint128_t **h_keys = NULL;
+    uint64_t **h_keys = NULL;
     __uint128_t **h_values = NULL;
     uint MemTable_count = 0;
 
@@ -190,9 +190,9 @@ public:
     unsigned char * h_bitmaps = NULL;
     uint bit_count = 0;         //256*256=65536  SSTable_count bitmap
     uint bitmaps_size = 0;
-    uint * d_wids = NULL;
-    uint * h_wids = NULL;
-    short * same_pid_count = NULL;
+    unsigned short * d_wids = NULL;
+    unsigned short * h_wids = NULL;
+    unsigned short * same_pid_count = NULL;
 
 
     pthread_mutex_t mutex_i;

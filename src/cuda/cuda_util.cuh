@@ -122,12 +122,12 @@ inline uint float_to_uint(float xy) {
 //    ret += (uint)(xy*10000);
 //    return ret;
     xy += 180;
-    return (uint)(xy*100000);
+    return (uint)(xy*10000);
 }
 
 __host__ __device__
 inline float uint_to_float(uint f) {
-    float ret = (float)f/100000;
+    float ret = (float)f/10000;
     ret -= 180;
     return ret;
 }

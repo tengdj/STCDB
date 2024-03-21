@@ -22,6 +22,10 @@ workbench::workbench(workbench *bench):workbench(bench->config){
         dwSeed = bench->dwSeed;
         dwFilterSize = bench->dwFilterSize;
     }
+    if(true){
+        bit_count = bench->bit_count;
+        bitmaps_size = bench->bitmaps_size;
+    }
 }
 
 workbench::workbench(configuration *conf){
@@ -125,16 +129,16 @@ void workbench::claim_space(){
 //		meeting_buckets[i].key = ULL_MAX;
 //	}
 
-    size = config->MemTable_capacity * sizeof(__uint128_t *);                 //sort
-    h_keys = (__uint128_t **)allocate(size);
+    size = config->MemTable_capacity * sizeof(uint64_t *);                 //sort
+    h_keys = (uint64_t **)allocate(size);
     //log("\t%.2f MB\tmeeting bucket space",size/1024.0/1024.0);
 
     size = config->MemTable_capacity * sizeof(__uint128_t *);
     h_values = (__uint128_t **)allocate(size);
 
     for(int i=0;i<config->MemTable_capacity; i++){
-        size = config->kv_capacity*sizeof(__uint128_t);
-        h_keys[i] = (__uint128_t *)allocate(size);
+        size = config->kv_capacity*sizeof(uint64_t);
+        h_keys[i] = (uint64_t *)allocate(size);
         log("\t%.2f MB\ta element of h_keys",size/1024.0/1024.0);
 
         size = config->kv_capacity*sizeof(__uint128_t);
@@ -172,11 +176,10 @@ void workbench::claim_space(){
         size = bitmaps_size;
         h_bitmaps = (unsigned char *) allocate(size);
         log("\t%.2f MB\t h_bitmaps", size / 1024.0 / 1024.0);
-        size = config->num_objects*sizeof(uint);
-        h_wids = (uint *) allocate(size);
+        size = config->num_objects*sizeof(unsigned short);
+        h_wids = (unsigned short *) allocate(size);
         log("\t%.2f MB\t h_wids", size / 1024.0 / 1024.0);
     }
-
 }
 
 bool workbench::search_memtable(uint pid){

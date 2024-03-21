@@ -559,19 +559,26 @@ void tracer::process(){
                 cout<<"start_time_min:"<<bench->start_time_min<<"start_time_max:"<<bench->start_time_max<<"bench->end_time_max:"<<bench->end_time_max<<endl;
 
                 bench->MemTable_count = 0;
-                vector<Point *> bit_points;
-                for(uint i=0;i<6000;i++){
-                    if(bench->h_bitmaps[+i/8] & (1<<(i%8))){
-                        Point *bit_p = new Point;
-                        uint x=0,y=0;
-                        decodeZOrder(i,x,y);
-                        bit_p->x = (double)x/256*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 256;
-                        bit_p->y = (double)y/256*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
-                        bit_points.push_back(bit_p);
+                Point * bit_points = new Point[bench->bit_count];
+                uint count_p;
+                for(uint j = 0;j<bench->config->SSTable_count;j++){
+                    //cerr<<"bitmap"<<j<<endl;
+                    cerr<<endl;
+                    count_p = 0;
+                    for(uint i=0;i<bench->bit_count;i++){
+                        if(bench->h_bitmaps[j*(bench->bit_count/8) + i/8] & (1<<(i%8))){
+                            Point bit_p = new Point;
+                            uint x=0,y=0;
+                            decodeZOrder(i,x,y);
+                            bit_p.x = (double)x/256*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 256;
+                            bit_p.y = (double)y/256*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
+                            bit_points[count_p] = bit_p;
+                            count_p++;
+                        }
                     }
+                    cout<<"bit_points.size():"<<count_p<<endl;
+                    print_points(bit_points,count_p);
                 }
-                cout<<"bit_points.size():"<<bit_points.size()<<endl;
-                print_points(bit_points);
 
                 uint offset = 0;
 //                if(bench->big_sorted_run_count%2==1){
@@ -579,7 +586,7 @@ void tracer::process(){
 //                }
                 for(int i=0;i<bench->config->MemTable_capacity/2; i++){
                     for(int j=0;j<10;j++){
-                        cout<<"wid:"<<(uint)(bench->h_keys[offset+i][j] >> 96)<<endl;
+                        cout<<"wid:"<<(uint)(bench->h_keys[offset+i][j] >> 48)<<endl;
                     }
                     cout<<endl;
                 }
