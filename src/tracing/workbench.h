@@ -80,10 +80,8 @@ typedef struct meeting_unit{
 }meeting_unit;
 
 typedef struct search_info_unit{
-    uint pid;
-    uint target;
-    uint end;
-    __uint128_t value;
+    uint pid,target,start,end;
+    float low0,low1,high0,high1;
 }search_info_unit;
 
 

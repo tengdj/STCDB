@@ -515,26 +515,26 @@ void tracer::process(){
                 cout<<"cuda multi search"<<endl;
                 cout<<"cuda multi_find_count: "<<bench->multi_find_count<<endl;
                 for(int i=0;i<bench->multi_find_count;i++){
-                    cout << bench->search_multi_list[i].pid << "-" << bench->search_multi_list[i].end << "-"
-                         << bench->search_multi_list[i].target << endl;
-                    print_128(bench->search_multi_list[i].value);
-                    cout<<endl;
+                    cout << bench->search_multi_list[i].pid << "-" << bench->search_multi_list[i].target << "-"
+                         << bench->search_multi_list[i].start << "-" << bench->search_multi_list[i].end << "-"
+                         << bench->search_multi_list[i].low0 << "-" << bench->search_multi_list[i].low1 << "-"
+                         << bench->search_multi_list[i].high0 << "-" << bench->search_multi_list[i].high1 << endl;
                 }
 
                 //search memtable
-                struct timeval newstart = get_cur_time();
-                for(int i=0;i<bench->search_multi_length;i++){
-                    bench->search_memtable(bench->search_multi_pid[i]);
-                }
-                bench->pro.search_memtable_time += get_time_elapsed(newstart,false);
-                logt("search memtable",newstart);
-
-                //search disk
-                for(int i=0;i<bench->search_multi_length;i++){
-                    bench->search_in_disk(bench->search_multi_pid[i], bench->valid_timestamp);
-                }
-                bench->pro.search_in_disk_time += get_time_elapsed(newstart,false);
-                logt("search in disk",newstart);
+//                struct timeval newstart = get_cur_time();
+//                for(int i=0;i<bench->search_multi_length;i++){
+//                    bench->search_memtable(bench->search_multi_pid[i]);
+//                }
+//                bench->pro.search_memtable_time += get_time_elapsed(newstart,false);
+//                logt("search memtable",newstart);
+//
+//                //search disk
+//                for(int i=0;i<bench->search_multi_length;i++){
+//                    bench->search_in_disk(bench->search_multi_pid[i], bench->valid_timestamp);
+//                }
+//                bench->pro.search_in_disk_time += get_time_elapsed(newstart,false);
+//                logt("search in disk",newstart);
             }
             if(bench->search_single){                                   //search_single
                 bench->interrupted = false;                             //reset
@@ -544,27 +544,25 @@ void tracer::process(){
                 cout<<"single_find_count: "<<bench->single_find_count<<endl;
                 bench->search_multi_length = bench->single_find_count;
                 for(int i=0;i<bench->single_find_count;i++){
-                    cout << bench->search_single_pid << "-" << bench->search_single_list[i].end << "-"
-                         << bench->search_single_list[i].target << endl;
-                    print_128(bench->search_single_list[i].value);
-                    cout<<endl;
-                    box temp_box(bench->search_single_list[i].value);
-                    temp_box.print();
+                    cout << bench->search_single_pid << "-" << bench->search_single_list[i].target << "-"
+                        << bench->search_single_list[i].start << "-" << bench->search_single_list[i].end << "-"
+                        << bench->search_single_list[i].low0 << "-" << bench->search_single_list[i].low1 << "-"
+                        << bench->search_single_list[i].high0 << "-" << bench->search_single_list[i].high1 << endl;
                     bench->search_multi_pid[i] = bench->search_single_list[i].target;
                 }
 
-                //search memtable
-                struct timeval newstart = get_cur_time();
-                bench->search_memtable(bench->search_single_pid);
-                bench->pro.search_memtable_time += get_time_elapsed(newstart,false);
-                logt("search memtable",newstart);
-
-                //search disk
-                bench->search_in_disk(bench->search_single_pid, bench->valid_timestamp);
-                bench->pro.search_in_disk_time += get_time_elapsed(newstart,false);
-                logt("search in disk",newstart);
-                pthread_mutex_unlock(&bench->mutex_i);
-                cout<<"final search_multi_length: "<<bench->search_multi_length<<endl;
+//                //search memtable
+//                struct timeval newstart = get_cur_time();
+//                bench->search_memtable(bench->search_single_pid);
+//                bench->pro.search_memtable_time += get_time_elapsed(newstart,false);
+//                logt("search memtable",newstart);
+//
+//                //search disk
+//                bench->search_in_disk(bench->search_single_pid, bench->valid_timestamp);
+//                bench->pro.search_in_disk_time += get_time_elapsed(newstart,false);
+//                logt("search in disk",newstart);
+//                pthread_mutex_unlock(&bench->mutex_i);
+//                cout<<"final search_multi_length: "<<bench->search_multi_length<<endl;
             }
 
 //            if(bench->MemTable_count>0){

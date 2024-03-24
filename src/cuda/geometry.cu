@@ -489,16 +489,25 @@ void cuda_identify_meetings(workbench *bench) {
                 if (bench->search_single_pid == getpid1(bench->meeting_buckets[bid].key)) {
                     uint meeting_idx = atomicAdd(&bench->single_find_count, 1);
                     assert(bench->single_find_count < bench->config->search_single_capacity);
+                    //bench->search_multi_list[meeting_idx].pid = bench->search_single_pid;
                     bench->search_single_list[meeting_idx].target = getpid2(bench->meeting_buckets[bid].key);
+                    bench->search_single_list[meeting_idx].start = bench->meeting_buckets[bid].start;
                     bench->search_single_list[meeting_idx].end = bench->meeting_buckets[bid].end;                  //real end
-                    bench->search_single_list[meeting_idx].value = ((__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 112) + box_to_128(&bench->meeting_buckets[bid].mbr);
+                    bench->search_single_list[meeting_idx].low0 = bench->meeting_buckets[bid].mbr.low[0];
+                    bench->search_single_list[meeting_idx].low1 = bench->meeting_buckets[bid].mbr.low[1];
+                    bench->search_single_list[meeting_idx].high0 = bench->meeting_buckets[bid].mbr.high[0];
+                    bench->search_single_list[meeting_idx].high1 = bench->meeting_buckets[bid].mbr.high[1];
                 }
                 else if (bench->search_single_pid == getpid2(bench->meeting_buckets[bid].key)) {
                     uint meeting_idx = atomicAdd(&bench->single_find_count, 1);
                     assert(bench->single_find_count < bench->config->search_single_capacity);
                     bench->search_single_list[meeting_idx].target = getpid1(bench->meeting_buckets[bid].key);
+                    bench->search_single_list[meeting_idx].start = bench->meeting_buckets[bid].start;
                     bench->search_single_list[meeting_idx].end = bench->meeting_buckets[bid].end;                  //real end
-                    bench->search_single_list[meeting_idx].value = ((__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 112) + box_to_128(&bench->meeting_buckets[bid].mbr);
+                    bench->search_single_list[meeting_idx].low0 = bench->meeting_buckets[bid].mbr.low[0];
+                    bench->search_single_list[meeting_idx].low1 = bench->meeting_buckets[bid].mbr.low[1];
+                    bench->search_single_list[meeting_idx].high0 = bench->meeting_buckets[bid].mbr.high[0];
+                    bench->search_single_list[meeting_idx].high1 = bench->meeting_buckets[bid].mbr.high[1];
                 }
             }
         }
@@ -510,16 +519,24 @@ void cuda_identify_meetings(workbench *bench) {
                         assert(bench->multi_find_count < bench->config->search_multi_capacity);
                         bench->search_multi_list[meeting_idx].pid = bench->search_multi_pid[i];
                         bench->search_multi_list[meeting_idx].target = getpid2(bench->meeting_buckets[bid].key);
+                        bench->search_multi_list[meeting_idx].start = bench->meeting_buckets[bid].start;
                         bench->search_multi_list[meeting_idx].end = bench->meeting_buckets[bid].end;                  //real end
-                        bench->search_multi_list[meeting_idx].value = ((__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 112) + box_to_128(&bench->meeting_buckets[bid].mbr);
+                        bench->search_multi_list[meeting_idx].low0 = bench->meeting_buckets[bid].mbr.low[0];
+                        bench->search_multi_list[meeting_idx].low1 = bench->meeting_buckets[bid].mbr.low[1];
+                        bench->search_multi_list[meeting_idx].high0 = bench->meeting_buckets[bid].mbr.high[0];
+                        bench->search_multi_list[meeting_idx].high1 = bench->meeting_buckets[bid].mbr.high[1];
                     }
                     if (bench->search_multi_pid[i] == getpid2(bench->meeting_buckets[bid].key)) {
                         uint meeting_idx = atomicAdd(&bench->multi_find_count, 1);
                         assert(bench->multi_find_count < bench->config->search_multi_capacity);
                         bench->search_multi_list[meeting_idx].pid = bench->search_multi_pid[i];
                         bench->search_multi_list[meeting_idx].target = getpid1(bench->meeting_buckets[bid].key);
+                        bench->search_multi_list[meeting_idx].start = bench->meeting_buckets[bid].start;
                         bench->search_multi_list[meeting_idx].end = bench->meeting_buckets[bid].end;                  //real end
-                        bench->search_multi_list[meeting_idx].value = ((__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 112) + box_to_128(&bench->meeting_buckets[bid].mbr);
+                        bench->search_multi_list[meeting_idx].low0 = bench->meeting_buckets[bid].mbr.low[0];
+                        bench->search_multi_list[meeting_idx].low1 = bench->meeting_buckets[bid].mbr.low[1];
+                        bench->search_multi_list[meeting_idx].high0 = bench->meeting_buckets[bid].mbr.high[0];
+                        bench->search_multi_list[meeting_idx].high1 = bench->meeting_buckets[bid].mbr.high[1];
                     }
                 }
             }
@@ -557,7 +574,7 @@ void cuda_identify_meetings(workbench *bench) {
                 target = swap;
             }
             bench->d_keys[meeting_idx] = ((uint64_t)wid << 48) + ((uint64_t)pid << 23) + ((uint64_t)(bench->meeting_buckets[bid].end - bench->end_time_min) << 8) + ((uint64_t)bench->same_pid_count[pid]);          //64 = 16 + 25 + 15 + 8
-            bench->d_values[meeting_idx] = ((__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 113) + ((__uint128_t)target << 88) + box_to_128(&bench->meeting_buckets[bid].mbr);;
+            bench->d_values[meeting_idx] = ((__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 113) + ((__uint128_t)target << 88) + box_to_128(&bench->meeting_buckets[bid].mbr);
             uint old_mid0 = 0;
             uint old_mid1 = 0;
             decodeZOrder(bench->d_wids[pid],old_mid0,old_mid1);
@@ -580,12 +597,16 @@ void cuda_search_single_kv(workbench *bench){
     if(kid>=bench->kv_count){
         return;
     }
-    if((uint)(bench->d_keys[kid] >> 39) == bench->search_single_pid){              //all the same
+    if((uint)(bench->d_keys[kid] >> 23 & ((1ULL << 25) - 1)) == bench->search_single_pid){              //all the same
         uint meeting_idx = atomicAdd(&bench->single_find_count, 1);
         assert(bench->single_find_count<bench->config->search_single_capacity);
-        bench->search_single_list[meeting_idx].end = ((bench->d_keys[kid] >> 25) & ((1ULL << 14) - 1)) + bench->end_time_min;
-        bench->search_single_list[meeting_idx].target = bench->d_keys[kid] & ((1ULL << 25) - 1);
-        bench->search_single_list[meeting_idx].value = bench->d_values[kid];
+        bench->search_single_list[meeting_idx].end = ((bench->d_keys[kid] >> 8) & ((1ULL << 15) - 1)) + bench->end_time_min;
+        bench->search_single_list[meeting_idx].start = bench->search_single_list[meeting_idx].end - (bench->d_values[kid] >> 113);
+        bench->search_single_list[meeting_idx].target = ((bench->d_values[kid] >> 88) & ((1ULL << 25) - 1));
+        bench->search_single_list[meeting_idx].low0 = uint_to_float((uint)((bench->d_values[kid] >> 66) & ((1ULL << 22) - 1)));
+        bench->search_single_list[meeting_idx].low1 = uint_to_float((uint)((bench->d_values[kid] >> 44) & ((1ULL << 22) - 1)));
+        bench->search_single_list[meeting_idx].high0 = uint_to_float((uint)((bench->d_values[kid] >> 22) & ((1ULL << 22) - 1)));
+        bench->search_single_list[meeting_idx].high1 = uint_to_float((uint)(bench->d_values[kid] & ((1ULL << 22) - 1)));
     }
 }
 
@@ -596,13 +617,17 @@ void cuda_search_multi_kv(workbench *bench){
         return;
     }
     for(int i = 0;i<bench->search_multi_length;i++){
-        if((uint)(bench->d_keys[kid] >> 39) == bench->search_multi_pid[i]){
+        if((uint)(bench->d_keys[kid] >> 23 & ((1ULL << 25) - 1)) == bench->search_multi_pid[i]){
             uint meeting_idx = atomicAdd(&bench->multi_find_count, 1);
             assert(bench->multi_find_count < bench->config->search_multi_capacity);
             bench->search_multi_list[meeting_idx].pid = bench->search_multi_pid[i];
-            bench->search_multi_list[meeting_idx].end = ((bench->d_keys[kid] >> 25) & ((1ULL << 14) - 1)) + bench->end_time_min;
-            bench->search_multi_list[meeting_idx].target = bench->d_keys[kid] & ((1ULL << 25) - 1);
-            bench->search_multi_list[meeting_idx].value = bench->d_values[kid];
+            bench->search_multi_list[meeting_idx].end = ((bench->d_keys[kid] >> 8) & ((1ULL << 15) - 1)) + bench->end_time_min;
+            bench->search_multi_list[meeting_idx].start = bench->search_multi_list[meeting_idx].end - (bench->d_values[kid] >> 113);
+            bench->search_multi_list[meeting_idx].target = ((bench->d_values[kid] >> 88) & ((1ULL << 25) - 1));
+            bench->search_multi_list[meeting_idx].low0 = uint_to_float((uint)((bench->d_values[kid] >> 66) & ((1ULL << 22) - 1)));
+            bench->search_multi_list[meeting_idx].low1 = uint_to_float((uint)((bench->d_values[kid] >> 44) & ((1ULL << 22) - 1)));
+            bench->search_multi_list[meeting_idx].high0 = uint_to_float((uint)((bench->d_values[kid] >> 22) & ((1ULL << 22) - 1)));
+            bench->search_multi_list[meeting_idx].high1 = uint_to_float((uint)(bench->d_values[kid] & ((1ULL << 22) - 1)));
         }
     }
 }
@@ -1099,7 +1124,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         h_bench.search_multi = true;
         h_bench.multi_find_count = 0;
         h_bench.search_multi_length = bench->search_multi_length;
-        CUDA_SAFE_CALL(cudaMemcpy(h_bench.search_multi_pid, bench->search_multi_pid, bench->search_multi_length * sizeof(search_info_unit),cudaMemcpyHostToDevice));
+        CUDA_SAFE_CALL(cudaMemcpy(h_bench.search_multi_pid, bench->search_multi_pid, bench->search_multi_length * sizeof(search_info_unit), cudaMemcpyHostToDevice));
     }
     else {
         h_bench.search_multi = false;
