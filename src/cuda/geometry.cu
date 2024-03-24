@@ -1226,13 +1226,17 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         bench->start_time_max = h_bench.start_time_max;
         h_bench.start_time_min = (1ULL<<32) -1;
         h_bench.start_time_max = 0;
+        uint offset = 0;
+        if(bench->big_sorted_run_count%2==1){
+            offset = bench->config->MemTable_capacity/2;
+        }
         if(true){
             write_wid<<<h_bench.kv_count / 1024 + 1,1024>>>(d_bench);
             check_execution();
             cudaDeviceSynchronize();
             CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
             //logt("bloom filter ", start);
-            CUDA_SAFE_CALL(cudaMemcpy(bench->h_wids, h_bench.d_wids, bench->config->num_objects*sizeof(unsigned short), cudaMemcpyDeviceToHost));      //offset not change
+            CUDA_SAFE_CALL(cudaMemcpy(bench->h_wids[offset+bench->MemTable_count], h_bench.d_wids, bench->config->num_objects*sizeof(unsigned short), cudaMemcpyDeviceToHost));
 
             cudaMemset(h_bench.d_wids, 0, bench->config->num_objects*sizeof(unsigned short));
             cudaMemset(h_bench.same_pid_count, 0, bench->config->num_objects * sizeof(unsigned short));
@@ -1250,10 +1254,6 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("cuda_sort_time: ",start);
-        uint offset = 0;
-        if(bench->big_sorted_run_count%2==1){
-            offset = bench->config->MemTable_capacity/2;
-        }
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_keys[offset+bench->MemTable_count], h_bench.d_keys, bench->config->kv_restriction * sizeof(uint64_t), cudaMemcpyDeviceToHost));
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_values[offset+bench->MemTable_count], h_bench.d_values, bench->config->kv_restriction * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
@@ -1280,15 +1280,6 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         box temp_box(bench->h_values[offset+bench->MemTable_count][10]);
         temp_box.print();
 
-//        for(uint i = 0; i<65536; i++){
-//            cout<<"wid:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][i] >> 48)<<endl;
-//        }
-//        cout<<"next bitmap"<<endl;
-//        for(uint i = 65536; i<70000; i++){
-//            cout<<"wid:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][i] >> 48)<<endl;
-//        }
-
-
         if(true){           //mbr bit map
             cout<<"h_bench.bit_count:"<<h_bench.bit_count<<endl;
             cout<<"h_bench.bitmaps_size:"<<h_bench.bitmaps_size<<endl;
@@ -1297,7 +1288,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
             cudaDeviceSynchronize();
             CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
             //logt("bloom filter ", start);
-            CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps, h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));      //offset not change
+            CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps[offset+bench->MemTable_count], h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));
             cudaMemset(h_bench.d_bitmaps, 0, bench->bitmaps_size);
         }
 
@@ -1307,10 +1298,9 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 //            cudaDeviceSynchronize();
 //            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
 //            //logt("bloom filter ", start);
-//            CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps, h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));      //offset not change
+//            CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps[offset+bench->MemTable_count], h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));
 //            cudaMemset(h_bench.d_bitmaps, 0, bench->bitmaps_size);
 //        }
-
 
         if(bench->config->bloom_filter){
             BloomFilter_Add<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
@@ -1318,7 +1308,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
             cudaDeviceSynchronize();
             CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
             logt("bloom filter ", start);
-            CUDA_SAFE_CALL(cudaMemcpy(bench->pstFilter[bench->MemTable_count], h_bench.d_pstFilter, bench->dwFilterSize, cudaMemcpyDeviceToHost));      //offset not change
+            CUDA_SAFE_CALL(cudaMemcpy(bench->pstFilter[bench->MemTable_count], h_bench.d_pstFilter, bench->dwFilterSize, cudaMemcpyDeviceToHost));
             cudaMemset(h_bench.d_pstFilter, 0, bench->dwFilterSize);
         }
 
@@ -1336,6 +1326,26 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 
     if(bench->crash_consistency){
         cout<<"crash_consistency, 1 cuda sort"<<endl;
+        bench->start_time_min = h_bench.start_time_min;
+        bench->start_time_max = h_bench.start_time_max;
+        h_bench.start_time_min = (1ULL<<32) -1;
+        h_bench.start_time_max = 0;
+        uint offset = 0;
+        if(bench->big_sorted_run_count%2==1){
+            offset = bench->config->MemTable_capacity/2;
+        }
+        if(true){
+            write_wid<<<h_bench.kv_count / 1024 + 1,1024>>>(d_bench);
+            check_execution();
+            cudaDeviceSynchronize();
+            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+            //logt("bloom filter ", start);
+            CUDA_SAFE_CALL(cudaMemcpy(bench->h_wids[offset+bench->MemTable_count], h_bench.d_wids, bench->config->num_objects*sizeof(unsigned short), cudaMemcpyDeviceToHost));      //offset not change
+
+//            cudaMemset(h_bench.d_wids, 0, bench->config->num_objects*sizeof(unsigned short));
+//            cudaMemset(h_bench.same_pid_count, 0, bench->config->num_objects * sizeof(unsigned short));
+        }
+
         // wrap raw pointer with a device_ptr
         thrust::device_ptr<uint64_t> d_vector_keys = thrust::device_pointer_cast(h_bench.d_keys);
         thrust::device_ptr<__uint128_t> d_vector_values = thrust::device_pointer_cast(h_bench.d_values);
@@ -1347,27 +1357,27 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("cuda_sort_time: ",start);
-        uint offset = 0;
-        if(bench->big_sorted_run_count%2==1){
-            offset = bench->config->MemTable_capacity/2;
-        }
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_keys[offset+bench->MemTable_count], h_bench.d_keys, h_bench.kv_count * sizeof(uint64_t), cudaMemcpyDeviceToHost));
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_values[offset+bench->MemTable_count], h_bench.d_values, h_bench.kv_count * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("cudaMemcpy kv",start);
         printf("cudaMemcpy kv right\n");
-//        cout<<bench->h_keys[offset+bench->MemTable_count][10]<<endl;
-//        cout<<"pid:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][10] >> 39)<<endl;
-//        print_128(bench->h_values[offset+bench->MemTable_count][10]);
-//        printf("\n");
-//        cout<<bench->h_keys[offset+bench->MemTable_count][11]<<endl;
-//        print_128(bench->h_values[offset+bench->MemTable_count][11]);
-//        printf("\n");
-//        cout<<bench->h_keys[offset+bench->MemTable_count][12]<<endl;
-//        print_128(bench->h_values[offset+bench->MemTable_count][12]);
-//        printf("\n");
-//        cout<<"10 11 12 finish"<<endl;
-        bench->MemTable_count++;
+
+        print_128(bench->h_keys[offset+bench->MemTable_count][10]);
+        printf("\n");
+        print_128(bench->h_values[offset+bench->MemTable_count][10]);
+        printf("\n");
+        printf("cudaMemcpy kv right\n");
+        cout<<"bench->end_time_min:"<<bench->end_time_min<<endl;
+        cout<<"wid:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][10] >> 48)<<endl;
+        cout<<"pid:"<<(uint)((bench->h_keys[offset+bench->MemTable_count][10] >> 23) & ((1ULL << 25) - 1))<<endl;
+        cout<<"end:"<<(uint)((bench->h_keys[offset+bench->MemTable_count][10] >> 8) & ((1ULL << 15) - 1)) + bench->end_time_min<<endl;
+        cout<<"count:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][10] & ((1ULL << 8) - 1))<<endl;
+        printf("\n");
+        cout<<"duration:"<<(uint)(bench->h_values[offset+bench->MemTable_count][10] >> 113)<<endl;
+        cout<<"target:"<<(uint)((bench->h_values[offset+bench->MemTable_count][10] >> 88) & ((1ULL << 25) - 1))<<endl;
+        box temp_box(bench->h_values[offset+bench->MemTable_count][10]);
+        temp_box.print();
     }
 
 	// todo do the data analyzes, for test only, should not copy out so much stuff

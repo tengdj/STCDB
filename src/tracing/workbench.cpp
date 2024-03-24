@@ -173,12 +173,19 @@ void workbench::claim_space(){
     }
 
     if(true){
-        size = bitmaps_size;
-        h_bitmaps = (unsigned char *) allocate(size);
-        log("\t%.2f MB\t h_bitmaps", size / 1024.0 / 1024.0);
-        size = config->num_objects*sizeof(unsigned short);
-        h_wids = (unsigned short *) allocate(size);
-        log("\t%.2f MB\t h_wids", size / 1024.0 / 1024.0);
+        size = config->MemTable_capacity * sizeof(unsigned char *);                 //sort
+        h_bitmaps = (unsigned char **)allocate(size);
+        size = config->MemTable_capacity * sizeof(unsigned short *);                 //sort
+        h_wids = (unsigned short **)allocate(size);
+
+        for(int i=0;i<config->MemTable_capacity; i++){
+            size = bitmaps_size;
+            h_bitmaps[i] = (unsigned char *) allocate(size);
+            log("\t%.2f MB\t h_bitmaps", size / 1024.0 / 1024.0);
+            size = config->num_objects*sizeof(unsigned short);
+            h_wids[i] = (unsigned short *) allocate(size);
+            log("\t%.2f MB\t h_wids", size / 1024.0 / 1024.0);
+        }
     }
 }
 
@@ -253,7 +260,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
     cout<<"disk search "<<pid<<endl;
     bool ret = false;
     for(int i=0;i<big_sorted_run_count;i++) {
-        if ((bg_run[i].timestamp_min < timestamp)) {
+        if ((bg_run[i].end_time_min < timestamp)) {
             //(bg_run[i].timestamp_min < timestamp) && (timestamp < bg_run[i].timestamp_max)
             cout<<"big_sorted_run_num:"<<i<<endl;
             bg_run[i].sst = new SSTable[bg_run[i].SSTable_count];                   //maybe useful later, should not delete after this func

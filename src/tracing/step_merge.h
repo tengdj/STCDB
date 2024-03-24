@@ -36,12 +36,16 @@ public:
     uint SSTable_count = 0;
     //uint SSTable_size = 10*1024*1024;       //10M   useless
     uint *first_pid = NULL;
-    uint timestamp_min = 0;
-    uint timestamp_max = 0;
+    unsigned short * wids = NULL;
+    unsigned char * bitmaps = NULL;
+    uint start_time_min = 0;
+    uint start_time_max = 0;
+    uint end_time_min = 0;
+    uint end_time_max = 0;
 
     ~sorted_run();
     void print_meta(){
-        fprintf(stdout,"SSTable_count:%d timestamp_min:%d timestamp_max:%d\n",SSTable_count,timestamp_min,timestamp_max);
+        fprintf(stdout,"SSTable_count:%d start_time:%d~%d,end_time:%d~%d\n",SSTable_count,start_time_min,start_time_max,end_time_min,end_time_max);
     }
     //bool search_in_disk(uint big_sort_id, uint pid);
 };

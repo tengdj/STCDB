@@ -187,11 +187,11 @@ public:
 
     //space for where id
     unsigned char * d_bitmaps = NULL;                 //1024  256*256
-    unsigned char * h_bitmaps = NULL;
+    unsigned char ** h_bitmaps = NULL;
     uint bit_count = 0;         //256*256=65536  SSTable_count bitmap
     uint bitmaps_size = 0;
     unsigned short * d_wids = NULL;
-    unsigned short * h_wids = NULL;
+    unsigned short ** h_wids = NULL;
     unsigned short * same_pid_count = NULL;
 
 
@@ -204,7 +204,6 @@ public:
     uint big_sorted_run_count = 0;
     uint start_time_min = 0;
     uint start_time_max = 0;
-
     uint end_time_min = 0;
     uint end_time_max = 0;
     uint SSTable_kv_capacity = 0;
