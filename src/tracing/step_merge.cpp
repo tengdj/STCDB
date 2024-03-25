@@ -67,7 +67,7 @@ bool SSTable::search_SSTable(uint pid, bool search_multi, uint &search_multi_len
 
 sorted_run::~sorted_run(){
     delete []sst;
-    delete []first_pid;
+    delete []first_key;
 }
 
 //bool sorted_run::search_in_disk(uint big_sort_id, uint pid){                              //this pointer refers to a single sorted_run
@@ -82,11 +82,11 @@ sorted_run::~sorted_run(){
 //    int mid;
 //    while (low <= high) {
 //        mid = (low + high) / 2;
-//        if (first_pid[mid] == pid){
+//        if (first_key[mid] == pid){
 //            find = mid;
 //            break;
 //        }
-//        else if (first_pid[mid] > pid){
+//        else if (first_key[mid] > pid){
 //            high = mid - 1;
 //        }
 //        else {
@@ -94,14 +94,14 @@ sorted_run::~sorted_run(){
 //        }
 //    }
 //    if(find==-1){
-//        cout<<"not find in first_pid"<<endl;
+//        cout<<"not find in first_key"<<endl;
 //        string filename = "../store/SSTable_"+to_string(big_sort_id)+"-"+to_string(high);
 //        cout<<filename<<endl;
 //        read_sst.open(filename);                   //final place is not high+1, but high
 //        assert(read_sst.is_open());
-//        cout<<low<<"-"<<first_pid[low]<<endl;
-//        cout<<mid<<"-"<<first_pid[mid]<<endl;
-//        cout<<high<<"-"<<first_pid[high]<<endl;
+//        cout<<low<<"-"<<first_key[low]<<endl;
+//        cout<<mid<<"-"<<first_key[mid]<<endl;
+//        cout<<high<<"-"<<first_key[high]<<endl;
 //
 //        sst[high].kv = new key_value[sst[high].SSTable_kv_capacity];
 //        read_sst.read((char *)sst[high].kv,sizeof(key_value)*sst[high].SSTable_kv_capacity);
@@ -110,12 +110,12 @@ sorted_run::~sorted_run(){
 //    }
 //    cout<<"high level binary search finish and find"<<endl;
 //
-//    //for the case, there are many SSTables that first_pid==pid
+//    //for the case, there are many SSTables that first_key==pid
 //    //find start and end
 //    uint pid_start = find;
 //    while(pid_start>=1){
 //        pid_start--;
-//        if(first_pid[pid_start]!=pid){
+//        if(first_key[pid_start]!=pid){
 //            break;
 //        }
 //    }
@@ -134,7 +134,7 @@ sorted_run::~sorted_run(){
 //        read_sst.read((char *) sst[cursor].kv, sizeof(key_value) * sst[cursor].SSTable_kv_capacity);
 //        read_sst.close();
 //        if (cursor + 1 < SSTable_count) {
-//            if (first_pid[cursor + 1] != pid) {               //must shut down in this cursor
+//            if (first_key[cursor + 1] != pid) {               //must shut down in this cursor
 //                uint index = 0;
 //                while (index <= sst[cursor].SSTable_kv_capacity - 1) {
 //                    temp_pid = sst[cursor].kv[index].key >> 39;
@@ -145,13 +145,13 @@ sorted_run::~sorted_run(){
 //                }
 //                break;
 //            }
-//            if (first_pid[cursor + 1] == pid) {               //mustn't shut down in this cursor
+//            if (first_key[cursor + 1] == pid) {               //mustn't shut down in this cursor
 //                for (uint i = 0; i < sst[cursor].SSTable_kv_capacity; i++) {
 //                    cout << sst[cursor].kv[i].key << endl;
 //                }
 //            }
 //            cursor++;
-//        } else {                                           // cursor is the last one, same too bg_run->first_pid[cursor+1]!=pid
+//        } else {                                           // cursor is the last one, same too bg_run->first_key[cursor+1]!=pid
 //            uint index = 0;
 //            while (index <= sst[cursor].SSTable_kv_capacity - 1) {
 //                temp_pid = sst[cursor].kv[index].key >> 39;

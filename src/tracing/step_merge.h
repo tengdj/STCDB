@@ -35,7 +35,7 @@ public:
     SSTable * sst = NULL;
     uint SSTable_count = 0;
     //uint SSTable_size = 10*1024*1024;       //10M   useless
-    uint *first_pid = NULL;
+    uint64_t *first_key = NULL;
     unsigned short * wids = NULL;
     unsigned char * bitmaps = NULL;
     uint start_time_min = 0;

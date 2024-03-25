@@ -124,8 +124,6 @@ public:
 			   p.y<=high[1];
 	}
 
-
-
 	double area(bool geography = false){
 		if(!geography){
 			return (high[0]-low[0])*(high[1]-low[1]);

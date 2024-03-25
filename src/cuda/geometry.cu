@@ -89,12 +89,6 @@ __uint128_t box_to_128(box *b){
     return ((__uint128_t)float_to_uint(b->low[0]) << 66) + ((__uint128_t)float_to_uint(b->low[1]) << 44) + ((__uint128_t)float_to_uint(b->high[0]) << 22) + ((__uint128_t)float_to_uint(b->high[1]));
 }
 
-__device__
-unsigned int zOrderFill(unsigned int x, unsigned int y) {
-    unsigned int z = x + y*256;
-    return z;
-}
-
 /*
  *
  * kernel functions
@@ -560,6 +554,12 @@ void cuda_identify_meetings(workbench *bench) {
         uint low1 = (bench->meeting_buckets[bid].mbr.low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
         uint high0 = (bench->meeting_buckets[bid].mbr.high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 256;
         uint high1 = (bench->meeting_buckets[bid].mbr.high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
+
+        uint s = (high0-low0+1)*(high1-low1+1);
+        if(bench->kv_count<200){
+            atomicAdd(&bench->s_of_all_mbr,s);
+        }
+
         //printf("low0 %d,low1 %d,high0 %d,high1 %d",low0,low1,high0,high1);
         uint mid0 = (low0+high0)/2;
         uint mid1 = (low1+high1)/2;
@@ -668,17 +668,6 @@ void BloomFilter_Add(workbench *bench){
 }
 
 __global__
-void wid_bitmap(workbench *bench){
-    uint kid = blockIdx.x*blockDim.x+threadIdx.x;
-    if(kid>=bench->config->kv_restriction){
-        return;
-    }
-    uint wid = bench->d_keys[kid] >> 48;
-    uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);           //kid/65536
-    bench->d_bitmaps[bitmap_id*(bench->bit_count/8)+wid/8] |= (1<<(wid%8));
-}
-
-__global__
 void mbr_bitmap(workbench *bench){
     uint kid = blockIdx.x*blockDim.x+threadIdx.x;
     if(kid>=bench->config->kv_restriction){
@@ -706,6 +695,17 @@ void mbr_bitmap(workbench *bench){
             bench->d_bitmaps[bitmap_id*(bench->bit_count/8)+bit_pos/8] |= (1<<(bit_pos%8));
         }
     }
+}
+
+__global__
+void wid_bitmap(workbench *bench){
+    uint kid = blockIdx.x*blockDim.x+threadIdx.x;
+    if(kid>=bench->config->kv_restriction){
+        return;
+    }
+    uint wid = bench->d_keys[kid] >> 48;
+    uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);           //kid/65536
+    bench->d_bitmaps[bitmap_id*(bench->bit_count/8)+wid/8] |= (1<<(wid%8));
 }
 
 /*
@@ -1131,6 +1131,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
     }
 	h_bench.cur_time = bench->cur_time;
     h_bench.end_time_min = bench->end_time_min;
+    h_bench.s_of_all_mbr = 0;
 	CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));
 	CUDA_SAFE_CALL(cudaMemcpy(h_bench.points, bench->points, bench->config->num_objects*sizeof(Point), cudaMemcpyHostToDevice));
 	bench->pro.copy_time += get_time_elapsed(start,false);
@@ -1239,6 +1240,8 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
     bench->pro.meeting_identify_time += get_time_elapsed(start,false);
     int kv_increase = h_bench.kv_count-before_kv;
     printf("second %d finished meetings : %d\n",bench->cur_time , kv_increase);
+    cout<<"ave_s_mbr"<<(float)h_bench.s_of_all_mbr/100<<endl;
+    //h_bench.s_of_all_mbr = 0;
     logt("meeting identify: %d meetings", start, kv_increase);
 	bench->num_active_meetings = h_bench.num_active_meetings;
 	bench->num_taken_buckets = h_bench.num_taken_buckets;

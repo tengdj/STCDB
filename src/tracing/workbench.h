@@ -206,6 +206,9 @@ public:
     uint end_time_max = 0;
     uint SSTable_kv_capacity = 0;
 
+    //s
+    uint s_of_all_mbr = 0;
+
     bool crash_consistency = false;
 
 	// the temporary space
@@ -277,8 +280,11 @@ public:
 		pthread_mutex_unlock(&insert_lk[key%MAX_LOCK_NUM]);
 	}
 
-    bool search_memtable(uint pid);
+    box bit_box(box b);
+
+    bool search_memtable(uint64_t pid);
     bool search_in_disk(uint pid, uint timestamp);
+    bool mbr_search_in_disk(box b, uint timestamp);
 };
 extern void lookup_rec(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);
 extern void lookup_stack(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);
