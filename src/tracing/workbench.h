@@ -186,6 +186,7 @@ public:
     //space for where id
     unsigned char * d_bitmaps = NULL;                 //1024  256*256
     unsigned char ** h_bitmaps = NULL;
+    uint bitmap_edge_length = 0;
     uint bit_count = 0;         //256*256=65536  SSTable_count bitmap
     uint bitmaps_size = 0;
     unsigned short * d_wids = NULL;

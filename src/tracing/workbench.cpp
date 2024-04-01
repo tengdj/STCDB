@@ -25,6 +25,7 @@ workbench::workbench(workbench *bench):workbench(bench->config){
     if(true){
         bit_count = bench->bit_count;
         bitmaps_size = bench->bitmaps_size;
+        bitmap_edge_length = bench->bitmap_edge_length;
     }
 }
 
@@ -404,8 +405,8 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
                 quit = false;
                 for (uint p = bit_b.low[0]; (p <= bit_b.high[0]) && (!quit); p++) {
                     for (uint q = bit_b.low[1]; (q <= bit_b.high[1]) && (!quit); q++) {
-                        bit_pos = zOrderFill(p, q);
-                        cout<<"bit_pos"<<bit_pos<<endl;
+//                        bit_pos = zOrderFill(p, q);
+//                        cout<<"bit_pos"<<bit_pos<<endl;
                         if (bg_run[i].bitmaps[j * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
                             cout << "SSTable_" << j << "bit_pos" << bit_pos << endl;
                             quit = true;

@@ -638,7 +638,7 @@ void tracer::process(){
                             }
                             Point bit_p = new Point;
                             uint x=0,y=0;
-                            decodeZOrder(i,x,y);
+                            d2xy(bench->bitmap_edge_length,i,x,y);
                             bit_p.x = (double)x/256*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 256;
                             bit_p.y = (double)y/256*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
                             bit_points[count_p] = bit_p;
@@ -666,10 +666,10 @@ void tracer::process(){
                 //bool findit = searchkv_in_all_place(bench, 2);
             }
 
-            if(bench->cur_time == 30){
-                box b(-87.8, 41.9, -87.7, 42);
-                bench->mbr_search_in_disk(b,10);
-            }
+//            if(bench->cur_time == 30){
+//                box b(-87.8, 41.9, -87.7, 42);
+//                bench->mbr_search_in_disk(b,10);
+//            }
 
 			if(config->analyze_grid||config->profile){
 				bench->analyze_grids();

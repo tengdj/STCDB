@@ -5,8 +5,8 @@
  *      Author: teng
  */
 
-#ifndef CUDA_UTIL_H_
-#define CUDA_UTIL_H_
+#ifndef CUDA_UTIL_CUH_
+#define CUDA_UTIL_CUH_
 
 #include <cuda.h>
 #include "../util/util.h"
@@ -145,4 +145,4 @@ inline void decodeZOrder(unsigned int z, unsigned int& x, unsigned int& y) {
 }
 
 
-#endif /* CUDA_UTIL_H_ */
+#endif /* CUDA_UTIL_CUH_ */

@@ -18,6 +18,7 @@
 #include <iostream>
 #include "../util/util.h"
 #include "../cuda/cuda_util.cuh"
+#include "../cuda/hilbert_curve.cuh"
 
 using namespace std;
 class Point{

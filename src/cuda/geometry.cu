@@ -1,6 +1,7 @@
 #include <cuda.h>
 #include "mygpu.h"
 #include "cuda_util.cuh"
+#include "hilbert_curve.cuh"
 #include "../geometry/geometry.h"
 #include "../util/query_context.h"
 #include "../tracing/partitioner.h"
@@ -577,12 +578,12 @@ void cuda_identify_meetings(workbench *bench) {
             bench->d_values[meeting_idx] = ((__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << 113) + ((__uint128_t)target << 88) + box_to_128(&bench->meeting_buckets[bid].mbr);
             uint old_mid0 = 0;
             uint old_mid1 = 0;
-            decodeZOrder(bench->d_wids[pid],old_mid0,old_mid1);
+            d2xy(bench->bitmap_edge_length,bench->d_wids[pid],old_mid0,old_mid1);
             uint new_mid0 = (old_mid0*bench->same_pid_count[pid] + mid0) / (bench->same_pid_count[pid] + 1);                //centroid
             uint new_mid1 = (old_mid1*bench->same_pid_count[pid] + mid1) / (bench->same_pid_count[pid] + 1);
             //printf("new_mid0 %d,new_mid1 %d",new_mid0,new_mid1);
-            bench->d_wids[pid] = zOrderFill(new_mid0, new_mid1);
-            //printf("zorder %d\n", bench->d_wids[pid]);
+            bench->d_wids[pid] = xy2d(bench->bitmap_edge_length,new_mid0, new_mid1);
+            //printf("hilbert %d\n", bench->d_wids[pid]);
 
             bench->same_pid_count[pid]++;
         }
@@ -691,7 +692,7 @@ void mbr_bitmap(workbench *bench){
     uint bit_pos = 0;
     for(uint i=low0;i<=high0;i++){
         for(uint j=low1;j<=high1;j++){
-            bit_pos = zOrderFill(i,j);
+            bit_pos = xy2d(bench->bitmap_edge_length,i,j);
             bench->d_bitmaps[bitmap_id*(bench->bit_count/8)+bit_pos/8] |= (1<<(bit_pos%8));
         }
     }
@@ -1240,7 +1241,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
     bench->pro.meeting_identify_time += get_time_elapsed(start,false);
     int kv_increase = h_bench.kv_count-before_kv;
     printf("second %d finished meetings : %d\n",bench->cur_time , kv_increase);
-    cout<<"ave_s_mbr"<<(float)h_bench.s_of_all_mbr/100<<endl;
+    //cout<<"ave_s_mbr"<<(float)h_bench.s_of_all_mbr/100<<endl;
     //h_bench.s_of_all_mbr = 0;
     logt("meeting identify: %d meetings", start, kv_increase);
 	bench->num_active_meetings = h_bench.num_active_meetings;
@@ -1266,8 +1267,8 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
             //logt("bloom filter ", start);
             CUDA_SAFE_CALL(cudaMemcpy(bench->h_wids[offset+bench->MemTable_count], h_bench.d_wids, bench->config->num_objects*sizeof(unsigned short), cudaMemcpyDeviceToHost));
 
-            cudaMemset(h_bench.d_wids, 0, bench->config->num_objects*sizeof(unsigned short));
-            cudaMemset(h_bench.same_pid_count, 0, bench->config->num_objects * sizeof(unsigned short));
+//            cudaMemset(h_bench.d_wids, 0, bench->config->num_objects*sizeof(unsigned short));
+//            cudaMemset(h_bench.same_pid_count, 0, bench->config->num_objects * sizeof(unsigned short));
         }
 
         // wrap raw pointer with a device_ptr
@@ -1308,20 +1309,10 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         box temp_box(bench->h_values[offset+bench->MemTable_count][10]);
         temp_box.print();
 
-        if(true){           //mbr bit map
-            cout<<"h_bench.bit_count:"<<h_bench.bit_count<<endl;
-            cout<<"h_bench.bitmaps_size:"<<h_bench.bitmaps_size<<endl;
-            mbr_bitmap<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
-            check_execution();
-            cudaDeviceSynchronize();
-            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-            //logt("bloom filter ", start);
-            CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps[offset+bench->MemTable_count], h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));
-            cudaMemset(h_bench.d_bitmaps, 0, bench->bitmaps_size);
-        }
-
-//        if(true){           //wid bit map
-//            wid_bitmap<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
+//        if(true){           //mbr bit map
+//            cout<<"h_bench.bit_count:"<<h_bench.bit_count<<endl;
+//            cout<<"h_bench.bitmaps_size:"<<h_bench.bitmaps_size<<endl;
+//            mbr_bitmap<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
 //            check_execution();
 //            cudaDeviceSynchronize();
 //            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
@@ -1329,6 +1320,16 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 //            CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps[offset+bench->MemTable_count], h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));
 //            cudaMemset(h_bench.d_bitmaps, 0, bench->bitmaps_size);
 //        }
+
+        if(true){           //wid bit map
+            wid_bitmap<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
+            check_execution();
+            cudaDeviceSynchronize();
+            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+            //logt("bloom filter ", start);
+            CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps[offset+bench->MemTable_count], h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));
+            cudaMemset(h_bench.d_bitmaps, 0, bench->bitmaps_size);
+        }
 
         if(bench->config->bloom_filter){
             BloomFilter_Add<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
