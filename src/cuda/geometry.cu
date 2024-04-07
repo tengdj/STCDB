@@ -1309,20 +1309,10 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         box temp_box(bench->h_values[offset+bench->MemTable_count][10]);
         temp_box.print();
 
-//        if(true){           //mbr bit map
-//            cout<<"h_bench.bit_count:"<<h_bench.bit_count<<endl;
-//            cout<<"h_bench.bitmaps_size:"<<h_bench.bitmaps_size<<endl;
-//            mbr_bitmap<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
-//            check_execution();
-//            cudaDeviceSynchronize();
-//            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//            //logt("bloom filter ", start);
-//            CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps[offset+bench->MemTable_count], h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));
-//            cudaMemset(h_bench.d_bitmaps, 0, bench->bitmaps_size);
-//        }
-
-        if(true){           //wid bit map
-            wid_bitmap<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
+        if(true){           //mbr bit map
+            cout<<"h_bench.bit_count:"<<h_bench.bit_count<<endl;
+            cout<<"h_bench.bitmaps_size:"<<h_bench.bitmaps_size<<endl;
+            mbr_bitmap<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
             check_execution();
             cudaDeviceSynchronize();
             CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
@@ -1330,6 +1320,16 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
             CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps[offset+bench->MemTable_count], h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));
             cudaMemset(h_bench.d_bitmaps, 0, bench->bitmaps_size);
         }
+
+//        if(true){           //wid bit map
+//            wid_bitmap<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
+//            check_execution();
+//            cudaDeviceSynchronize();
+//            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+//            //logt("bloom filter ", start);
+//            CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps[offset+bench->MemTable_count], h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));
+//            cudaMemset(h_bench.d_bitmaps, 0, bench->bitmaps_size);
+//        }
 
         if(bench->config->bloom_filter){
             BloomFilter_Add<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
