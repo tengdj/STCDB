@@ -551,10 +551,10 @@ void cuda_identify_meetings(workbench *bench) {
         pid = getpid1(bench->meeting_buckets[bid].key);
         target = getpid2(bench->meeting_buckets[bid].key);
 
-        uint low0 = (bench->meeting_buckets[bid].mbr.low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 256;
-        uint low1 = (bench->meeting_buckets[bid].mbr.low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
-        uint high0 = (bench->meeting_buckets[bid].mbr.high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 256;
-        uint high1 = (bench->meeting_buckets[bid].mbr.high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
+        uint low0 = (bench->meeting_buckets[bid].mbr.low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 255;
+        uint low1 = (bench->meeting_buckets[bid].mbr.low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 255;
+        uint high0 = (bench->meeting_buckets[bid].mbr.high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 255;
+        uint high1 = (bench->meeting_buckets[bid].mbr.high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 255;
 
         uint s = (high0-low0+1)*(high1-low1+1);
         if(bench->kv_count<200){
@@ -647,7 +647,9 @@ void write_wid(workbench *bench){
 //        printf("x%d y%d\n",x,y);
 //    }
     assert(bench->d_wids[pid]<=bench->bit_count);
-    bench->d_keys[kid] += ((uint64_t)bench->d_wids[pid] << 48);
+    if(bench->d_wids[pid]){
+        bench->d_keys[kid] = ((uint64_t)bench->d_wids[pid] << 48) + (bench->d_keys[kid] & ((1ULL << 48) - 1));
+    }
 }
 
 __global__
@@ -682,12 +684,10 @@ void mbr_bitmap(workbench *bench){
     float f_high0 = uint_to_float((uint)((bench->d_values[kid] >> 22) & ((1ULL << 22) - 1)));
     float f_high1 = uint_to_float((uint)(bench->d_values[kid] & ((1ULL << 22) - 1)));
 
-    uint low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 256;
-    uint low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
-    uint high0 = (f_high0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 256;
-    uint high1 = (f_high1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 256;
-    //4
-    //uint bitmap_id = kid/(bench->bit_count/8);          //256*256/8 = 8192B 1B=1char    ???????
+    uint low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 255;
+    uint low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 255;
+    uint high0 = (f_high0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 255;
+    uint high1 = (f_high1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 255;
     uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);           //kid/65536
     uint bit_pos = 0;
     for(uint i=low0;i<=high0;i++){
@@ -1267,8 +1267,8 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
             //logt("bloom filter ", start);
             CUDA_SAFE_CALL(cudaMemcpy(bench->h_wids[offset+bench->MemTable_count], h_bench.d_wids, bench->config->num_objects*sizeof(unsigned short), cudaMemcpyDeviceToHost));
 
-//            cudaMemset(h_bench.d_wids, 0, bench->config->num_objects*sizeof(unsigned short));
-//            cudaMemset(h_bench.same_pid_count, 0, bench->config->num_objects * sizeof(unsigned short));
+            cudaMemset(h_bench.d_wids, 0, bench->config->num_objects*sizeof(unsigned short));
+            cudaMemset(h_bench.same_pid_count, 0, bench->config->num_objects * sizeof(unsigned short));
         }
 
         // wrap raw pointer with a device_ptr
@@ -1371,8 +1371,8 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
             //logt("bloom filter ", start);
             CUDA_SAFE_CALL(cudaMemcpy(bench->h_wids[offset+bench->MemTable_count], h_bench.d_wids, bench->config->num_objects*sizeof(unsigned short), cudaMemcpyDeviceToHost));      //offset not change
 
-//            cudaMemset(h_bench.d_wids, 0, bench->config->num_objects*sizeof(unsigned short));
-//            cudaMemset(h_bench.same_pid_count, 0, bench->config->num_objects * sizeof(unsigned short));
+            cudaMemset(h_bench.d_wids, 0, bench->config->num_objects*sizeof(unsigned short));
+            cudaMemset(h_bench.same_pid_count, 0, bench->config->num_objects * sizeof(unsigned short));
         }
 
         // wrap raw pointer with a device_ptr
