@@ -192,6 +192,7 @@ public:
     unsigned short * d_wids = NULL;
     unsigned short ** h_wids = NULL;
     unsigned short * same_pid_count = NULL;
+    box * bitmap_mbrs = NULL;
 
 
     pthread_mutex_t mutex_i;
@@ -206,9 +207,10 @@ public:
     uint end_time_min = 0;
     uint end_time_max = 0;
     uint SSTable_kv_capacity = 0;
+    bool dumping = false;
 
     //s
-    uint s_of_all_mbr = 0;
+    //uint s_of_all_mbr = 0;
 
     bool crash_consistency = false;
 

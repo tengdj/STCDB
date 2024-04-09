@@ -169,14 +169,11 @@ void workbench::claim_space(){
 
     size = config->big_sorted_run_capacity*sizeof(sorted_run);
     bg_run = (sorted_run *)allocate(size);
-    for(int i=0;i<config->big_sorted_run_capacity;i++){
-        bg_run[i].SSTable_count = config->SSTable_count;
-    }
 
     if(true){
-        size = config->MemTable_capacity * sizeof(unsigned char *);                 //sort
+        size = config->MemTable_capacity * sizeof(unsigned char *);
         h_bitmaps = (unsigned char **)allocate(size);
-        size = config->MemTable_capacity * sizeof(unsigned short *);                 //sort
+        size = config->MemTable_capacity * sizeof(unsigned short *);
         h_wids = (unsigned short **)allocate(size);
 
         for(int i=0;i<config->MemTable_capacity; i++){
@@ -192,10 +189,10 @@ void workbench::claim_space(){
 
 box workbench::bit_box(box b){
     box new_b;
-    new_b.low[0] = (b.low[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * 256;
-    new_b.low[1] = (b.low[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * 256;
-    new_b.high[0] = (b.high[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * 256;
-    new_b.high[1] = (b.high[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * 256;
+    new_b.low[0] = (b.low[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * 255;
+    new_b.low[1] = (b.low[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * 255;
+    new_b.high[0] = (b.high[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * 255;
+    new_b.high[1] = (b.high[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * 255;
     return new_b;
 }
 
@@ -215,7 +212,7 @@ bool workbench::search_memtable(uint64_t pid){          //wid_pid
         //box temp_box;
         while (low <= high) {
             mid = (low + high) / 2;
-            temp_pid = h_keys[offset+i][mid] >> 23;
+            temp_pid = (h_keys[offset+i][mid] >> 23) ;
             if (temp_pid == pid) {
                 find = mid;
                 ret = true;
@@ -234,7 +231,7 @@ bool workbench::search_memtable(uint64_t pid){          //wid_pid
         uint cursor = find;
         while (temp_pid == pid && cursor >= 1) {
             cursor--;
-            temp_pid = h_keys[offset+i][cursor] >> 23;
+            temp_pid = (h_keys[offset+i][cursor] >> 23) ;
         }
         if (temp_pid == pid && cursor == 0) {
             //print_128(h_keys[offset+i][0]);
@@ -243,13 +240,13 @@ bool workbench::search_memtable(uint64_t pid){          //wid_pid
             box temp_box(h_values[offset+i][0]);
             temp_box.print();
             if(search_multi){
-                search_multi_pid[search_multi_length] = (h_keys[offset+i][0] >> 23) & ((1ULL << 25) - 1);       //real pid
+                search_multi_pid[search_multi_length] = (h_keys[offset+i][0] >> 23) ;       //real pid
                 search_multi_length++;
             }
         }
         while (cursor + 1 < config->kv_restriction) {
             cursor++;
-            temp_pid = h_keys[offset+i][cursor] >> 23;
+            temp_pid = (h_keys[offset+i][cursor] >> 23) & ((1ULL << 25) - 1);
             if (temp_pid == pid) {
                 //cout<<h_keys[offset+i][cursor];
                 print_128(h_keys[offset+i][cursor]);
@@ -258,7 +255,7 @@ bool workbench::search_memtable(uint64_t pid){          //wid_pid
                 box temp_box(h_values[offset+i][cursor]);
                 temp_box.print();
                 if(search_multi) {
-                    search_multi_pid[search_multi_length] = (h_keys[offset+i][cursor] >> 23) & ((1ULL << 25) - 1);
+                    search_multi_pid[search_multi_length] = (h_keys[offset+i][cursor] >> 23);
                     search_multi_length++;
                 }
             }
@@ -272,26 +269,31 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
     bool ret = false;
     for(int i=0;i<big_sorted_run_count;i++) {
         if ( (bg_run[i].start_time_min < timestamp)&&(timestamp < bg_run[i].end_time_max)) {
-            //(bg_run[i].timestamp_min < timestamp) && (timestamp < bg_run[i].timestamp_max)
             cout<<"big_sorted_run_num:"<<i<<endl;
-            bg_run[i].sst = new SSTable[bg_run[i].SSTable_count];                   //maybe useful later, should not delete after this func
-            for(uint j=0;j<bg_run[i].SSTable_count;j++){
-                bg_run[i].sst[j].SSTable_kv_capacity = SSTable_kv_capacity;
+            uint wp = pid;
+            if(bg_run[i].wids[pid]==0){
+                continue;
             }
+            else{
+                wp += bg_run[i].wids[pid]<<25;
+                cout<<"wp: "<<wp<<endl;
+            }
+            bg_run[i].sst = new SSTable[config->SSTable_count];                   //maybe useful later, should not delete after this func , if(!NULL)
             ifstream read_sst;
 
             //high level binary search
             int find = -1;
             int low = 0;
-            int high = bg_run[i].SSTable_count - 1;
+            int high = config->SSTable_count - 1;
             int mid;
             while (low <= high) {
                 mid = (low + high) / 2;
-                if (bg_run[i].first_key[mid] == pid){
+                cout << bg_run[i].first_widpid[mid] << endl;
+                if (bg_run[i].first_widpid[mid] == wp){
                     find = mid;
                     break;
                 }
-                else if (bg_run[i].first_key[mid] > pid){
+                else if (bg_run[i].first_widpid[mid] > wp){
                     high = mid - 1;
                 }
                 else {
@@ -299,36 +301,39 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                 }
             }
             if(find==-1){
-                cout<<"not find in first_key"<<endl;
+                cout<<"not find in first_widpid"<<endl;
+                cout << low << "-" << bg_run[i].first_widpid[low] << endl;
+                cout << mid << "-" << bg_run[i].first_widpid[mid] << endl;
+                cout << high << "-" << bg_run[i].first_widpid[high] << endl;
+                if(high<0){
+                    high = 0;
+                }
                 string filename = "../store/SSTable_"+to_string(i)+"-"+to_string(high);
                 cout<<filename<<endl;
                 read_sst.open(filename);                   //final place is not high+1, but high
                 assert(read_sst.is_open());
-                cout << low << "-" << bg_run[i].first_key[low] << endl;
-                cout << mid << "-" << bg_run[i].first_key[mid] << endl;
-                cout << high << "-" << bg_run[i].first_key[high] << endl;
 
-                bg_run[i].sst[high].kv = new key_value[bg_run[i].sst[high].SSTable_kv_capacity];
-                read_sst.read((char *)bg_run[i].sst[high].kv,sizeof(key_value)*bg_run[i].sst[high].SSTable_kv_capacity);
+                bg_run[i].sst[high].kv = new key_value[SSTable_kv_capacity];
+                read_sst.read((char *)bg_run[i].sst[high].kv,sizeof(key_value)*SSTable_kv_capacity);
                 read_sst.close();
-                ret |= bg_run[i].sst[high].search_SSTable(pid,search_multi,search_multi_length,search_multi_pid);
+                ret |= bg_run[i].sst[high].search_SSTable(wp,search_multi,search_multi_length,search_multi_pid);
                 continue;
             }
             cout<<"high level binary search finish and find"<<endl;
 
-            //for the case, there are many SSTables that first_key==pid
+            //for the case, there are many SSTables that first_widpid==wp
             //find start and end
             uint pid_start = find;
             while(pid_start>=1){
                 pid_start--;
-                if(bg_run[i].first_key[pid_start] != pid){
+                if(bg_run[i].first_widpid[pid_start] != wp){
                     break;
                 }
             }
             read_sst.open("../store/SSTable_"+to_string(i)+"-"+to_string(pid_start));
             assert(read_sst.is_open());
-            bg_run[i].sst[pid_start].kv = new key_value[bg_run[i].sst[pid_start].SSTable_kv_capacity];
-            read_sst.read((char *)bg_run[i].sst[pid_start].kv,sizeof(key_value)*bg_run[i].sst[pid_start].SSTable_kv_capacity);
+            bg_run[i].sst[pid_start].kv = new key_value[SSTable_kv_capacity];
+            read_sst.read((char *)bg_run[i].sst[pid_start].kv,sizeof(key_value)*SSTable_kv_capacity);
             bg_run[i].sst[pid_start].search_SSTable(pid,search_multi,search_multi_length,search_multi_pid);
             read_sst.close();
             uint cursor = pid_start+1;
@@ -336,19 +341,19 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
             while(true) {
                 read_sst.open("../store/SSTable_" + to_string(i) + "-" + to_string(cursor));
                 assert(read_sst.is_open());
-                bg_run[i].sst[cursor].kv = new key_value[bg_run[i].sst[cursor].SSTable_kv_capacity];
-                read_sst.read((char *) bg_run[i].sst[cursor].kv, sizeof(key_value) * bg_run[i].sst[cursor].SSTable_kv_capacity);
+                bg_run[i].sst[cursor].kv = new key_value[SSTable_kv_capacity];
+                read_sst.read((char *) bg_run[i].sst[cursor].kv, sizeof(key_value) * SSTable_kv_capacity);
                 read_sst.close();
-                if (cursor + 1 < bg_run[i].SSTable_count) {
-                    if (bg_run[i].first_key[cursor + 1] != pid) {               //must shut down in this cursor
+                if (cursor + 1 < config->SSTable_count) {
+                    if (bg_run[i].first_widpid[cursor + 1] != wp) {               //must shut down in this cursor
                         cout<<"case 1"<<endl;
                         uint index = 0;
-                        while (index <= bg_run[i].sst[cursor].SSTable_kv_capacity - 1) {
-                            temp_pid = bg_run[i].sst[cursor].kv[index].key >> 39;
-                            if (temp_pid == pid) {
+                        while (index <= SSTable_kv_capacity - 1) {
+                            temp_pid = (bg_run[i].sst[cursor].kv[index].key >> 23) ;
+                            if (temp_pid == wp) {
                                 cout << bg_run[i].sst[cursor].kv[index].key << endl;
                                 if(search_multi){
-                                    search_multi_pid[search_multi_length] = bg_run[i].sst[cursor].kv[index].key & ((1ULL << 25) - 1);
+                                    search_multi_pid[search_multi_length] = (bg_run[i].sst[cursor].kv[index].key >> 23) ;
                                     search_multi_length++;
                                 }
                             } else break;
@@ -356,25 +361,25 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                         }
                         break;
                     }
-                    if (bg_run[i].first_key[cursor + 1] == pid) {               //mustn't shut down in this cursor
-                        for (uint j = 0; j < bg_run[i].sst[cursor].SSTable_kv_capacity; j++) {
+                    if (bg_run[i].first_widpid[cursor + 1] == wp) {               //mustn't shut down in this cursor
+                        for (uint j = 0; j < SSTable_kv_capacity; j++) {
                             cout << bg_run[i].sst[cursor].kv[j].key << endl;
                             if(search_multi){
-                                search_multi_pid[search_multi_length] = bg_run[i].sst[cursor].kv[j].key & ((1ULL << 25) - 1);
+                                search_multi_pid[search_multi_length] = (bg_run[i].sst[cursor].kv[j].key >> 23) ;
                                 search_multi_length++;
                             }
                         }
                     }
                     cursor++;
-                } else {                                           // cursor is the last one, same too bg_run->first_key[cursor+1]!=pid
+                } else {                                           // cursor is the last one, same too bg_run->first_widpid[cursor+1]!=pid
                     uint index = 0;
-                    while (index <= bg_run[i].sst[cursor].SSTable_kv_capacity - 1) {
+                    while (index <= SSTable_kv_capacity - 1) {
                         temp_pid = bg_run[i].sst[cursor].kv[index].key >> 39;
                         cout<<"temp_pid: "<<temp_pid<<endl;
-                        if (temp_pid == pid) {
+                        if (temp_pid == wp) {
                             cout << bg_run[i].sst[cursor].kv[index].key << endl;
                             if(search_multi){
-                                search_multi_pid[search_multi_length] = bg_run[i].sst[cursor].kv[index].key & ((1ULL << 25) - 1);
+                                search_multi_pid[search_multi_length] = (bg_run[i].sst[cursor].kv[index].key >> 23);
                                 search_multi_length++;
                             }
                         } else break;
@@ -393,30 +398,48 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
 bool workbench::mbr_search_in_disk(box b, uint timestamp) {
     assert(mbr.contain(b));
     cout << "mbr disk search" << endl;
-    bool ret = false, quit = false;
+    bool ret = false, find = false;
     box bit_b;
     uint bit_pos = 0;
     for (int i = 0; i < big_sorted_run_count; i++) {
         if ((bg_run[i].start_time_min < timestamp) && (timestamp < bg_run[i].end_time_max)) {
+            bg_run[i].sst = new SSTable[config->SSTable_count];
             cout << "in bg_run" << i << endl;
             bit_b = bit_box(b);
             cout<<bit_b.low[0]<<" "<<bit_b.low[1]<<" "<<bit_b.high[0]<<" "<<bit_b.high[1]<<endl;
             for (uint j = 0; j < config->SSTable_count; j++) {
-                quit = false;
-                for (uint p = bit_b.low[0]; (p <= bit_b.high[0]) && (!quit); p++) {
-                    for (uint q = bit_b.low[1]; (q <= bit_b.high[1]) && (!quit); q++) {
-//                        bit_pos = zOrderFill(p, q);
-//                        cout<<"bit_pos"<<bit_pos<<endl;
-                        if (bg_run[i].bitmaps[j * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
-                            cout << "SSTable_" << j << "bit_pos" << bit_pos << endl;
-                            quit = true;
-                            ret = true;
-                            break;
+                bg_run[i].bitmap_mbrs[j].print();
+                if(b.intersect(bg_run[i].bitmap_mbrs[j])) {     //real box intersect
+                    cout<<"bitmap_mbr filter"<<endl;
+                    find = false;
+                    for (uint p = bit_b.low[0]; (p <= bit_b.high[0]) && (!find); p++) {
+                        for (uint q = bit_b.low[1]; (q <= bit_b.high[1]) && (!find); q++) {
+                            if (bg_run[i].bitmaps[j * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
+                                cout << "SSTable_" << j << "bit_pos" << bit_pos << endl;
+                                find = true;
+                                ret = true;
+                                break;
+                            }
                         }
                     }
-                }
-                if(quit){
-                    cout << "SSTable_" << j << endl;
+                    if(find){
+                        ifstream read_sst;
+                        string filename = "../store/SSTable_"+to_string(i)+"-"+to_string(j);
+                        cout<<filename<<endl;
+                        read_sst.open(filename);                   //final place is not high+1, but high
+                        assert(read_sst.is_open());
+                        bg_run[i].sst[j].kv = new key_value[SSTable_kv_capacity];
+                        read_sst.read((char *)bg_run[i].sst[j].kv,sizeof(key_value)*SSTable_kv_capacity);
+                        cout<<"read right"<<endl;
+                        read_sst.close();
+                        for(uint q = 0; q < SSTable_kv_capacity; q++){
+                            box value_box(bg_run[i].sst[j].kv[q].value);
+                            if(b.intersect(value_box)){
+                                cout<<"box find!"<<endl;
+                                value_box.print();
+                            }
+                        }
+                    }
                 }
             }
         }

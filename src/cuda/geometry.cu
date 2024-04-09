@@ -556,10 +556,10 @@ void cuda_identify_meetings(workbench *bench) {
         uint high0 = (bench->meeting_buckets[bid].mbr.high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 255;
         uint high1 = (bench->meeting_buckets[bid].mbr.high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 255;
 
-        uint s = (high0-low0+1)*(high1-low1+1);
-        if(bench->kv_count<200){
-            atomicAdd(&bench->s_of_all_mbr,s);
-        }
+//        uint s = (high0-low0+1)*(high1-low1+1);
+//        if(bench->kv_count<200){
+//            atomicAdd(&bench->s_of_all_mbr,s);
+//        }
 
         //printf("low0 %d,low1 %d,high0 %d,high1 %d",low0,low1,high0,high1);
         uint mid0 = (low0+high0)/2;
@@ -1132,7 +1132,6 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
     }
 	h_bench.cur_time = bench->cur_time;
     h_bench.end_time_min = bench->end_time_min;
-    h_bench.s_of_all_mbr = 0;
 	CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));
 	CUDA_SAFE_CALL(cudaMemcpy(h_bench.points, bench->points, bench->config->num_objects*sizeof(Point), cudaMemcpyHostToDevice));
 	bench->pro.copy_time += get_time_elapsed(start,false);
@@ -1303,7 +1302,6 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         cout<<"pid:"<<(uint)((bench->h_keys[offset+bench->MemTable_count][10] >> 23) & ((1ULL << 25) - 1))<<endl;
         cout<<"end:"<<(uint)((bench->h_keys[offset+bench->MemTable_count][10] >> 8) & ((1ULL << 15) - 1)) + bench->end_time_min<<endl;
         cout<<"count:"<<(uint)(bench->h_keys[offset+bench->MemTable_count][10] & ((1ULL << 8) - 1))<<endl;
-        printf("\n");
         cout<<"duration:"<<(uint)(bench->h_values[offset+bench->MemTable_count][10] >> 113)<<endl;
         cout<<"target:"<<(uint)((bench->h_values[offset+bench->MemTable_count][10] >> 88) & ((1ULL << 25) - 1))<<endl;
         box temp_box(bench->h_values[offset+bench->MemTable_count][10]);

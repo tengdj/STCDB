@@ -132,17 +132,5 @@ inline float uint_to_float(uint f) {
     return ret;
 }
 
-__host__ __device__
-inline uint zOrderFill(uint x, uint y) {
-    uint z = x + y*256;
-    return z;
-}
-
-__host__ __device__
-inline void decodeZOrder(unsigned int z, unsigned int& x, unsigned int& y) {
-    x = z % 256;
-    y = z / 256;
-}
-
 
 #endif /* CUDA_UTIL_CUH_ */

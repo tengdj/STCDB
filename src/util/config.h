@@ -54,7 +54,7 @@ public:
     uint MemTable_capacity = 2;             //5*2
 
     uint big_sorted_run_capacity = 100;
-    uint SSTable_count = 10;              //1024
+    uint SSTable_count = 100;              //1024
 
     //bool search_kv = true;
     uint search_single_capacity = 100;

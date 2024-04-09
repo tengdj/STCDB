@@ -80,7 +80,7 @@ public:
         low[1] = uint_to_float((uint)((value >> 44) & ((1ULL << 22) - 1)));
         high[0] = uint_to_float((uint)((value >> 22) & ((1ULL << 22) - 1)));
         high[1] = uint_to_float((uint)(value & ((1ULL << 22) - 1)));
-        cout<<low[0]<<" "<<low[1]<<" "<<high[0]<<" "<<high[1]<<endl;
+        //cout<<low[0]<<" "<<low[1]<<" "<<high[0]<<" "<<high[1]<<endl;
     }
 
 	void update(Point p){
@@ -107,10 +107,10 @@ public:
 	}
 
 	bool intersect(box &target){
-		return !(target.low[0]>high[0]||
-				 target.high[0]<low[0]||
-				 target.low[1]>high[1]||
-				 target.high[1]<low[1]);
+		return !(target.low[0]>high[0]||            //target is at the right of this
+				 target.high[0]<low[0]||            //... left...
+				 target.low[1]>high[1]||            //high
+				 target.high[1]<low[1]);            //low
 	}
 	bool contain(box &target){
 		return target.low[0]>=low[0]&&
