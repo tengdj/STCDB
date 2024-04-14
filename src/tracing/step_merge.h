@@ -16,7 +16,7 @@
 
 typedef struct key_value{
     uint64_t key;
-    __uint128_t value;
+    uint64_t value;
 }key_value;                         //sizeof(key_value)==32, beacuse 8+16=24, but 24<2*16=32
 
 class SSTable{

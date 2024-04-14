@@ -39,6 +39,13 @@ namespace{
 #define __MGAIC_CODE__          (0x01464C42)
 #define MIX_UINT64(v)       ((uint32_t)((v>>32)^(v)))
 
+#define FIRST_HILBERT_BIT 16
+#define SECOND_HILBERT_BIT 8
+#define PID_BIT 26
+#define DURATION_BIT 12
+#define END_BIT 10
+
+
 const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
 
     inline double degree_per_meter_longitude(double latitude){

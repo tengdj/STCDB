@@ -9,8 +9,9 @@
 #define CUDA_UTIL_CUH_
 
 #include <cuda.h>
-#include "../util/util.h"
 #include <cuda_runtime.h>
+#include "../util/util.h"
+#include "hilbert_curve.cuh"
 
 
 
@@ -126,11 +127,48 @@ inline uint float_to_uint(float xy) {
 }
 
 __host__ __device__
-inline float uint_to_float(uint f) {
-    float ret = (float)f/10000;
-    ret -= 180;
-    return ret;
+float uint_to_float(uint f);
+
+__host__ __device__
+uint get_key_hilbert_id(uint64_t key);
+
+__host__ __device__
+uint get_key_pid(uint64_t key);
+
+__host__ __device__
+uint get_value_mbr_low(uint64_t value);
+
+__host__ __device__
+uint get_value_mbr_high(uint64_t value);
+
+__host__ __device__
+uint get_value_target(uint64_t value);
+
+__host__ __device__
+uint get_value_duration(uint64_t value);
+
+__host__ __device__
+uint get_value_end(uint64_t value);
+
+__host__
+inline void print_parse_key(uint64_t key){
+    cout<<"key:"<<key<<endl;
+    cout<<"wid low:"<<get_key_pid(key)<<endl;
+    cout<<"pid:"<<get_key_hilbert_id(key)<<endl;
 }
 
+__host__
+inline void print_parse_value(uint64_t value){
+    cout<<"value:"<<value<<endl;
+    uint low = get_value_mbr_low(value);
+    uint high = get_value_mbr_high(value);
+    uint second_low0, second_low1, second_high0, second_high1;
+    d2xy(SECOND_HILBERT_BIT/2, low, second_low0, second_low1);
+    d2xy(SECOND_HILBERT_BIT/2, high, second_high0, second_high1);
+    cout<<"("<<second_low0<<","<<second_low1<<")-("<<second_high0<<","<<second_high1<<")"<<endl;
+    cout<<"target:"<<get_value_target(value)<<endl;
+    cout<<"duration:"<<get_value_duration(value)<<endl;
+    cout<<"end offset:"<<get_value_end(value)<<endl;
+}
 
 #endif /* CUDA_UTIL_CUH_ */

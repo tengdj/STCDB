@@ -134,16 +134,16 @@ void workbench::claim_space(){
     h_keys = (uint64_t **)allocate(size);
     //log("\t%.2f MB\tmeeting bucket space",size/1024.0/1024.0);
 
-    size = config->MemTable_capacity * sizeof(__uint128_t *);
-    h_values = (__uint128_t **)allocate(size);
+    size = config->MemTable_capacity * sizeof(uint64_t *);
+    h_values = (uint64_t **)allocate(size);
 
     for(int i=0;i<config->MemTable_capacity; i++){
         size = config->kv_capacity*sizeof(uint64_t);
         h_keys[i] = (uint64_t *)allocate(size);
         log("\t%.2f MB\ta element of h_keys",size/1024.0/1024.0);
 
-        size = config->kv_capacity*sizeof(__uint128_t);
-        h_values[i] = (__uint128_t *)allocate(size);
+        size = config->kv_capacity*sizeof(uint64_t);
+        h_values[i] = (uint64_t *)allocate(size);
         log("\t%.2f MB\ta element of h_values",size/1024.0/1024.0);
     }
 
@@ -173,16 +173,16 @@ void workbench::claim_space(){
     if(true){
         size = config->MemTable_capacity * sizeof(unsigned char *);
         h_bitmaps = (unsigned char **)allocate(size);
-        size = config->MemTable_capacity * sizeof(unsigned short *);
-        h_wids = (unsigned short **)allocate(size);
+        size = 2*config->MemTable_capacity * sizeof(unsigned short *);
+        h_bitboxs = (unsigned short **)allocate(size);
 
         for(int i=0;i<config->MemTable_capacity; i++){
             size = bitmaps_size;
             h_bitmaps[i] = (unsigned char *) allocate(size);
             log("\t%.2f MB\t h_bitmaps", size / 1024.0 / 1024.0);
-            size = config->num_objects*sizeof(unsigned short);
-            h_wids[i] = (unsigned short *) allocate(size);
-            log("\t%.2f MB\t h_wids", size / 1024.0 / 1024.0);
+            size = 2*config->num_objects * sizeof(unsigned short);
+            h_bitboxs[i] = (unsigned short *) allocate(size);
+            log("\t%.2f MB\t h_bitboxs", size / 1024.0 / 1024.0);
         }
     }
 }
@@ -203,64 +203,64 @@ bool workbench::search_memtable(uint64_t pid){          //wid_pid
         offset = config->MemTable_capacity/2;
     }
     bool ret = false;
-    for(int i=0;i<MemTable_count;i++) {
-        int find = -1;
-        int low = 0;
-        int high = config->kv_restriction - 1;
-        int mid;
-        uint64_t temp_pid;
-        //box temp_box;
-        while (low <= high) {
-            mid = (low + high) / 2;
-            temp_pid = (h_keys[offset+i][mid] >> 23) ;
-            if (temp_pid == pid) {
-                find = mid;
-                ret = true;
-                break;
-            } else if (temp_pid > pid) {
-                high = mid - 1;
-            } else {
-                low = mid + 1;
-            }
-        }
-        if (find == -1) {
-            cout << "cannot find" << endl;
-            break;
-        }
-        cout << "exactly find" << endl;
-        uint cursor = find;
-        while (temp_pid == pid && cursor >= 1) {
-            cursor--;
-            temp_pid = (h_keys[offset+i][cursor] >> 23) ;
-        }
-        if (temp_pid == pid && cursor == 0) {
-            //print_128(h_keys[offset+i][0]);
-            cout<<"duration:"<<(uint)(h_values[offset+i][0] >> 113)<<endl;
-            cout<<"target:"<<(uint)((h_values[offset+i][0] >> 88) & ((1ULL << 25) - 1))<<endl;
-            box temp_box(h_values[offset+i][0]);
-            temp_box.print();
-            if(search_multi){
-                search_multi_pid[search_multi_length] = (h_keys[offset+i][0] >> 23) ;       //real pid
-                search_multi_length++;
-            }
-        }
-        while (cursor + 1 < config->kv_restriction) {
-            cursor++;
-            temp_pid = (h_keys[offset+i][cursor] >> 23) & ((1ULL << 25) - 1);
-            if (temp_pid == pid) {
-                //cout<<h_keys[offset+i][cursor];
-                print_128(h_keys[offset+i][cursor]);
-                cout<<"duration:"<<(uint)(h_values[offset+i][cursor] >> 113)<<endl;
-                cout<<"target:"<<(uint)((h_values[offset+i][cursor] >> 88) & ((1ULL << 25) - 1))<<endl;
-                box temp_box(h_values[offset+i][cursor]);
-                temp_box.print();
-                if(search_multi) {
-                    search_multi_pid[search_multi_length] = (h_keys[offset+i][cursor] >> 23);
-                    search_multi_length++;
-                }
-            }
-        }
-    }
+//    for(int i=0;i<MemTable_count;i++) {
+//        int find = -1;
+//        int low = 0;
+//        int high = config->kv_restriction - 1;
+//        int mid;
+//        uint64_t temp_pid;
+//        //box temp_box;
+//        while (low <= high) {
+//            mid = (low + high) / 2;
+//            temp_pid = (h_keys[offset+i][mid] >> 23) ;
+//            if (temp_pid == pid) {
+//                find = mid;
+//                ret = true;
+//                break;
+//            } else if (temp_pid > pid) {
+//                high = mid - 1;
+//            } else {
+//                low = mid + 1;
+//            }
+//        }
+//        if (find == -1) {
+//            cout << "cannot find" << endl;
+//            break;
+//        }
+//        cout << "exactly find" << endl;
+//        uint cursor = find;
+//        while (temp_pid == pid && cursor >= 1) {
+//            cursor--;
+//            temp_pid = (h_keys[offset+i][cursor] >> 23) ;
+//        }
+//        if (temp_pid == pid && cursor == 0) {
+//            //print_128(h_keys[offset+i][0]);
+//            cout<<"duration:"<<(uint)(h_values[offset+i][0] >> 113)<<endl;
+//            cout<<"target:"<<(uint)((h_values[offset+i][0] >> 88) & ((1ULL << 25) - 1))<<endl;
+//            box temp_box(h_values[offset+i][0]);
+//            temp_box.print();
+//            if(search_multi){
+//                search_multi_pid[search_multi_length] = (h_keys[offset+i][0] >> 23) ;       //real pid
+//                search_multi_length++;
+//            }
+//        }
+//        while (cursor + 1 < config->kv_restriction) {
+//            cursor++;
+//            temp_pid = (h_keys[offset+i][cursor] >> 23) & ((1ULL << 25) - 1);
+//            if (temp_pid == pid) {
+//                //cout<<h_keys[offset+i][cursor];
+//                print_128(h_keys[offset+i][cursor]);
+//                cout<<"duration:"<<(uint)(h_values[offset+i][cursor] >> 113)<<endl;
+//                cout<<"target:"<<(uint)((h_values[offset+i][cursor] >> 88) & ((1ULL << 25) - 1))<<endl;
+//                box temp_box(h_values[offset+i][cursor]);
+//                temp_box.print();
+//                if(search_multi) {
+//                    search_multi_pid[search_multi_length] = (h_keys[offset+i][cursor] >> 23);
+//                    search_multi_length++;
+//                }
+//            }
+//        }
+//    }
     return ret;
 }
 
@@ -399,50 +399,50 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
     assert(mbr.contain(b));
     cout << "mbr disk search" << endl;
     bool ret = false, find = false;
-    box bit_b;
-    uint bit_pos = 0;
-    for (int i = 0; i < big_sorted_run_count; i++) {
-        if ((bg_run[i].start_time_min < timestamp) && (timestamp < bg_run[i].end_time_max)) {
-            bg_run[i].sst = new SSTable[config->SSTable_count];
-            cout << "in bg_run" << i << endl;
-            bit_b = bit_box(b);
-            cout<<bit_b.low[0]<<" "<<bit_b.low[1]<<" "<<bit_b.high[0]<<" "<<bit_b.high[1]<<endl;
-            for (uint j = 0; j < config->SSTable_count; j++) {
-                bg_run[i].bitmap_mbrs[j].print();
-                if(b.intersect(bg_run[i].bitmap_mbrs[j])) {     //real box intersect
-                    cout<<"bitmap_mbr filter"<<endl;
-                    find = false;
-                    for (uint p = bit_b.low[0]; (p <= bit_b.high[0]) && (!find); p++) {
-                        for (uint q = bit_b.low[1]; (q <= bit_b.high[1]) && (!find); q++) {
-                            if (bg_run[i].bitmaps[j * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
-                                cout << "SSTable_" << j << "bit_pos" << bit_pos << endl;
-                                find = true;
-                                ret = true;
-                                break;
-                            }
-                        }
-                    }
-                    if(find){
-                        ifstream read_sst;
-                        string filename = "../store/SSTable_"+to_string(i)+"-"+to_string(j);
-                        cout<<filename<<endl;
-                        read_sst.open(filename);                   //final place is not high+1, but high
-                        assert(read_sst.is_open());
-                        bg_run[i].sst[j].kv = new key_value[SSTable_kv_capacity];
-                        read_sst.read((char *)bg_run[i].sst[j].kv,sizeof(key_value)*SSTable_kv_capacity);
-                        cout<<"read right"<<endl;
-                        read_sst.close();
-                        for(uint q = 0; q < SSTable_kv_capacity; q++){
-                            box value_box(bg_run[i].sst[j].kv[q].value);
-                            if(b.intersect(value_box)){
-                                cout<<"box find!"<<endl;
-                                value_box.print();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+//    box bit_b;
+//    uint bit_pos = 0;
+//    for (int i = 0; i < big_sorted_run_count; i++) {
+//        if ((bg_run[i].start_time_min < timestamp) && (timestamp < bg_run[i].end_time_max)) {
+//            bg_run[i].sst = new SSTable[config->SSTable_count];
+//            cout << "in bg_run" << i << endl;
+//            bit_b = bit_box(b);
+//            cout<<bit_b.low[0]<<" "<<bit_b.low[1]<<" "<<bit_b.high[0]<<" "<<bit_b.high[1]<<endl;
+//            for (uint j = 0; j < config->SSTable_count; j++) {
+//                bg_run[i].bitmap_mbrs[j].print();
+//                if(b.intersect(bg_run[i].bitmap_mbrs[j])) {     //real box intersect
+//                    cout<<"bitmap_mbr filter"<<endl;
+//                    find = false;
+//                    for (uint p = bit_b.low[0]; (p <= bit_b.high[0]) && (!find); p++) {
+//                        for (uint q = bit_b.low[1]; (q <= bit_b.high[1]) && (!find); q++) {
+//                            if (bg_run[i].bitmaps[j * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
+//                                cout << "SSTable_" << j << "bit_pos" << bit_pos << endl;
+//                                find = true;
+//                                ret = true;
+//                                break;
+//                            }
+//                        }
+//                    }
+//                    if(find){
+//                        ifstream read_sst;
+//                        string filename = "../store/SSTable_"+to_string(i)+"-"+to_string(j);
+//                        cout<<filename<<endl;
+//                        read_sst.open(filename);                   //final place is not high+1, but high
+//                        assert(read_sst.is_open());
+//                        bg_run[i].sst[j].kv = new key_value[SSTable_kv_capacity];
+//                        read_sst.read((char *)bg_run[i].sst[j].kv,sizeof(key_value)*SSTable_kv_capacity);
+//                        cout<<"read right"<<endl;
+//                        read_sst.close();
+//                        for(uint q = 0; q < SSTable_kv_capacity; q++){
+//                            box value_box(bg_run[i].sst[j].kv[q].value);
+//                            if(b.intersect(value_box)){
+//                                cout<<"box find!"<<endl;
+//                                value_box.print();
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//    }
     return ret;
 }

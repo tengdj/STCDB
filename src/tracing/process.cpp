@@ -223,7 +223,7 @@ void *merge_dump(void *arg){
     key_value *temp_kvs = new key_value[bench->SSTable_kv_capacity];
     uint *key_index = new uint[bench->config->MemTable_capacity/2]{0};
     int finish = 0;
-    __uint128_t temp_key;
+    uint64_t temp_key;
     uint taken_id = 0;
     struct timeval bg_start = get_cur_time();
     while(finish<bench->config->MemTable_capacity/2){
@@ -306,7 +306,7 @@ void *crash_merge_dump(void *arg){
     key_value *temp_kvs = new key_value[bench->SSTable_kv_capacity];
     uint *key_index = new uint[bench->config->MemTable_capacity/2]{0};
     int finish = 0;
-    __uint128_t temp_key;
+    uint64_t temp_key;
     uint taken_id = 0;
     struct timeval bg_start = get_cur_time();
     while(finish<bench->MemTable_count){
@@ -380,15 +380,10 @@ void *straight_dump(void *arg){
     bench->bg_run[old_big].end_time_max = bench->end_time_max;
     bench->end_time_min = bench->end_time_max;              //new min = old max
     bench->bg_run[old_big].first_widpid = new uint64_t[bench->config->SSTable_count];
-//    bench->bg_run[old_big].wids = new unsigned short[bench->config->num_objects];
-//    bench->bg_run[old_big].bitmaps = new unsigned char[bench->bitmaps_size];
-    bench->bg_run[old_big].wids = new unsigned short(*bench->h_wids[offset]);       //deep copy
-    for(int i = 1111111; i < 2222222; i++){
-        if(bench->bg_run[old_big].wids[i]!=0){
-            cout<<i<<"copy right"<<bench->bg_run[old_big].wids[i]<<endl;
-        }
-    }
-    bench->bg_run[old_big].bitmaps = new unsigned char(*bench->h_bitmaps[offset]);
+    bench->bg_run[old_big].wids = new unsigned short[bench->config->num_objects];
+    copy(bench->h_bitboxs[offset], bench->h_bitboxs[offset] + bench->config->num_objects, bench->bg_run[old_big].wids);
+    bench->bg_run[old_big].bitmaps = new unsigned char[bench->bitmaps_size];
+    copy(bench->h_bitmaps[offset], bench->h_bitmaps[offset] + bench->bitmaps_size, bench->bg_run[old_big].bitmaps);
     bench->bg_run[old_big].bitmap_mbrs = new box[bench->config->SSTable_count];
 
     cout<<"sst_capacity:"<<bench->SSTable_kv_capacity<<endl;
