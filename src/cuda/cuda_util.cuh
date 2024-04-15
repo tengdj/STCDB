@@ -153,8 +153,12 @@ uint get_value_end(uint64_t value);
 __host__
 inline void print_parse_key(uint64_t key){
     cout<<"key:"<<key<<endl;
-    cout<<"wid low:"<<get_key_pid(key)<<endl;
-    cout<<"pid:"<<get_key_hilbert_id(key)<<endl;
+    uint wid_low = get_key_hilbert_id(key);
+    cout<<"wid low:"<<wid_low<<endl;
+    uint first_low0, first_low1;
+    d2xy(FIRST_HILBERT_BIT/2, wid_low, first_low0, first_low1);
+    cout<<first_low0<<" , "<<first_low1<<endl;
+    cout<<"pid:"<<get_key_pid(key)<<endl;
 }
 
 __host__

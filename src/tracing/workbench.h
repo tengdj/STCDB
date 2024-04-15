@@ -192,7 +192,7 @@ public:
     unsigned short * d_bitboxs = NULL;              //first hilbert, 2:1 num_objects(2 shorts for a box)
     unsigned short ** h_bitboxs = NULL;
     //unsigned short * same_pid_count = NULL;
-    box * kv_boxs = NULL;       //real box, 1:1 kv
+    box * kv_boxs = NULL;                           //real box, 1:1 kv
 
     pthread_mutex_t mutex_i;
     bool interrupted = false;
@@ -287,6 +287,8 @@ public:
     bool search_memtable(uint64_t pid);
     bool search_in_disk(uint pid, uint timestamp);
     bool mbr_search_in_disk(box b, uint timestamp);
+
+    box parse_to_real_mbr(unsigned short first_low, unsigned short first_high, uint64_t value);
 };
 extern void lookup_rec(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);
 extern void lookup_stack(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);

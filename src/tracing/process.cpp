@@ -195,171 +195,171 @@ inline bool BloomFilter_Check(workbench *bench, uint sst, uint pid){
     return true;
 }
 
-void *merge_dump(void *arg){
-    cout<<"step into the sst_dump"<<endl;
-    workbench *bench = (workbench *)arg;
-    cout<<"cur_time: "<<bench->cur_time<<endl;
-    uint offset = 0;
-    assert(bench->config->MemTable_capacity%2==0);
-    uint old_big = bench->big_sorted_run_count;                 //atomic add
-    cout<<"old big_sorted_run_count: "<<old_big<<endl;
-    bench->big_sorted_run_count++;
-    if(old_big%2==1){
-        offset = bench->config->MemTable_capacity/2;
-    }
-    bench->bg_run[old_big].start_time_min = bench->start_time_min;
-    bench->bg_run[old_big].start_time_max = bench->start_time_max;
-    bench->bg_run[old_big].end_time_min = bench->end_time_min;
-    bench->bg_run[old_big].end_time_max = bench->end_time_max;
-    bench->end_time_min = bench->end_time_max;              //new min = old max
-    bench->bg_run[old_big].first_widpid = new uint64_t[bench->config->SSTable_count];
-
-    //merge sort
-    ofstream SSTable_of;
-    //bool of_open = false;
-    uint kv_count = 0;
-    uint sst_count = 0;
-    cout<<"sst_capacity:"<<bench->SSTable_kv_capacity<<endl;
-    key_value *temp_kvs = new key_value[bench->SSTable_kv_capacity];
-    uint *key_index = new uint[bench->config->MemTable_capacity/2]{0};
-    int finish = 0;
-    uint64_t temp_key;
-    uint taken_id = 0;
-    struct timeval bg_start = get_cur_time();
-    while(finish<bench->config->MemTable_capacity/2){
-        if(kv_count==0){
-            SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out | ios::trunc);
-            assert(SSTable_of.is_open());
-            bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
-        }
-        finish = 0;
-        temp_key = UINT64_MAX;
-        taken_id = 0;
-        for(int i=0;i<bench->config->MemTable_capacity/2; i++){
-            if(key_index[i]>= bench->config->kv_restriction){              //empty kv
-                finish++;
-                continue;
-            }
-            if( temp_key > bench->h_keys[offset+i][key_index[i]] ){
-                temp_key = bench->h_keys[offset+i][key_index[i]];
-                taken_id = i;
-            }
-        }
-        if(finish<bench->config->MemTable_capacity/2){
-            temp_kvs[kv_count].key = temp_key;
-            temp_kvs[kv_count].value = bench->h_values[offset + taken_id][key_index[taken_id]];     //box
-            if(kv_count==0){
-                bench->bg_run[old_big].first_widpid[sst_count] = temp_key >> 23;
-            }
-            bench->h_keys[offset + taken_id][key_index[taken_id]] = 0;                                     //init
-            key_index[taken_id]++;                                                                  // one while, one kv
-            kv_count++;
-        }
-        if(kv_count==bench->SSTable_kv_capacity||finish==bench->config->MemTable_capacity/2){
-            bench->pro.bg_merge_time += get_time_elapsed(bg_start,true);
-            SSTable_of.write((char *)temp_kvs, sizeof(key_value)*kv_count);
-            SSTable_of.flush();
-            SSTable_of.close();
-            bench->pro.bg_flush_time += get_time_elapsed(bg_start,true);
-            sst_count++;
-            kv_count = 0;
-        }
-    }
-    fprintf(stdout,"\tmerge sort:\t%.2f\n",bench->pro.bg_merge_time);
-    fprintf(stdout,"\tflush:\t%.2f\n",bench->pro.bg_flush_time);
-    fprintf(stdout,"\topen:\t%.2f\n",bench->pro.bg_open_time);
-    cout<<"sst_count :"<<sst_count<<" less than"<<1024<<endl;
-    for(int i=0;i<bench->config->MemTable_capacity/2; i++){
-        cout<<"key_index"<<key_index[i]<<endl;
-    }
-    delete[] key_index;
-    bench->bg_run[old_big].print_meta();
-    //logt("merge sort and flush", bg_start);
-    return NULL;
-}
-
-void *crash_merge_dump(void *arg){
-    cout<<"step into the sst_dump"<<endl;
-    workbench *bench = (workbench *)arg;
-    cout<<"cur_time: "<<bench->cur_time<<endl;
-    uint offset = 0;
-    assert(bench->config->MemTable_capacity%2==0);
-    uint old_big = bench->big_sorted_run_count;                 //atomic add
-    cout<<"old big_sorted_run_count: "<<old_big<<endl;
-    bench->big_sorted_run_count++;
-    if(old_big%2==1){
-        offset = bench->config->MemTable_capacity/2;
-    }
-    bench->bg_run[old_big].start_time_min = bench->start_time_min;
-    bench->bg_run[old_big].start_time_max = bench->start_time_max;
-    bench->bg_run[old_big].end_time_min = bench->end_time_min;
-    bench->bg_run[old_big].end_time_max = bench->end_time_max;
-    bench->end_time_min = bench->end_time_max;              //new min = old max
-    bench->bg_run[old_big].first_widpid = new uint64_t[bench->config->SSTable_count];
-
-    //merge sort
-    ofstream SSTable_of;
-    //bool of_open = false;
-    uint kv_count = 0;
-    uint sst_count = 0;
-    cout<<"sst_capacity:"<<bench->SSTable_kv_capacity<<endl;
-    key_value *temp_kvs = new key_value[bench->SSTable_kv_capacity];
-    uint *key_index = new uint[bench->config->MemTable_capacity/2]{0};
-    int finish = 0;
-    uint64_t temp_key;
-    uint taken_id = 0;
-    struct timeval bg_start = get_cur_time();
-    while(finish<bench->MemTable_count){
-        if(kv_count==0){
-            SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out | ios::trunc);
-            assert(SSTable_of.is_open());
-            bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
-        }
-        finish = 0;
-        temp_key = UINT64_MAX;
-        taken_id = 0;
-        for(int i=0;i<bench->MemTable_count; i++){
-            if( bench->h_keys[offset+i][key_index[i]] == 0){              //empty kv
-                finish++;
-                continue;
-            }
+//void *merge_dump(void *arg){
+//    cout<<"step into the sst_dump"<<endl;
+//    workbench *bench = (workbench *)arg;
+//    cout<<"cur_time: "<<bench->cur_time<<endl;
+//    uint offset = 0;
+//    assert(bench->config->MemTable_capacity%2==0);
+//    uint old_big = bench->big_sorted_run_count;                 //atomic add
+//    cout<<"old big_sorted_run_count: "<<old_big<<endl;
+//    bench->big_sorted_run_count++;
+//    if(old_big%2==1){
+//        offset = bench->config->MemTable_capacity/2;
+//    }
+//    bench->bg_run[old_big].start_time_min = bench->start_time_min;
+//    bench->bg_run[old_big].start_time_max = bench->start_time_max;
+//    bench->bg_run[old_big].end_time_min = bench->end_time_min;
+//    bench->bg_run[old_big].end_time_max = bench->end_time_max;
+//    bench->end_time_min = bench->end_time_max;              //new min = old max
+//    bench->bg_run[old_big].first_widpid = new uint64_t[bench->config->SSTable_count];
+//
+//    //merge sort
+//    ofstream SSTable_of;
+//    //bool of_open = false;
+//    uint kv_count = 0;
+//    uint sst_count = 0;
+//    cout<<"sst_capacity:"<<bench->SSTable_kv_capacity<<endl;
+//    key_value *temp_kvs = new key_value[bench->SSTable_kv_capacity];
+//    uint *key_index = new uint[bench->config->MemTable_capacity/2]{0};
+//    int finish = 0;
+//    uint64_t temp_key;
+//    uint taken_id = 0;
+//    struct timeval bg_start = get_cur_time();
+//    while(finish<bench->config->MemTable_capacity/2){
+//        if(kv_count==0){
+//            SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out | ios::trunc);
+//            assert(SSTable_of.is_open());
+//            bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
+//        }
+//        finish = 0;
+//        temp_key = UINT64_MAX;
+//        taken_id = 0;
+//        for(int i=0;i<bench->config->MemTable_capacity/2; i++){
 //            if(key_index[i]>= bench->config->kv_restriction){              //empty kv
 //                finish++;
 //                continue;
 //            }
-            if( temp_key > bench->h_keys[offset+i][key_index[i]] ){
-                temp_key = bench->h_keys[offset+i][key_index[i]];
-                taken_id = i;
-            }
-        }
-        if(finish<bench->MemTable_count){
-            temp_kvs[kv_count].key = temp_key;
-            temp_kvs[kv_count].value = bench->h_values[offset + taken_id][key_index[taken_id]];     //box
-            if(kv_count==0){
-                bench->bg_run[old_big].first_widpid[sst_count] = temp_key >> 23;
-            }
-            bench->h_keys[offset + taken_id][key_index[taken_id]] = 0;                                     //init
-            key_index[taken_id]++;                                                                  // one while, one kv
-            kv_count++;
-        }
-        if(kv_count==bench->SSTable_kv_capacity||finish==bench->MemTable_count){
-            bench->pro.bg_merge_time += get_time_elapsed(bg_start,true);
-            SSTable_of.write((char *)temp_kvs, sizeof(key_value)*kv_count);
-            SSTable_of.flush();
-            SSTable_of.close();
-            bench->pro.bg_flush_time += get_time_elapsed(bg_start,true);
-            sst_count++;
-            kv_count = 0;
-        }
-    }
-    cout<<"sst_count :"<<sst_count<<" less than"<<1024<<endl;
-    for(int i=0;i<bench->MemTable_count; i++){
-        cout<<"key_index"<<key_index[i]<<endl;
-    }
-    delete[] key_index;
-    bench->bg_run[old_big].print_meta();
-    return NULL;
-}
+//            if( temp_key > bench->h_keys[offset+i][key_index[i]] ){
+//                temp_key = bench->h_keys[offset+i][key_index[i]];
+//                taken_id = i;
+//            }
+//        }
+//        if(finish<bench->config->MemTable_capacity/2){
+//            temp_kvs[kv_count].key = temp_key;
+//            temp_kvs[kv_count].value = bench->h_values[offset + taken_id][key_index[taken_id]];     //box
+//            if(kv_count==0){
+//                bench->bg_run[old_big].first_widpid[sst_count] = temp_key >> 23;
+//            }
+//            bench->h_keys[offset + taken_id][key_index[taken_id]] = 0;                                     //init
+//            key_index[taken_id]++;                                                                  // one while, one kv
+//            kv_count++;
+//        }
+//        if(kv_count==bench->SSTable_kv_capacity||finish==bench->config->MemTable_capacity/2){
+//            bench->pro.bg_merge_time += get_time_elapsed(bg_start,true);
+//            SSTable_of.write((char *)temp_kvs, sizeof(key_value)*kv_count);
+//            SSTable_of.flush();
+//            SSTable_of.close();
+//            bench->pro.bg_flush_time += get_time_elapsed(bg_start,true);
+//            sst_count++;
+//            kv_count = 0;
+//        }
+//    }
+//    fprintf(stdout,"\tmerge sort:\t%.2f\n",bench->pro.bg_merge_time);
+//    fprintf(stdout,"\tflush:\t%.2f\n",bench->pro.bg_flush_time);
+//    fprintf(stdout,"\topen:\t%.2f\n",bench->pro.bg_open_time);
+//    cout<<"sst_count :"<<sst_count<<" less than"<<1024<<endl;
+//    for(int i=0;i<bench->config->MemTable_capacity/2; i++){
+//        cout<<"key_index"<<key_index[i]<<endl;
+//    }
+//    delete[] key_index;
+//    bench->bg_run[old_big].print_meta();
+//    //logt("merge sort and flush", bg_start);
+//    return NULL;
+//}
+//
+//void *crash_merge_dump(void *arg){
+//    cout<<"step into the sst_dump"<<endl;
+//    workbench *bench = (workbench *)arg;
+//    cout<<"cur_time: "<<bench->cur_time<<endl;
+//    uint offset = 0;
+//    assert(bench->config->MemTable_capacity%2==0);
+//    uint old_big = bench->big_sorted_run_count;                 //atomic add
+//    cout<<"old big_sorted_run_count: "<<old_big<<endl;
+//    bench->big_sorted_run_count++;
+//    if(old_big%2==1){
+//        offset = bench->config->MemTable_capacity/2;
+//    }
+//    bench->bg_run[old_big].start_time_min = bench->start_time_min;
+//    bench->bg_run[old_big].start_time_max = bench->start_time_max;
+//    bench->bg_run[old_big].end_time_min = bench->end_time_min;
+//    bench->bg_run[old_big].end_time_max = bench->end_time_max;
+//    bench->end_time_min = bench->end_time_max;              //new min = old max
+//    bench->bg_run[old_big].first_widpid = new uint64_t[bench->config->SSTable_count];
+//
+//    //merge sort
+//    ofstream SSTable_of;
+//    //bool of_open = false;
+//    uint kv_count = 0;
+//    uint sst_count = 0;
+//    cout<<"sst_capacity:"<<bench->SSTable_kv_capacity<<endl;
+//    key_value *temp_kvs = new key_value[bench->SSTable_kv_capacity];
+//    uint *key_index = new uint[bench->config->MemTable_capacity/2]{0};
+//    int finish = 0;
+//    uint64_t temp_key;
+//    uint taken_id = 0;
+//    struct timeval bg_start = get_cur_time();
+//    while(finish<bench->MemTable_count){
+//        if(kv_count==0){
+//            SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out | ios::trunc);
+//            assert(SSTable_of.is_open());
+//            bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
+//        }
+//        finish = 0;
+//        temp_key = UINT64_MAX;
+//        taken_id = 0;
+//        for(int i=0;i<bench->MemTable_count; i++){
+//            if( bench->h_keys[offset+i][key_index[i]] == 0){              //empty kv
+//                finish++;
+//                continue;
+//            }
+////            if(key_index[i]>= bench->config->kv_restriction){              //empty kv
+////                finish++;
+////                continue;
+////            }
+//            if( temp_key > bench->h_keys[offset+i][key_index[i]] ){
+//                temp_key = bench->h_keys[offset+i][key_index[i]];
+//                taken_id = i;
+//            }
+//        }
+//        if(finish<bench->MemTable_count){
+//            temp_kvs[kv_count].key = temp_key;
+//            temp_kvs[kv_count].value = bench->h_values[offset + taken_id][key_index[taken_id]];     //box
+//            if(kv_count==0){
+//                bench->bg_run[old_big].first_widpid[sst_count] = temp_key >> 23;
+//            }
+//            bench->h_keys[offset + taken_id][key_index[taken_id]] = 0;                                     //init
+//            key_index[taken_id]++;                                                                  // one while, one kv
+//            kv_count++;
+//        }
+//        if(kv_count==bench->SSTable_kv_capacity||finish==bench->MemTable_count){
+//            bench->pro.bg_merge_time += get_time_elapsed(bg_start,true);
+//            SSTable_of.write((char *)temp_kvs, sizeof(key_value)*kv_count);
+//            SSTable_of.flush();
+//            SSTable_of.close();
+//            bench->pro.bg_flush_time += get_time_elapsed(bg_start,true);
+//            sst_count++;
+//            kv_count = 0;
+//        }
+//    }
+//    cout<<"sst_count :"<<sst_count<<" less than"<<1024<<endl;
+//    for(int i=0;i<bench->MemTable_count; i++){
+//        cout<<"key_index"<<key_index[i]<<endl;
+//    }
+//    delete[] key_index;
+//    bench->bg_run[old_big].print_meta();
+//    return NULL;
+//}
 
 void *straight_dump(void *arg){
     cout<<"step into the sst_dump"<<endl;
@@ -380,8 +380,8 @@ void *straight_dump(void *arg){
     bench->bg_run[old_big].end_time_max = bench->end_time_max;
     bench->end_time_min = bench->end_time_max;              //new min = old max
     bench->bg_run[old_big].first_widpid = new uint64_t[bench->config->SSTable_count];
-    bench->bg_run[old_big].wids = new unsigned short[bench->config->num_objects];
-    copy(bench->h_bitboxs[offset], bench->h_bitboxs[offset] + bench->config->num_objects, bench->bg_run[old_big].wids);
+    bench->bg_run[old_big].bitboxs = new unsigned short[2*bench->config->num_objects];
+    copy(bench->h_bitboxs[offset], bench->h_bitboxs[offset] + 2*bench->config->num_objects, bench->bg_run[old_big].bitboxs);
     bench->bg_run[old_big].bitmaps = new unsigned char[bench->bitmaps_size];
     copy(bench->h_bitmaps[offset], bench->h_bitmaps[offset] + bench->bitmaps_size, bench->bg_run[old_big].bitmaps);
     bench->bg_run[old_big].bitmap_mbrs = new box[bench->config->SSTable_count];
@@ -394,7 +394,7 @@ void *straight_dump(void *arg){
     uint sst_count = 0;
     struct timeval bg_start = get_cur_time();
     for(uint sst_count=0;sst_count<bench->config->SSTable_count;sst_count++){
-        bench->bg_run[old_big].first_widpid[sst_count] = bench->h_keys[offset][total_index] >> 23;
+        bench->bg_run[old_big].first_widpid[sst_count] = bench->h_keys[offset][total_index];
         for(small_index = 0; small_index < bench->SSTable_kv_capacity; small_index++,total_index++){
             temp_kvs[small_index].key = bench->h_keys[offset][total_index];
             temp_kvs[small_index].value = bench->h_values[offset][total_index];
@@ -642,6 +642,37 @@ void tracer::process(){
                 if(bench->big_sorted_run_count%2==1){
                     offset = bench->config->MemTable_capacity/2;
                 }
+
+
+                Point * bit_points = new Point[bench->bit_count];
+                uint count_p;
+                for(uint j = 0;j<bench->config->SSTable_count;j++){
+                    //cerr<<"bitmap"<<j<<endl;
+                    cerr<<endl;
+                    count_p = 0;
+                    bool is_print = false;
+                    for(uint i=0;i<bench->bit_count;i++){
+                        if(bench->h_bitmaps[offset][j*(bench->bit_count/8) + i/8] & (1<<(i%8))){
+                            if(!is_print){
+                                cout<<i<<"in SST"<<j<<endl;
+                                is_print = true;
+                            }
+                            Point bit_p = new Point;
+                            uint x=0,y=0;
+                            d2xy(bench->bitmap_edge_length,i,x,y);
+                            bit_p.x = (double)x/255*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 255;
+                            bit_p.y = (double)y/255*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 255;
+                            bit_points[count_p] = bit_p;
+                            count_p++;
+                        }
+                    }
+                    cout<<"bit_points.size():"<<count_p<<endl;
+                    print_points(bit_points,count_p);
+                }
+
+
+
+
                 bench->end_time_max = bench->cur_time;              //old max
                 cout<<"start_time_min:"<<bench->start_time_min<<"start_time_max:"<<bench->start_time_max<<"bench->end_time_max:"<<bench->end_time_max<<endl;
                 bench->MemTable_count = 0;
@@ -659,13 +690,13 @@ void tracer::process(){
                 while(bench->dumping){
                     sleep(1);
                 }
-//                box b(-87.8, 41.8, -87.7, 41.9);
-//                b.print();
-//                bench->mbr_search_in_disk(b, 15);
-                uint pid = 1111111;
-                while(!bench->search_in_disk(pid, 15)){
-                    pid++;
-                }
+                box b(-87.8, 41.8, -87.7, 41.9);
+                b.print();
+                bench->mbr_search_in_disk(b, 15);
+//                uint pid = 1111111;
+//                while(!bench->search_in_disk(pid, 15)){
+//                    pid++;
+//                }
 
             }
 
