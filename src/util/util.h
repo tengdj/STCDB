@@ -33,17 +33,18 @@ namespace{
 #define OSM_SRID 4326
 #define PI 3.14159265
 #define ULL_MAX (unsigned long long)1<<62
+#define BLOCK_DIM 1024
 // some utility function
 
 #define __BLOOMFILTER_VERSION__ "1.1"
 #define __MGAIC_CODE__          (0x01464C42)
 #define MIX_UINT64(v)       ((uint32_t)((v>>32)^(v)))
 
-#define FIRST_HILBERT_BIT 16
-#define SECOND_HILBERT_BIT 8
+#define WID_BIT 16
 #define PID_BIT 26
+#define MBR_BIT 36
 #define DURATION_BIT 12
-#define END_BIT 10
+#define END_BIT 12
 
 
 const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
@@ -57,7 +58,6 @@ const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
         return 360.0/(sin((90-absla)*PI/180)*40076.0*1000.0);
     }
 
-
     inline size_t cantorPairing(uint pid1, uint pid2){
         return (size_t)(pid1+pid2)*(pid1+pid2+1)/2+pid2;
     }
@@ -69,7 +69,6 @@ const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
         uint x = (uint)(w - y);
         return pair<uint,uint>(x,y);
     }
-
 
     inline int double_to_int(double val){
         int vi = (int)val;

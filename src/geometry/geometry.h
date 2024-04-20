@@ -226,6 +226,11 @@ public:
 
 };
 
+class f_box{
+public:
+    float low[2] = {100000.0,100000.0};
+    float high[2] = {-100000.0,-100000.0};
+};
 
 class Grid{
 

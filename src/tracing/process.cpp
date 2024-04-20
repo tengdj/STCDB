@@ -380,11 +380,12 @@ void *straight_dump(void *arg){
     bench->bg_run[old_big].end_time_max = bench->end_time_max;
     bench->end_time_min = bench->end_time_max;              //new min = old max
     bench->bg_run[old_big].first_widpid = new uint64_t[bench->config->SSTable_count];
-    bench->bg_run[old_big].bitboxs = new unsigned short[2*bench->config->num_objects];
-    copy(bench->h_bitboxs[offset], bench->h_bitboxs[offset] + 2*bench->config->num_objects, bench->bg_run[old_big].bitboxs);
+    bench->bg_run[old_big].wids = new unsigned short[bench->config->num_objects];
+    copy(bench->h_wids[offset], bench->h_wids[offset] + bench->config->num_objects, bench->bg_run[old_big].wids);
     bench->bg_run[old_big].bitmaps = new unsigned char[bench->bitmaps_size];
     copy(bench->h_bitmaps[offset], bench->h_bitmaps[offset] + bench->bitmaps_size, bench->bg_run[old_big].bitmaps);
     bench->bg_run[old_big].bitmap_mbrs = new box[bench->config->SSTable_count];
+    copy(bench->h_bitmap_mbrs[offset], bench->h_bitmap_mbrs[offset] + bench->config->SSTable_count, bench->bg_run[old_big].bitmap_mbrs);
 
     cout<<"sst_capacity:"<<bench->SSTable_kv_capacity<<endl;
     ofstream SSTable_of;
@@ -414,25 +415,26 @@ void *straight_dump(void *arg){
     fprintf(stdout,"\topen:\t%.2f\n",bench->pro.bg_open_time);
     cout<<"sst_count :"<<sst_count<<" less than"<<1024<<endl;
 
-    //Point * bit_points = new Point[bench->bit_count];
-    uint count_p;
-    Point bit_p;
-    for(uint j = 0;j<bench->config->SSTable_count;j++){
-        count_p = 0;
-        for(uint i=0;i<bench->bit_count;i++){
-            if(bench->h_bitmaps[offset][j*(bench->bit_count/8) + i/8] & (1<<(i%8))){
-                uint x=0,y=0;
-                d2xy(bench->bitmap_edge_length,i,x,y);
-                bit_p.x = (double)x/255*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 255;
-                bit_p.y = (double)y/255*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 255;
-                //bit_points[count_p] = bit_p;
-                bench->bg_run[old_big].bitmap_mbrs[j].update(bit_p);
-                count_p++;
-            }
-        }
-        cout<<"bit_points.size():"<<count_p<<endl;
-        //print_points(bit_points,count_p);
-    }
+//    //Point * bit_points = new Point[bench->bit_count];
+//    uint count_p;
+//    Point bit_p;
+//    for(uint j = 0;j<bench->config->SSTable_count;j++){
+//        count_p = 0;
+//        for(uint i=0;i<bench->bit_count;i++){
+//            if(bench->h_bitmaps[offset][j*(bench->bit_count/8) + i/8] & (1<<(i%8))){
+//                uint x=0,y=0;
+//                d2xy(bench->bitmap_edge_length,i,x,y);
+//                bit_p.x = (double)x/255*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * 255;
+//                bit_p.y = (double)y/255*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * 255;
+//                //bit_points[count_p] = bit_p;
+//                bench->bg_run[old_big].bitmap_mbrs[j].update(bit_p);
+//                count_p++;
+//            }
+//        }
+//        cout<<"bit_points.size():"<<count_p<<endl;
+//        //print_points(bit_points,count_p);
+//    }
+
     bench->bg_run[old_big].print_meta();
     //logt("merge sort and flush", bg_start);
     //delete[] bit_points;
@@ -670,9 +672,6 @@ void tracer::process(){
                     print_points(bit_points,count_p);
                 }
 
-
-
-
                 bench->end_time_max = bench->cur_time;              //old max
                 cout<<"start_time_min:"<<bench->start_time_min<<"start_time_max:"<<bench->start_time_max<<"bench->end_time_max:"<<bench->end_time_max<<endl;
                 bench->MemTable_count = 0;
@@ -686,19 +685,19 @@ void tracer::process(){
 
                 //bool findit = searchkv_in_all_place(bench, 2);
             }
-            if(bench->cur_time == 48){
-                while(bench->dumping){
-                    sleep(1);
-                }
-                box b(-87.8, 41.8, -87.7, 41.9);
-                b.print();
-                bench->mbr_search_in_disk(b, 15);
-//                uint pid = 1111111;
-//                while(!bench->search_in_disk(pid, 15)){
-//                    pid++;
+//            if(bench->cur_time == 48){
+//                while(bench->dumping){
+//                    sleep(1);
 //                }
-
-            }
+//                box b(-87.8, 41.8, -87.7, 41.9);
+//                b.print();
+//                bench->mbr_search_in_disk(b, 15);
+////                uint pid = 1111111;
+////                while(!bench->search_in_disk(pid, 15)){
+////                    pid++;
+////                }
+//
+//            }
 
 //            if(bench->cur_time == 30){
 //                box b(-87.8, 41.9, -87.7, 42);

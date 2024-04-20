@@ -150,7 +150,7 @@ public:
 //	uint meeting_counter = 0;
 
     //for space for cuda sort
-    uint64_t *d_keys = NULL;
+    __uint128_t *d_keys = NULL;
     uint64_t *d_values = NULL;
     uint kv_count = 0;
 
@@ -189,10 +189,12 @@ public:
     uint bitmap_edge_length = 0;
     uint bit_count = 0;         //256*256=65536  SSTable_count bitmap
     uint bitmaps_size = 0;
-    unsigned short * d_bitboxs = NULL;              //first hilbert, 2:1 num_objects(2 shorts for a box)
-    unsigned short ** h_bitboxs = NULL;
-    //unsigned short * same_pid_count = NULL;
-    box * kv_boxs = NULL;                           //real box, 1:1 kv
+    unsigned short * d_wids = NULL;
+    unsigned short ** h_wids = NULL;
+    f_box * kv_boxs = NULL;                           //real box, 1:1 kv
+    box * d_bitmap_mbrs = NULL;
+    box ** h_bitmap_mbrs = NULL;
+
 
     pthread_mutex_t mutex_i;
     bool interrupted = false;

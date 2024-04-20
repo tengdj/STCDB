@@ -130,49 +130,39 @@ __host__ __device__
 float uint_to_float(uint f);
 
 __host__ __device__
-uint get_key_hilbert_id(uint64_t key);
+uint get_key_wid(__uint128_t key);
 
 __host__ __device__
-uint get_key_pid(uint64_t key);
+uint get_key_pid(__uint128_t key);
+
+//__host__ __device__
+//uint get_value_mbr_low(__uint128_t key);
+//
+//__host__ __device__
+//uint get_value_mbr_high(__uint128_t key);
 
 __host__ __device__
-uint get_value_mbr_low(uint64_t value);
+uint get_key_target(__uint128_t key);
 
 __host__ __device__
-uint get_value_mbr_high(uint64_t value);
+uint get_key_duration(__uint128_t key);
 
 __host__ __device__
-uint get_value_target(uint64_t value);
-
-__host__ __device__
-uint get_value_duration(uint64_t value);
-
-__host__ __device__
-uint get_value_end(uint64_t value);
+uint get_key_end(__uint128_t key);
 
 __host__
-inline void print_parse_key(uint64_t key){
-    cout<<"key:"<<key<<endl;
-    uint wid_low = get_key_hilbert_id(key);
-    cout<<"wid low:"<<wid_low<<endl;
+inline void print_parse_key(__uint128_t key){
+    print_128(key);
+    cout<<endl;
+    uint wid = get_key_wid(key);
+    cout<<"wid:"<<wid<<endl;
     uint first_low0, first_low1;
-    d2xy(FIRST_HILBERT_BIT/2, wid_low, first_low0, first_low1);
-    cout<<first_low0<<" , "<<first_low1<<endl;
+    d2xy(WID_BIT, wid, first_low0, first_low1);
     cout<<"pid:"<<get_key_pid(key)<<endl;
-}
-
-__host__
-inline void print_parse_value(uint64_t value){
-    cout<<"value:"<<value<<endl;
-    uint low = get_value_mbr_low(value);
-    uint high = get_value_mbr_high(value);
-    uint second_low0, second_low1, second_high0, second_high1;
-    d2xy(SECOND_HILBERT_BIT/2, low, second_low0, second_low1);
-    d2xy(SECOND_HILBERT_BIT/2, high, second_high0, second_high1);
-    cout<<"("<<second_low0<<","<<second_low1<<")-("<<second_high0<<","<<second_high1<<")"<<endl;
-    cout<<"target:"<<get_value_target(value)<<endl;
-    cout<<"duration:"<<get_value_duration(value)<<endl;
-    cout<<"end offset:"<<get_value_end(value)<<endl;
+    //mbr
+    cout<<"target:"<<get_key_target(key)<<endl;
+    cout<<"duration:"<<get_key_duration(key)<<endl;
+    cout<<"end offset:"<<get_key_end(key)<<endl;
 }
 
 #endif /* CUDA_UTIL_CUH_ */
