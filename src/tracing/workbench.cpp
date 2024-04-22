@@ -25,7 +25,6 @@ workbench::workbench(workbench *bench):workbench(bench->config){
     if(true){
         bit_count = bench->bit_count;
         bitmaps_size = bench->bitmaps_size;
-        bitmap_edge_length = bench->bitmap_edge_length;
     }
 }
 
@@ -130,21 +129,14 @@ void workbench::claim_space(){
 //		meeting_buckets[i].key = ULL_MAX;
 //	}
 
-    size = config->MemTable_capacity * sizeof(uint64_t *);                 //sort
-    h_keys = (uint64_t **)allocate(size);
+    size = config->MemTable_capacity * sizeof(__uint128_t *);                 //sort
+    h_keys = (__uint128_t **)allocate(size);
     //log("\t%.2f MB\tmeeting bucket space",size/1024.0/1024.0);
 
-    size = config->MemTable_capacity * sizeof(uint64_t *);
-    h_values = (uint64_t **)allocate(size);
-
-    for(int i=0;i<config->MemTable_capacity; i++){
-        size = config->kv_capacity*sizeof(uint64_t);
-        h_keys[i] = (uint64_t *)allocate(size);
+    for(int i=0; i<config->MemTable_capacity; i++){
+        size = config->kv_capacity*sizeof(__uint128_t);
+        h_keys[i] = (__uint128_t *)allocate(size);
         log("\t%.2f MB\ta element of h_keys",size/1024.0/1024.0);
-
-        size = config->kv_capacity*sizeof(uint64_t);
-        h_values[i] = (uint64_t *)allocate(size);
-        log("\t%.2f MB\ta element of h_values",size/1024.0/1024.0);
     }
 
     size = config->search_single_capacity*sizeof(search_info_unit);                   //search
@@ -194,10 +186,10 @@ void workbench::claim_space(){
 
 box workbench::bit_box(box b){
     box new_b;
-    new_b.low[0] = (b.low[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * 255;
-    new_b.low[1] = (b.low[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * 255;
-    new_b.high[0] = (b.high[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * 255;
-    new_b.high[1] = (b.high[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * 255;
+    new_b.low[0] = (b.low[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
+    new_b.low[1] = (b.low[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
+    new_b.high[0] = (b.high[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
+    new_b.high[1] = (b.high[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
     return new_b;
 }
 
@@ -273,17 +265,20 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
     cout<<"disk search "<<pid<<endl;
     bool ret = false;
     for(int i=0;i<big_sorted_run_count;i++) {
-        if ( (bg_run[i].start_time_min < timestamp)&&(timestamp < bg_run[i].end_time_max)) {
+        if ( (bg_run[i].start_time_min < timestamp)&&(timestamp < bg_run[i].end_time_max) ) {
             cout<<"big_sorted_run_num:"<<i<<endl;
-            uint wp = pid;
+            uint64_t wp = pid;
             if(bg_run[i].wids[pid] == 0){
                 continue;
             }
             else{
-                wp += bg_run[i].wids[pid] << 25;
+                wp += ((uint64_t)bg_run[i].wids[pid] << PID_BIT);
                 cout<<"wp: "<<wp<<endl;
             }
-            bg_run[i].sst = new SSTable[config->SSTable_count];                   //maybe useful later, should not delete after this func , if(!NULL)
+            if(!bg_run[i].sst){
+                cout<<"new SSTables"<<endl;
+                bg_run[i].sst = new SSTable[config->SSTable_count];                   //maybe useful later, should not delete after this func , if(!NULL)
+            }
             ifstream read_sst;
 
             //high level binary search
@@ -313,15 +308,17 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                 if(high<0){
                     high = 0;
                 }
-                string filename = "../store/SSTable_"+to_string(i)+"-"+to_string(high);
-                cout<<filename<<endl;
-                read_sst.open(filename);                   //final place is not high+1, but high
-                assert(read_sst.is_open());
-
-                bg_run[i].sst[high].kv = new key_value[SSTable_kv_capacity];
-                read_sst.read((char *)bg_run[i].sst[high].kv,sizeof(key_value)*SSTable_kv_capacity);
-                read_sst.close();
-                ret |= bg_run[i].sst[high].search_SSTable(wp,search_multi,search_multi_length,search_multi_pid);
+                if(!bg_run[i].sst[high].keys){
+                    cout<<"new SSTables keys"<<high<<endl;
+                    string filename = "../store/SSTable_"+to_string(i)+"-"+to_string(high);
+                    cout<<filename<<endl;
+                    read_sst.open(filename);                   //final place is not high+1, but high
+                    assert(read_sst.is_open());
+                    bg_run[i].sst[high].keys = new __uint128_t [SSTable_kv_capacity];
+                    read_sst.read((char *)bg_run[i].sst[high].keys,sizeof(__uint128_t)*SSTable_kv_capacity);
+                    read_sst.close();
+                }
+                ret |= bg_run[i].sst[high].search_SSTable(wp,search_multi,SSTable_kv_capacity,search_multi_length,search_multi_pid);
                 continue;
             }
             cout<<"high level binary search finish and find"<<endl;
@@ -335,30 +332,34 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                     break;
                 }
             }
-            read_sst.open("../store/SSTable_"+to_string(i)+"-"+to_string(pid_start));
-            assert(read_sst.is_open());
-            bg_run[i].sst[pid_start].kv = new key_value[SSTable_kv_capacity];
-            read_sst.read((char *)bg_run[i].sst[pid_start].kv,sizeof(key_value)*SSTable_kv_capacity);
-            bg_run[i].sst[pid_start].search_SSTable(pid,search_multi,search_multi_length,search_multi_pid);
-            read_sst.close();
+            if(!bg_run[i].sst[pid_start].keys){
+                read_sst.open("../store/SSTable_"+to_string(i)+"-"+to_string(pid_start));
+                assert(read_sst.is_open());
+                bg_run[i].sst[pid_start].keys = new __uint128_t[SSTable_kv_capacity];
+                read_sst.read((char *)bg_run[i].sst[pid_start].keys,sizeof(__uint128_t)*SSTable_kv_capacity);
+                read_sst.close();
+            }
+            bg_run[i].sst[pid_start].search_SSTable(wp,search_multi,SSTable_kv_capacity,search_multi_length,search_multi_pid);
             uint cursor = pid_start+1;
             uint temp_pid;
             while(true) {
                 read_sst.open("../store/SSTable_" + to_string(i) + "-" + to_string(cursor));
                 assert(read_sst.is_open());
-                bg_run[i].sst[cursor].kv = new key_value[SSTable_kv_capacity];
-                read_sst.read((char *) bg_run[i].sst[cursor].kv, sizeof(key_value) * SSTable_kv_capacity);
+                if(!bg_run[i].sst[cursor].keys){
+                    bg_run[i].sst[cursor].keys = new __uint128_t[SSTable_kv_capacity];
+                }
+                read_sst.read((char *) bg_run[i].sst[cursor].keys, sizeof(__uint128_t) * SSTable_kv_capacity);
                 read_sst.close();
                 if (cursor + 1 < config->SSTable_count) {
                     if (bg_run[i].first_widpid[cursor + 1] != wp) {               //must shut down in this cursor
                         cout<<"case 1"<<endl;
                         uint index = 0;
                         while (index <= SSTable_kv_capacity - 1) {
-                            temp_pid = (bg_run[i].sst[cursor].kv[index].key >> 23) ;
-                            if (temp_pid == wp) {
-                                cout << bg_run[i].sst[cursor].kv[index].key << endl;
+                            temp_pid = get_key_pid(bg_run[i].sst[cursor].keys[index]) ;
+                            if (temp_pid == pid) {
+                                //cout << bg_run[i].sst[cursor].keys[index] << endl;
                                 if(search_multi){
-                                    search_multi_pid[search_multi_length] = (bg_run[i].sst[cursor].kv[index].key >> 23) ;
+                                    search_multi_pid[search_multi_length] = get_key_pid(bg_run[i].sst[cursor].keys[index]) ;
                                     search_multi_length++;
                                 }
                             } else break;
@@ -368,9 +369,9 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                     }
                     if (bg_run[i].first_widpid[cursor + 1] == wp) {               //mustn't shut down in this cursor
                         for (uint j = 0; j < SSTable_kv_capacity; j++) {
-                            cout << bg_run[i].sst[cursor].kv[j].key << endl;
+                            //cout << bg_run[i].sst[cursor].keys[j] << endl;
                             if(search_multi){
-                                search_multi_pid[search_multi_length] = (bg_run[i].sst[cursor].kv[j].key >> 23) ;
+                                search_multi_pid[search_multi_length] = get_key_pid(bg_run[i].sst[cursor].keys[j]) ;
                                 search_multi_length++;
                             }
                         }
@@ -379,12 +380,12 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                 } else {                                           // cursor is the last one, same too bg_run->first_widpid[cursor+1]!=pid
                     uint index = 0;
                     while (index <= SSTable_kv_capacity - 1) {
-                        temp_pid = bg_run[i].sst[cursor].kv[index].key >> 39;
+                        temp_pid = get_key_pid(bg_run[i].sst[cursor].keys[index]);
                         cout<<"temp_pid: "<<temp_pid<<endl;
-                        if (temp_pid == wp) {
-                            cout << bg_run[i].sst[cursor].kv[index].key << endl;
+                        if (temp_pid == pid) {
+                            //cout << bg_run[i].sst[cursor].keys[index] << endl;
                             if(search_multi){
-                                search_multi_pid[search_multi_length] = (bg_run[i].sst[cursor].kv[index].key >> 23);
+                                search_multi_pid[search_multi_length] = get_key_pid(bg_run[i].sst[cursor].keys[index]);
                                 search_multi_length++;
                             }
                         } else break;
@@ -404,10 +405,10 @@ box workbench::parse_to_real_mbr(unsigned short first_low, unsigned short first_
 //    uint first_low0, first_low1, first_high0, first_high1;
 //    d2xy(FIRST_HILBERT_BIT/2, first_low, first_low0, first_low1);
 //    d2xy(FIRST_HILBERT_BIT/2, first_high, first_high0, first_high1);
-//    double float_first_low0 = (double)first_low0/255*(mbr.high[0] - mbr.low[0]) + mbr.low[0];
-//    double float_first_low1 = (double)first_low1/255*(mbr.high[1] - mbr.low[1]) + mbr.low[1];
-//    double float_first_high0 = (double)first_high0/255*(mbr.high[0] - mbr.low[0]) + mbr.low[0];
-//    double float_first_high1 = (double)first_high1/255*(mbr.high[1] - mbr.low[1]) + mbr.low[1];
+//    double float_first_low0 = (double)first_low0/(pow(2,WID_BIT/2) - 1)*(mbr.high[0] - mbr.low[0]) + mbr.low[0];
+//    double float_first_low1 = (double)first_low1/(pow(2,WID_BIT/2) - 1)*(mbr.high[1] - mbr.low[1]) + mbr.low[1];
+//    double float_first_high0 = (double)first_high0/(pow(2,WID_BIT/2) - 1)*(mbr.high[0] - mbr.low[0]) + mbr.low[0];
+//    double float_first_high1 = (double)first_high1/(pow(2,WID_BIT/2) - 1)*(mbr.high[1] - mbr.low[1]) + mbr.low[1];
 //    box first(float_first_low0, float_first_low1, float_first_high0, float_first_high1);
 //    cerr<<"first\n";
 //    first.print();
@@ -436,7 +437,9 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
     uint bit_pos = 0;
     for (int i = 0; i < big_sorted_run_count; i++) {
         if ((bg_run[i].start_time_min < timestamp) && (timestamp < bg_run[i].end_time_max)) {
-            bg_run[i].sst = new SSTable[config->SSTable_count];
+            if(!bg_run[i].sst){
+                bg_run[i].sst = new SSTable[config->SSTable_count];
+            }
             cout << "in bg_run" << i << endl;
             bit_b = bit_box(b);
             cout<<bit_b.low[0]<<" "<<bit_b.low[1]<<" "<<bit_b.high[0]<<" "<<bit_b.high[1]<<endl;
@@ -457,21 +460,25 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
                         }
                     }
                     if(find){
-                        ifstream read_sst;
-                        string filename = "../store/SSTable_"+to_string(i)+"-"+to_string(j);
-                        cout<<filename<<endl;
-                        read_sst.open(filename);                   //final place is not high+1, but high
-                        assert(read_sst.is_open());
-                        bg_run[i].sst[j].kv = new key_value[SSTable_kv_capacity];
-                        read_sst.read((char *)bg_run[i].sst[j].kv,sizeof(key_value)*SSTable_kv_capacity);
-                        cout<<"read right"<<endl;
-                        read_sst.close();
+                        if(!bg_run[i].sst[j].keys){
+                            ifstream read_sst;
+                            string filename = "../store/SSTable_"+to_string(i)+"-"+to_string(j);
+                            cout<<filename<<endl;
+                            read_sst.open(filename);                   //final place is not high+1, but high
+                            assert(read_sst.is_open());
+                            bg_run[i].sst[j].keys = new __uint128_t[SSTable_kv_capacity];
+                            read_sst.read((char *)bg_run[i].sst[j].keys,sizeof(__uint128_t)*SSTable_kv_capacity);
+                            cout<<"read right"<<endl;
+                            read_sst.close();
+                        }
                         for(uint q = 0; q < SSTable_kv_capacity; q++){
-                            uint pid = get_key_pid(bg_run[i].sst[j].kv[q].key);
-                            box value_box = parse_to_real_mbr(bg_run[i].wids[2 * pid], bg_run[i].wids[2 * pid + 1], bg_run[i].sst[j].kv[q].value);
-                            if(b.intersect(value_box)){
+                            uint pid = get_key_pid(bg_run[i].sst[j].keys[q]);
+                            //box value_box = parse_to_real_mbr(bg_run[i].wids[2 * pid], bg_run[i].wids[2 * pid + 1], bg_run[i].sst[j].kv[q].value);
+                            box key_box;
+                            parse_mbr(bg_run[i].sst[j].keys[q], key_box, bg_run[i].bitmap_mbrs[j]);
+                            if(b.intersect(key_box)){
                                 cout<<"box find!"<<endl;
-                                value_box.print();
+                                key_box.print();
                             }
                         }
                     }

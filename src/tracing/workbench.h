@@ -13,6 +13,7 @@
 #include "../geometry/geometry.h"
 #include "../index/QTree.h"
 #include "step_merge.h"
+#include "../cuda/cuda_util.cuh"
 
 typedef struct profiler{
 	double copy_time = 0;
@@ -151,12 +152,12 @@ public:
 
     //for space for cuda sort
     __uint128_t *d_keys = NULL;
-    uint64_t *d_values = NULL;
+    //uint64_t *d_values = NULL;
     uint kv_count = 0;
 
     //space for MemTable
-    uint64_t **h_keys = NULL;
-    uint64_t **h_values = NULL;
+    __uint128_t **h_keys = NULL;
+    //uint64_t **h_values = NULL;
     uint MemTable_count = 0;
 
     //Bloom filter

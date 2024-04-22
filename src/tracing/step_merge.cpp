@@ -8,60 +8,60 @@
 #include "step_merge.h"
 
 SSTable::~SSTable(){
-    delete []kv;
+    delete []keys;
 }
 
 //range query
-bool SSTable::search_SSTable(uint pid, bool search_multi, uint &search_multi_length, uint *search_multi_pid) {
-//    cout<<"into search_SSTable"<<endl;
-//    int find = -1;
-//    int low = 0;
-//    int high = SSTable_kv_capacity - 1;
-//    int mid;
-//    uint temp_pid;
-//    while (low <= high) {
-//        mid = (low + high) / 2;
-//        temp_pid = kv[mid].key >> 39;
-//        if ( temp_pid == pid){
-//            find = mid;
-//            break;
-//        }
-//        else if (temp_pid > pid){
-//            high = mid - 1;
-//        }
-//        else {
-//            low = mid + 1;
-//        }
-//    }
-//    if(find==-1){
-//        cout<<"cannot find"<<endl;
-//        return false;
-//    }
-//    cout<<"exactly find"<<endl;
-//    uint cursor = find;
-//    while(temp_pid==pid&&cursor>=1){
-//        cursor--;
-//        temp_pid = kv[cursor].key >> 39;
-//    }
-//    if(temp_pid==pid&&cursor==0){
-//        cout<<kv[0].key<<endl;
-//        if(search_multi){
-//            search_multi_pid[search_multi_length] = kv[0].key & ((1ULL << 25) - 1);
-//            search_multi_length++;
-//        }
-//    }
-//    while(cursor+1<SSTable_kv_capacity){
-//        cursor++;
-//        temp_pid = kv[cursor].key >> 39;
-//        if(temp_pid==pid){
-//            cout<<kv[cursor].key<<endl;
-//            if(search_multi){
-//                search_multi_pid[search_multi_length] = kv[cursor].key & ((1ULL << 25) - 1);
-//                search_multi_length++;
-//            }
-//        }
-//    }
-//    cout<<"find !"<<endl;
+bool SSTable::search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_capacity, uint &search_multi_length, uint *search_multi_pid) {
+    cout<<"into search_SSTable"<<endl;
+    int find = -1;
+    int low = 0;
+    int high = SSTable_kv_capacity - 1;
+    int mid;
+    uint64_t temp_wp;
+    while (low <= high) {
+        mid = (low + high) / 2;
+        temp_wp = keys[mid] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
+        if (temp_wp == wp){
+            find = mid;
+            break;
+        }
+        else if (temp_wp > wp){
+            high = mid - 1;
+        }
+        else {
+            low = mid + 1;
+        }
+    }
+    if(find==-1){
+        cout<<"cannot find"<<endl;
+        return false;
+    }
+    cout<<"exactly find"<<endl;
+    uint cursor = find;
+    while(temp_wp == wp && cursor >= 1){
+        cursor--;
+        temp_wp = keys[cursor] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
+    }
+    if(temp_wp == wp && cursor == 0){
+        //cout<<wp<<endl;
+        if(search_multi){
+            search_multi_pid[search_multi_length] = get_key_pid(keys[0]);
+            search_multi_length++;
+        }
+    }
+    while(cursor+1<SSTable_kv_capacity){
+        cursor++;
+        temp_wp = keys[cursor] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
+        if(temp_wp == wp){
+            cout<<get_key_target(keys[cursor])<<endl;
+            if(search_multi){
+                search_multi_pid[search_multi_length] = get_key_pid(keys[cursor]);
+                search_multi_length++;
+            }
+        }
+    }
+    cout<<"find !"<<endl;
     return true;
 }
 

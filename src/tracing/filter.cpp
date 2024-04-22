@@ -69,13 +69,12 @@ workbench *partitioner::build_schema(Point *points, size_t num_objects){
              << " bench->dwFilterSize :" << bench->dwFilterSize << endl;
     }
     if(true){
-        bench->bitmap_edge_length = 8;
-        bench->bit_count = pow(2,bench->bitmap_edge_length) * pow(2,bench->bitmap_edge_length);
+        bench->bit_count = pow(2,WID_BIT/2) * pow(2,WID_BIT/2);
         bench->bitmaps_size = bench->bit_count/8*bench->config->SSTable_count;
 
     }
 
-    bench->SSTable_kv_capacity = bench->config->kv_restriction*bench->config->MemTable_capacity/2/bench->config->SSTable_count;     //327680
+    bench->SSTable_kv_capacity = bench->config->kv_restriction * bench->config->MemTable_capacity /2 /bench->config->SSTable_count;
 
 	bench->claim_space();
 	logt("claim %.3f MB memory space",start, bench->space_claimed()/1024.0/1024.0);

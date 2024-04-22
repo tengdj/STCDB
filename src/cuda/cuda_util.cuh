@@ -12,6 +12,7 @@
 #include <cuda_runtime.h>
 #include "../util/util.h"
 #include "hilbert_curve.cuh"
+#include "../geometry/geometry.h"
 
 
 
@@ -135,14 +136,11 @@ uint get_key_wid(__uint128_t key);
 __host__ __device__
 uint get_key_pid(__uint128_t key);
 
-//__host__ __device__
-//uint get_value_mbr_low(__uint128_t key);
-//
-//__host__ __device__
-//uint get_value_mbr_high(__uint128_t key);
-
 __host__ __device__
 uint get_key_target(__uint128_t key);
+
+__host__ __device__
+uint64_t get_key_mbr_code(__uint128_t key);
 
 __host__ __device__
 uint get_key_duration(__uint128_t key);
@@ -155,14 +153,29 @@ inline void print_parse_key(__uint128_t key){
     print_128(key);
     cout<<endl;
     uint wid = get_key_wid(key);
-    cout<<"wid:"<<wid<<endl;
     uint first_low0, first_low1;
     d2xy(WID_BIT, wid, first_low0, first_low1);
+    cout<<"wid:"<<wid<<" "<<first_low0<<"-"<<first_low1<<endl;
     cout<<"pid:"<<get_key_pid(key)<<endl;
     //mbr
     cout<<"target:"<<get_key_target(key)<<endl;
     cout<<"duration:"<<get_key_duration(key)<<endl;
     cout<<"end offset:"<<get_key_end(key)<<endl;
 }
+
+__host__
+inline void parse_mbr(__uint128_t key, box &b, box bitmap_mbr){
+    uint64_t mbr_code = get_key_mbr_code(key);
+    uint64_t low0 = mbr_code >> (MBR_BIT/4*3);
+    uint64_t low1 = (mbr_code >> (MBR_BIT/2)) & (MBR_BIT/4);
+    uint64_t high0 = (mbr_code >> (MBR_BIT/4)) & (MBR_BIT/4);
+    uint64_t high1 = mbr_code & (MBR_BIT/4);
+
+    b.low[0] = (double)low0/(pow(2,MBR_BIT/2) - 1) * (bitmap_mbr.high[0] - bitmap_mbr.low[0]) + bitmap_mbr.low[0];
+    b.low[1] = (double)low1/(pow(2,MBR_BIT/2) - 1) * (bitmap_mbr.high[1] - bitmap_mbr.low[1]) + bitmap_mbr.low[1];
+    b.high[0] = (double)high0/(pow(2,MBR_BIT/2) - 1) * (bitmap_mbr.high[0] - bitmap_mbr.low[0]) + bitmap_mbr.low[0];
+    b.high[1] = (double)high1/(pow(2,MBR_BIT/2) - 1) * (bitmap_mbr.high[1] - bitmap_mbr.low[1]) + bitmap_mbr.low[1];
+}
+
 
 #endif /* CUDA_UTIL_CUH_ */

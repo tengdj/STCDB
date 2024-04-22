@@ -13,6 +13,7 @@
 #include "../util/query_context.h"
 #include "../geometry/geometry.h"
 #include "../index/QTree.h"
+#include "../cuda/cuda_util.cuh"
 
 typedef struct key_value{
     uint64_t key;
@@ -20,19 +21,20 @@ typedef struct key_value{
 }key_value;                         //sizeof(key_value)==32, beacuse 8+16=24, but 24<2*16=32
 
 class SSTable{
-
 public:
-    key_value *kv = NULL;
+    __uint128_t * keys = NULL;
+    //key_value *kv = NULL;
     //uint SSTable_kv_capacity = 327680;              //67108864 * 5 / 1024 = 327,680 (Round up)
 
     ~SSTable();
-    bool search_SSTable(uint pid, bool search_multi, uint &search_multi_length, uint *search_multi_pid);
+    bool search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_capacity, uint &search_multi_length, uint *search_multi_pid);
 };
 
 class sorted_run {                          //10G
 
 public:
     SSTable * sst = NULL;
+
     //uint SSTable_count = 0;
     //uint SSTable_size = 10*1024*1024;       //10M   useless
     uint64_t *first_widpid = NULL;

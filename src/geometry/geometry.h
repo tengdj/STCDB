@@ -17,8 +17,7 @@
 #include <queue>
 #include <iostream>
 #include "../util/util.h"
-#include "../cuda/cuda_util.cuh"
-#include "../cuda/hilbert_curve.cuh"
+//#include "../cuda/cuda_util.cuh"
 
 using namespace std;
 class Point{
