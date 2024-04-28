@@ -344,6 +344,9 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                 if(target_count){
                     ret = true;
                 }
+                else{
+                    disk_not_find_count++;
+                }
                 continue;
             }
             //cout<<"high level binary search finish and find"<<endl;

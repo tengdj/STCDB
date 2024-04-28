@@ -636,7 +636,7 @@ void tracer::process(){
 
                 //bool findit = searchkv_in_all_place(bench, 2);
             }
-            if(bench->cur_time == 800){
+            if(bench->cur_time == 850){
                 while(bench->dumping){
                     sleep(1);
                 }
@@ -668,8 +668,8 @@ void tracer::process(){
                 }
                 double time_consume = get_time_elapsed(disk_search_time);
                 printf("disk_search_time %.2f\n", time_consume);
-                cout << "question_count:" << question_count << " disk_find_count:" << bench->disk_find_count << endl;
-                cout << "wid_filter_count:" << bench->wid_filter_count <<" kv_restriction:"<< bench->config->kv_restriction << endl;
+                cout << "question_count:" << question_count << " disk_find_count:" << bench->disk_find_count <<" kv_restriction:"<< bench->config->kv_restriction << endl;
+                cout << "wid_filter_count:" << bench->wid_filter_count <<"disk_not_find_count"<<bench->disk_not_find_count <<endl;
 //                while(!bench->search_in_disk(pid, 15)){
 //                    pid++;
 //                }

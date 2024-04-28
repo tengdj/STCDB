@@ -185,6 +185,7 @@ public:
     uint multi_find_count = 0;
     uint wid_filter_count = 0;
     uint disk_find_count = 0;
+    uint disk_not_find_count = 0;
 
 
     //space for where id
