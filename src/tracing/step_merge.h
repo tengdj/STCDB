@@ -27,7 +27,7 @@ public:
     //uint SSTable_kv_capacity = 327680;              //67108864 * 5 / 1024 = 327,680 (Round up)
 
     ~SSTable();
-    bool search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_capacity, uint &search_multi_length, uint *search_multi_pid);
+    uint search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_capacity, uint &search_multi_length, uint *search_multi_pid);
 };
 
 class sorted_run {                          //10G

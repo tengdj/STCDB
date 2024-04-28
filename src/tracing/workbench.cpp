@@ -282,21 +282,22 @@ bool workbench::search_memtable(uint64_t pid){          //wid_pid
 }
 
 bool workbench::search_in_disk(uint pid, uint timestamp){
-    cout<<"disk search "<<pid<<endl;
+    //cout<<"disk search "<<pid<<endl;
     bool ret = false;
     for(int i=0;i<big_sorted_run_count;i++) {
         if ( (bg_run[i].start_time_min < timestamp)&&(timestamp < bg_run[i].end_time_max) ) {
-            cout<<"big_sorted_run_num:"<<i<<endl;
+            //cout<<"big_sorted_run_num:"<<i<<endl;
             uint64_t wp = pid;
             if(bg_run[i].wids[pid] == 0){
+                wid_filter_count++;
                 continue;
             }
             else{
                 wp += ((uint64_t)bg_run[i].wids[pid] << PID_BIT);
-                cout<<"wp: "<<wp<<endl;
+                //cout<<"wp: "<<wp<<endl;
             }
             if(!bg_run[i].sst){
-                cout<<"new SSTables"<<endl;
+                //cout<<"new SSTables"<<endl;
                 bg_run[i].sst = new SSTable[config->SSTable_count];                   //maybe useful later, should not delete after this func , if(!NULL)
             }
             ifstream read_sst;
@@ -308,7 +309,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
             int mid;
             while (low <= high) {
                 mid = (low + high) / 2;
-                cout << bg_run[i].first_widpid[mid] << endl;
+                //cout << bg_run[i].first_widpid[mid] << endl;
                 if (bg_run[i].first_widpid[mid] == wp){
                     find = mid;
                     break;
@@ -321,27 +322,31 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                 }
             }
             if(find==-1){
-                cout<<"not find in first_widpid"<<endl;
-                cout << low << "-" << bg_run[i].first_widpid[low] << endl;
-                cout << mid << "-" << bg_run[i].first_widpid[mid] << endl;
-                cout << high << "-" << bg_run[i].first_widpid[high] << endl;
+//                cout<<"not find in first_widpid"<<endl;
+//                cout << low << "-" << bg_run[i].first_widpid[low] << endl;
+//                cout << mid << "-" << bg_run[i].first_widpid[mid] << endl;
+//                cout << high << "-" << bg_run[i].first_widpid[high] << endl;
                 if(high<0){
                     high = 0;
                 }
                 if(!bg_run[i].sst[high].keys){
-                    cout<<"new SSTables keys"<<high<<endl;
+                    //cout<<"new SSTables keys"<<high<<endl;
                     string filename = "../store/SSTable_"+to_string(i)+"-"+to_string(high);
-                    cout<<filename<<endl;
+                    //cout<<filename<<endl;
                     read_sst.open(filename);                   //final place is not high+1, but high
                     assert(read_sst.is_open());
                     bg_run[i].sst[high].keys = new __uint128_t [SSTable_kv_capacity];
                     read_sst.read((char *)bg_run[i].sst[high].keys,sizeof(__uint128_t)*SSTable_kv_capacity);
                     read_sst.close();
                 }
-                ret |= bg_run[i].sst[high].search_SSTable(wp,search_multi,SSTable_kv_capacity,search_multi_length,search_multi_pid);
+                uint target_count = bg_run[i].sst[high].search_SSTable(wp,search_multi,SSTable_kv_capacity,search_multi_length,search_multi_pid);
+                disk_find_count += target_count;
+                if(target_count){
+                    ret = true;
+                }
                 continue;
             }
-            cout<<"high level binary search finish and find"<<endl;
+            //cout<<"high level binary search finish and find"<<endl;
 
             //for the case, there are many SSTables that first_widpid==wp
             //find start and end
@@ -377,6 +382,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                         while (index <= SSTable_kv_capacity - 1) {
                             temp_pid = get_key_pid(bg_run[i].sst[cursor].keys[index]) ;
                             if (temp_pid == pid) {
+                                disk_find_count++;
                                 //cout << bg_run[i].sst[cursor].keys[index] << endl;
                                 if(search_multi){
                                     search_multi_pid[search_multi_length] = get_key_pid(bg_run[i].sst[cursor].keys[index]) ;
@@ -417,7 +423,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
             ret = true;
         }
     }
-    cout<<"finish disk search "<<pid<<endl;
+    //cout<<"finish disk search "<<pid<<endl;
     return ret;
 }
 
@@ -510,8 +516,8 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
             }
         }
     }
-    cout<<"find_count:"<<find_count<<endl;
-    cout<<"uni.size():"<<uni.size()<<endl;
+    cout<<"disk_find_count:"<<find_count<<"kv_restriction:"<<config->kv_restriction<<endl;
+    cout<<"uni.size():"<<uni.size()<<"num_objects:"<<config->num_objects<<endl;
     uni.clear();
     return ret;
 }

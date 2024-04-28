@@ -183,6 +183,9 @@ public:
     //uint search_count = 0;
     uint single_find_count = 0;
     uint multi_find_count = 0;
+    uint wid_filter_count = 0;
+    uint disk_find_count = 0;
+
 
     //space for where id
     unsigned char * d_bitmaps = NULL;                 //1024  256*256

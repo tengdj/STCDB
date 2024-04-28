@@ -12,8 +12,9 @@ SSTable::~SSTable(){
 }
 
 //range query
-bool SSTable::search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_capacity, uint &search_multi_length, uint *search_multi_pid) {
-    cout<<"into search_SSTable"<<endl;
+uint SSTable::search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_capacity, uint &search_multi_length, uint *search_multi_pid) {
+    uint count = 0;
+    //cout<<"into search_SSTable"<<endl;
     int find = -1;
     int low = 0;
     int high = SSTable_kv_capacity - 1;
@@ -34,16 +35,17 @@ bool SSTable::search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_cap
         }
     }
     if(find==-1){
-        cout<<"cannot find"<<endl;
-        return false;
+        //cout<<"cannot find"<<endl;
+        return 0;
     }
-    cout<<"exactly find"<<endl;
+    //cout<<"exactly find"<<endl;
     uint cursor = find;
     while(temp_wp == wp && cursor >= 1){
         cursor--;
         temp_wp = keys[cursor] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
     }
     if(temp_wp == wp && cursor == 0){
+        count++;
         //cout<<wp<<endl;
         if(search_multi){
             search_multi_pid[search_multi_length] = get_key_pid(keys[0]);
@@ -54,15 +56,17 @@ bool SSTable::search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_cap
         cursor++;
         temp_wp = keys[cursor] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
         if(temp_wp == wp){
-            cout<<get_key_target(keys[cursor])<<endl;
+            count++;
+            //cout<<get_key_target(keys[cursor])<<endl;
             if(search_multi){
                 search_multi_pid[search_multi_length] = get_key_pid(keys[cursor]);
                 search_multi_length++;
             }
         }
+        else break;
     }
-    cout<<"find !"<<endl;
-    return true;
+    //cout<<"find !"<<endl;
+    return count;
 }
 
 sorted_run::~sorted_run(){
