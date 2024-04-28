@@ -291,6 +291,7 @@ public:
     bool search_in_disk(uint pid, uint timestamp);
     bool mbr_search_in_disk(box b, uint timestamp);
 
+    void load_big_sorted_run(uint b);
     box parse_to_real_mbr(unsigned short first_low, unsigned short first_high, uint64_t value);
 };
 extern void lookup_rec(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);

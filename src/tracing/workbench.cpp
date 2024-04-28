@@ -6,6 +6,7 @@
  */
 
 #include "workbench.h"
+#include <unordered_set>
 
 
 workbench::workbench(workbench *bench):workbench(bench->config){
@@ -191,6 +192,25 @@ box workbench::bit_box(box b){
     new_b.high[0] = (b.high[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
     new_b.high[1] = (b.high[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
     return new_b;
+}
+
+void workbench::load_big_sorted_run(uint b){
+    if(!bg_run[b].sst){
+        bg_run[b].sst = new SSTable[config->SSTable_count];
+    }
+    ifstream read_sst;
+    for(int i = 0; i < config->SSTable_count; i++){
+        if(!bg_run[b].sst[i].keys){
+            string filename = "../store/SSTable_"+to_string(b)+"-"+to_string(i);
+            //cout<<filename<<endl;
+            read_sst.open(filename);
+            assert(read_sst.is_open());
+            bg_run[b].sst[i].keys = new __uint128_t [SSTable_kv_capacity];
+            read_sst.read((char *)bg_run[b].sst[i].keys,sizeof(__uint128_t)*SSTable_kv_capacity);
+            read_sst.close();
+        }
+    }
+
 }
 
 bool workbench::search_memtable(uint64_t pid){          //wid_pid
@@ -432,6 +452,8 @@ box workbench::parse_to_real_mbr(unsigned short first_low, unsigned short first_
 bool workbench::mbr_search_in_disk(box b, uint timestamp) {
     assert(mbr.contain(b));
     cout << "mbr disk search" << endl;
+    uint find_count = 0;
+    unordered_set<uint> uni;
     bool ret = false, find = false;
     box bit_b;
     uint bit_pos = 0;
@@ -442,17 +464,16 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
             }
             cout << "in bg_run" << i << endl;
             bit_b = bit_box(b);
-            cout<<bit_b.low[0]<<" "<<bit_b.low[1]<<" "<<bit_b.high[0]<<" "<<bit_b.high[1]<<endl;
+            cout<<bit_b.low[0]<<","<<bit_b.low[1]<<","<<bit_b.high[0]<<","<<bit_b.high[1]<<endl;
             for (uint j = 0; j < config->SSTable_count; j++) {
-                bg_run[i].bitmap_mbrs[j].print();
+                //bg_run[i].bitmap_mbrs[j].print();
                 if(b.intersect(bg_run[i].bitmap_mbrs[j])) {     //real box intersect
-                    cout<<"bitmap_mbr filter"<<endl;
                     find = false;
-                    for (uint p = bit_b.low[0]; (p <= bit_b.high[0]) && (!find); p++) {
-                        for (uint q = bit_b.low[1]; (q <= bit_b.high[1]) && (!find); q++) {
+                    for (uint p = bit_b.low[0]-1; (p <= bit_b.high[0]) && (!find); p++) {
+                        for (uint q = bit_b.low[1]-1; (q <= bit_b.high[1]) && (!find); q++) {
                             bit_pos = xy2d(WID_BIT/2, p, q);
                             if (bg_run[i].bitmaps[j * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
-                                cout << "SSTable_" << j << "bit_pos" << bit_pos << endl;
+                                //cout << "SSTable_" << j << "bit_pos" << bit_pos << endl;
                                 find = true;
                                 ret = true;
                                 break;
@@ -468,7 +489,7 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
                             assert(read_sst.is_open());
                             bg_run[i].sst[j].keys = new __uint128_t[SSTable_kv_capacity];
                             read_sst.read((char *)bg_run[i].sst[j].keys,sizeof(__uint128_t)*SSTable_kv_capacity);
-                            cout<<"read right"<<endl;
+                            //cout<<"read right"<<endl;
                             read_sst.close();
                         }
                         for(uint q = 0; q < SSTable_kv_capacity; q++){
@@ -477,8 +498,11 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
                             box key_box;
                             parse_mbr(bg_run[i].sst[j].keys[q], key_box, bg_run[i].bitmap_mbrs[j]);
                             if(b.intersect(key_box)){
-                                cout<<"box find!"<<endl;
-                                key_box.print();
+                                uni.insert(pid);
+                                find_count++;
+                                //cout<<"box find!"<<endl;
+                                //key_box.print();
+
                             }
                         }
                     }
@@ -486,5 +510,8 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
             }
         }
     }
+    cout<<"find_count:"<<find_count<<endl;
+    cout<<"uni.size():"<<uni.size()<<endl;
+    uni.clear();
     return ret;
 }

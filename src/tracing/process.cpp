@@ -397,10 +397,9 @@ void *straight_dump(void *arg){
     struct timeval bg_start = get_cur_time();
     for(uint sst_count=0; sst_count<bench->config->SSTable_count; sst_count++){
         bench->bg_run[old_big].first_widpid[sst_count] = bench->h_keys[offset][total_index] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
-        cout<<bench->bg_run[old_big].first_widpid[sst_count]<<endl;
-        cout<<(uint64_t)(bench->h_keys[offset][total_index] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT))<<endl;
-        cout<<get_key_wid(bench->h_keys[offset][total_index])<<endl;
-        cout<<get_key_pid(bench->h_keys[offset][total_index])<<endl<<endl;
+//        cout<<bench->bg_run[old_big].first_widpid[sst_count]<<endl;
+//        cout<<get_key_wid(bench->h_keys[offset][total_index])<<endl;
+//        cout<<get_key_pid(bench->h_keys[offset][total_index])<<endl<<endl;
         copy(bench->h_keys[offset] + total_index, bench->h_keys[offset] + total_index + bench->SSTable_kv_capacity, keys);
         total_index += bench->SSTable_kv_capacity;
         assert(total_index<=bench->config->kv_restriction);
@@ -598,31 +597,31 @@ void tracer::process(){
                     offset = bench->config->MemTable_capacity/2;
                 }
 
-                Point * bit_points = new Point[bench->bit_count];
-                uint count_p;
-                for(uint j = 0;j<bench->config->SSTable_count;j++){
-                    //cerr<<"bitmap"<<j<<endl;
-                    cerr<<endl;
-                    count_p = 0;
-                    bool is_print = false;
-                    for(uint i=0;i<bench->bit_count;i++){
-                        if(bench->h_bitmaps[offset][j*(bench->bit_count/8) + i/8] & (1<<(i%8))){
-                            if(!is_print){
-                                cout<<i<<"in SST"<<j<<endl;
-                                is_print = true;
-                            }
-                            Point bit_p = new Point;
-                            uint x=0,y=0;
-                            d2xy(WID_BIT/2,i,x,y);
-                            bit_p.x = (double)x/(pow(2,WID_BIT/2) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
-                            bit_p.y = (double)y/(pow(2,WID_BIT/2) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
-                            bit_points[count_p] = bit_p;
-                            count_p++;
-                        }
-                    }
-                    cout<<"bit_points.size():"<<count_p<<endl;
-                    print_points(bit_points,count_p);
-                }
+//                Point * bit_points = new Point[bench->bit_count];
+//                uint count_p;
+//                for(uint j = 0;j<bench->config->SSTable_count;j++){
+//                    //cerr<<"bitmap"<<j<<endl;
+//                    cerr<<endl;
+//                    count_p = 0;
+//                    bool is_print = false;
+//                    for(uint i=0;i<bench->bit_count;i++){
+//                        if(bench->h_bitmaps[offset][j*(bench->bit_count/8) + i/8] & (1<<(i%8))){
+//                            if(!is_print){
+//                                cout<<i<<"in SST"<<j<<endl;
+//                                is_print = true;
+//                            }
+//                            Point bit_p = new Point;
+//                            uint x=0,y=0;
+//                            d2xy(WID_BIT/2,i,x,y);
+//                            bit_p.x = (double)x/(pow(2,WID_BIT/2) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
+//                            bit_p.y = (double)y/(pow(2,WID_BIT/2) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
+//                            bit_points[count_p] = bit_p;
+//                            count_p++;
+//                        }
+//                    }
+//                    cout<<"bit_points.size():"<<count_p<<endl;
+//                    print_points(bit_points,count_p);
+//                }
 
                 bench->end_time_max = bench->cur_time;              //old max
                 cout<<"start_time_min:"<<bench->start_time_min<<"start_time_max:"<<bench->start_time_max<<"bench->end_time_min:"<<bench->end_time_min<<"bench->end_time_max:"<<bench->end_time_max<<endl;
@@ -641,11 +640,28 @@ void tracer::process(){
                 while(bench->dumping){
                     sleep(1);
                 }
-                box b(-87.8, 41.8, -87.7, 41.9);
-                b.print();
-                bench->mbr_search_in_disk(b, 15);
 
-//                uint pid = 1111111;
+//                double mid_x = (mbr.low[0] + mbr.high[0])/2;
+//                double mid_y = (mbr.low[1] + mbr.high[1])/2;
+//                double edge_length = 0.01;
+//                for(int i = 0; i <10 ; i++){
+//                    //cout << fixed << setprecision(6) << mid_x - edge_length/2 <<","<<mid_y - edge_length/2 <<","<<mid_x + edge_length/2 <<","<<mid_y + edge_length/2 <<endl;
+//                    box search_area(mid_x - edge_length/2, mid_y - edge_length/2, mid_x + edge_length/2, mid_y + edge_length/2);
+//                    search_area.print();
+//                    struct timeval area_search_time = get_cur_time();
+//                    bench->mbr_search_in_disk(search_area, 15);
+//                    double time_consume = get_time_elapsed(area_search_time);
+//                    printf("area_search_time %.2f\n", time_consume);
+//                    edge_length += 0.01;
+//                }
+
+
+                uint pid = 1000000;
+                bench->load_big_sorted_run(0);
+                for(int i = 0; i < 10; i++){
+                    bench->search_in_disk(pid, 15);
+                    pid++;
+                }
 //                while(!bench->search_in_disk(pid, 15)){
 //                    pid++;
 //                }

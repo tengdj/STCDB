@@ -1465,10 +1465,11 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         box b;
         parse_mbr(bench->h_keys[offset+bench->MemTable_count][10], b, bench->h_bitmap_mbrs[offset+bench->MemTable_count][0]);
         b.print();
-        cerr<<"bitmap_mbrs:"<<endl;
-        for(int i = 0; i < bench->config->SSTable_count; i++){
-            bench->h_bitmap_mbrs[offset+bench->MemTable_count][i].print();
-        }
+        bench->h_bitmap_mbrs[offset+bench->MemTable_count][0].print();
+//        cerr<<"bitmap_mbrs:"<<endl;
+//        for(int i = 0; i < bench->config->SSTable_count; i++){
+//            bench->h_bitmap_mbrs[offset+bench->MemTable_count][i].print();
+//        }
 
         //init
         cudaMemset(h_bench.d_wids, 0, bench->config->num_objects*sizeof(unsigned short));
