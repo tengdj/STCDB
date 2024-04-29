@@ -636,43 +636,45 @@ void tracer::process(){
 
                 //bool findit = searchkv_in_all_place(bench, 2);
             }
-            if(bench->cur_time == 850){
+            if(bench->cur_time == 45){
                 while(bench->dumping){
                     sleep(1);
                 }
 
-//                double mid_x = (mbr.low[0] + mbr.high[0])/2;
-//                double mid_y = (mbr.low[1] + mbr.high[1])/2;
-//                double edge_length = 0.01;
-//                for(int i = 0; i <10 ; i++){
-//                    //cout << fixed << setprecision(6) << mid_x - edge_length/2 <<","<<mid_y - edge_length/2 <<","<<mid_x + edge_length/2 <<","<<mid_y + edge_length/2 <<endl;
-//                    box search_area(mid_x - edge_length/2, mid_y - edge_length/2, mid_x + edge_length/2, mid_y + edge_length/2);
-//                    search_area.print();
-//                    struct timeval area_search_time = get_cur_time();
-//                    bench->mbr_search_in_disk(search_area, 15);
-//                    double time_consume = get_time_elapsed(area_search_time);
-//                    printf("area_search_time %.2f\n", time_consume);
-//                    edge_length += 0.01;
-//                }
-
-                uint question_count = 1000000;
-                bench->wid_filter_count = 0;
-                bench->disk_find_count = 0;
-                uint pid = 1000000;
-                bench->load_big_sorted_run(0);
-
-                struct timeval disk_search_time = get_cur_time();
-                for(int i = 0; i < question_count; i++){
-                    bench->search_in_disk(pid, 15);
-                    pid++;
+                double mid_x = (mbr.low[0] + mbr.high[0])/2;
+                double mid_y = (mbr.low[1] + mbr.high[1])/2;
+                double edge_length = 0.04;
+                //bench->load_big_sorted_run(0);
+                for(int i = 0; i <10 ; i++){
+                    //cout << fixed << setprecision(6) << mid_x - edge_length/2 <<","<<mid_y - edge_length/2 <<","<<mid_x + edge_length/2 <<","<<mid_y + edge_length/2 <<endl;
+                    box search_area(mid_x - edge_length/2, mid_y - edge_length/2, mid_x + edge_length/2, mid_y + edge_length/2);
+                    cerr<<"search_area"<<i<<endl;
+                    search_area.print();
+                    struct timeval area_search_time = get_cur_time();
+                    bench->mbr_search_in_disk(search_area, 15);
+                    double time_consume = get_time_elapsed(area_search_time);
+                    printf("area_search_time %.2f\n", time_consume);
+                    edge_length += 0.002;
                 }
-                double time_consume = get_time_elapsed(disk_search_time);
-                printf("disk_search_time %.2f\n", time_consume);
-                cout << "question_count:" << question_count << " disk_find_count:" << bench->disk_find_count <<" kv_restriction:"<< bench->config->kv_restriction << endl;
-                cout << "wid_filter_count:" << bench->wid_filter_count <<"disk_not_find_count"<<bench->disk_not_find_count <<endl;
-//                while(!bench->search_in_disk(pid, 15)){
+
+//                uint question_count = 1000000;
+//                bench->wid_filter_count = 0;
+//                bench->disk_find_count = 0;
+//                uint pid = 1000000;
+//                bench->load_big_sorted_run(0);
+//
+//                struct timeval disk_search_time = get_cur_time();
+//                for(int i = 0; i < question_count; i++){
+//                    bench->search_in_disk(pid, 15);
 //                    pid++;
 //                }
+//                double time_consume = get_time_elapsed(disk_search_time);
+//                printf("disk_search_time %.2f\n", time_consume);
+//                cout << "question_count:" << question_count << " disk_find_count:" << bench->disk_find_count <<" kv_restriction:"<< bench->config->kv_restriction << endl;
+//                cout << "wid_filter_count:" << bench->wid_filter_count <<"disk_not_find_count"<<bench->disk_not_find_count <<endl;
+////                while(!bench->search_in_disk(pid, 15)){
+////                    pid++;
+////                }
             }
 
 //            if(bench->cur_time == 30){

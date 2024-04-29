@@ -461,7 +461,7 @@ box workbench::parse_to_real_mbr(unsigned short first_low, unsigned short first_
 bool workbench::mbr_search_in_disk(box b, uint timestamp) {
     assert(mbr.contain(b));
     cout << "mbr disk search" << endl;
-    uint find_count = 0;
+    uint find_count = 0, intersect_sst_count = 0;
     unordered_set<uint> uni;
     bool ret = false, find = false;
     box bit_b;
@@ -473,10 +473,13 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
             }
             cout << "in bg_run" << i << endl;
             bit_b = bit_box(b);
+            cerr<<"bit_box"<<endl;
+            bit_b.print();
             cout<<bit_b.low[0]<<","<<bit_b.low[1]<<","<<bit_b.high[0]<<","<<bit_b.high[1]<<endl;
             for (uint j = 0; j < config->SSTable_count; j++) {
                 //bg_run[i].bitmap_mbrs[j].print();
                 if(b.intersect(bg_run[i].bitmap_mbrs[j])) {     //real box intersect
+                    intersect_sst_count++;
                     find = false;
                     for (uint p = bit_b.low[0]-1; (p <= bit_b.high[0]) && (!find); p++) {
                         for (uint q = bit_b.low[1]-1; (q <= bit_b.high[1]) && (!find); q++) {
@@ -501,6 +504,7 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
                             //cout<<"read right"<<endl;
                             read_sst.close();
                         }
+                        uint this_find = find_count;
                         for(uint q = 0; q < SSTable_kv_capacity; q++){
                             uint pid = get_key_pid(bg_run[i].sst[j].keys[q]);
                             //box value_box = parse_to_real_mbr(bg_run[i].wids[2 * pid], bg_run[i].wids[2 * pid + 1], bg_run[i].sst[j].kv[q].value);
@@ -514,13 +518,15 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
 
                             }
                         }
+                        cout<<find_count - this_find<<"finds in sst "<<j<<endl;
                     }
                 }
             }
         }
     }
-    cout<<"disk_find_count:"<<find_count<<"kv_restriction:"<<config->kv_restriction<<endl;
-    cout<<"uni.size():"<<uni.size()<<"num_objects:"<<config->num_objects<<endl;
+    cout<<"disk_find_count:"<<find_count<<" kv_restriction:"<<config->kv_restriction<<endl;
+    cout<<"uni.size():"<<uni.size()<<" num_objects:"<<config->num_objects<<endl;
+    cout<<"intersect_sst_count:"<<intersect_sst_count<<" config->SSTable_count:"<<config->SSTable_count<<endl;
     uni.clear();
     return ret;
 }

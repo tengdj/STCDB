@@ -37,6 +37,7 @@ public:
     bool unroll = true;
     uint schema_update_delay = 1; //
     uint min_meet_time = 10;
+    uint max_meet_time = pow(2, DURATION_BIT-2);
     double reach_distance = 2;          //2
     double x_buffer = 0;
     double y_buffer = 0;
@@ -49,8 +50,8 @@ public:
     //added
     bool load_data = true;
 
-    uint kv_capacity = 140000000;            //
-    uint kv_restriction = 134217728;                  //2*1024*1024*1024/16 = 134217728
+    uint kv_capacity = 14000000;            //
+    uint kv_restriction = 13421772;                  //2*1024*1024*1024/16 = 134217728
     uint MemTable_capacity = 2;             //5*2
 
     uint big_sorted_run_capacity = 100;
