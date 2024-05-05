@@ -539,6 +539,7 @@ void cuda_identify_meetings(workbench *bench) {
     if (bench->meeting_buckets[bid].end == bench->cur_time) {
         if(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start >= bench->config->max_meet_time){
             meet_cut = true;
+            atomicAdd(&bench->meeting_cut_count, 1);
         }
         if(bench->search_single) {
             if (bench->cur_time - bench->meeting_buckets[bid].start >= bench->config->min_meet_time + 1) {
@@ -601,6 +602,22 @@ void cuda_identify_meetings(workbench *bench) {
     }
     //bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start >= bench->config->min_meet_time
     if (bench->cur_time - bench->meeting_buckets[bid].start >= bench->config->min_meet_time + 1) {
+        uint duration = bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start;
+        if(duration >= 1000){
+            if(duration < 2000){
+                atomicAdd(&bench->larger_than_1000s, 1);
+            }
+            if(duration >= 2000 && duration < 3000){
+                atomicAdd(&bench->larger_than_2000s, 1);
+            }
+            if(duration >= 3000 && duration < 4000){
+                atomicAdd(&bench->larger_than_3000s, 1);
+            }
+            if(duration >= 4000){
+                atomicAdd(&bench->larger_than_4000s, 1);
+            }
+        }
+
         atomicMin(&bench->start_time_min,bench->meeting_buckets[bid].start);
         atomicMax(&bench->start_time_max,bench->meeting_buckets[bid].start);
 
@@ -1410,6 +1427,8 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 
     //4.5 cuda sort
     if(h_bench.kv_count>bench->config->kv_restriction){
+        cout <<"1000~2000 " << h_bench.larger_than_1000s << " 2000~3000 " << h_bench.larger_than_2000s << " 3000~4000 " << h_bench.larger_than_3000s << " >4000 " << h_bench.larger_than_4000s <<endl;
+        bench->meeting_cut_count = h_bench.meeting_cut_count;
         bench->start_time_min = h_bench.start_time_min;
         bench->start_time_max = h_bench.start_time_max;
         uint offset = 0;
