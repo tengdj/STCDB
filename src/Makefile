@@ -29,7 +29,7 @@ ifdef USE_GPU
 endif
 
 %_cu.o: %.cu
-	$(NVCC) -c -g -std=c++14 -DCUB_IGNORE_DEPRECATED_CPP_DIALECT $(INCLUDES) -o $@ $<
+	$(NVCC) -c -g -std=c++14 -arch=sm_60 -DCUB_IGNORE_DEPRECATED_CPP_DIALECT $(INCLUDES) -o $@ $<
 
 %.o:	%.cpp
 	$(CXX) -c $(CPPFLAGS) $(INCLUDES) -o $@ $<

@@ -184,8 +184,13 @@ public:
     uint single_find_count = 0;
     uint multi_find_count = 0;
     uint wid_filter_count = 0;
-    uint disk_find_count = 0;
-    uint disk_not_find_count = 0;
+    uint id_find_count = 0;
+    uint id_not_find_count = 0;
+    uint mbr_find_count = 0;
+    uint mbr_unique_find = 0;
+    uint intersect_sst_count = 0;
+    double all_meeting_mid_x = 0;
+    double all_meeting_mid_y = 0;
 
 
     //space for where id
@@ -199,7 +204,6 @@ public:
     f_box * kv_boxs = NULL;                           //real box, 1:1 kv
     box * d_bitmap_mbrs = NULL;
     box ** h_bitmap_mbrs = NULL;
-
 
     pthread_mutex_t mutex_i;
     bool interrupted = false;
