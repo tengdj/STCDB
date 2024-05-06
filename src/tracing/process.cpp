@@ -639,32 +639,32 @@ void tracer::process(){
             }
 
 
-//            if(bench->cur_time == 850){
-//                while(bench->dumping){
-//                    sleep(1);
-//                }
-//
-////                double mid_x = bench->all_meeting_mid_x;
-////                double mid_y = bench->all_meeting_mid_y;
-////
-////                double edge_length = 0.002;
-////                bench->load_big_sorted_run(0);
-////                ofstream p;
-////                p.open("search_mbr.csv", ios::out | ios::trunc);
-////                p << "search area" << ',' << "find_count" << ',' << "unique_find" << ',' << "intersect_sst_count" << ',' << "time(ms)" << endl;
-////                for(int i = 0; i <99 ; i++){
-////                    //cout << fixed << setprecision(6) << mid_x - edge_length/2 <<","<<mid_y - edge_length/2 <<","<<mid_x + edge_length/2 <<","<<mid_y + edge_length/2 <<endl;
-////                    box search_area(mid_x - edge_length/2, mid_y - edge_length/2, mid_x + edge_length/2, mid_y + edge_length/2);
-////                    search_area.print();
-////                    struct timeval area_search_time = get_cur_time();
-////                    bench->mbr_search_in_disk(search_area, 15);
-////                    double time_consume = get_time_elapsed(area_search_time);
-////                    //printf("area_search_time %.2f\n", time_consume);
-////                    p << edge_length*edge_length << ',' << bench->mbr_find_count << ',' << bench->mbr_unique_find << ',' << bench->intersect_sst_count << ',' << time_consume << endl;
-////                    edge_length += 0.002;
-////                }
-////                p.close();
-//
+            if(bench->cur_time == 45){
+                while(bench->dumping){
+                    sleep(1);
+                }
+
+                double mid_x = bench->all_meeting_mid_x;
+                double mid_y = bench->all_meeting_mid_y;
+
+                double edge_length = 0.001;
+                bench->load_big_sorted_run(0);
+                ofstream p;
+                p.open("search_mbr.csv", ios::out | ios::trunc);
+                p << "search area" << ',' << "find_count" << ',' << "unique_find" << ',' << "intersect_sst_count" << ',' << "time(ms)" << endl;
+                for(int i = 0; i <5 ; i++){
+                    //cout << fixed << setprecision(6) << mid_x - edge_length/2 <<","<<mid_y - edge_length/2 <<","<<mid_x + edge_length/2 <<","<<mid_y + edge_length/2 <<endl;
+                    box search_area(mid_x - edge_length/2, mid_y - edge_length/2, mid_x + edge_length/2, mid_y + edge_length/2);
+                    search_area.print();
+                    struct timeval area_search_time = get_cur_time();
+                    bench->mbr_search_in_disk(search_area, 15);
+                    double time_consume = get_time_elapsed(area_search_time);
+                    //printf("area_search_time %.2f\n", time_consume);
+                    p << edge_length*edge_length << ',' << bench->mbr_find_count << ',' << bench->mbr_unique_find << ',' << bench->intersect_sst_count << ',' << time_consume << endl;
+                    edge_length += 0.001;
+                }
+                p.close();
+
 //                uint question_count = 10000;
 //                bench->wid_filter_count = 0;
 //                bench->id_find_count = 0;
@@ -688,15 +688,8 @@ void tracer::process(){
 //                q.close();
 //                cout << "question_count:" << question_count << " id_find_count:" << bench->id_find_count <<" kv_restriction:"<< bench->config->kv_restriction << endl;
 //                cout << "wid_filter_count:" << bench->wid_filter_count <<"id_not_find_count"<<bench->id_not_find_count <<endl;
-////                while(!bench->search_in_disk(pid, 15)){
-////                    pid++;
-////                }
-//            }
+            }
 
-//            if(bench->cur_time == 30){
-//                box b(-87.8, 41.9, -87.7, 42);
-//                bench->mbr_search_in_disk(b,10);
-//            }
 
 			if(config->analyze_grid||config->profile){
 				bench->analyze_grids();

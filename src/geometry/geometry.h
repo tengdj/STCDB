@@ -229,6 +229,21 @@ class f_box{
 public:
     float low[2] = {100000.0,100000.0};
     float high[2] = {-100000.0,-100000.0};
+
+    void print_vertices(){
+        fprintf(stderr,"%f %f, %f %f, %f %f, %f %f, %f %f",
+                low[0],low[1],
+                high[0],low[1],
+                high[0],high[1],
+                low[0],high[1],
+                low[0],low[1]);
+    }
+
+    void print(){
+        fprintf(stderr,"POLYGON((");
+        print_vertices();
+        fprintf(stderr,"))\n");
+    }
 };
 
 class Grid{

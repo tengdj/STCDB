@@ -187,10 +187,10 @@ void workbench::claim_space(){
 
 box workbench::bit_box(box b){
     box new_b;
-    new_b.low[0] = (b.low[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
-    new_b.low[1] = (b.low[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
-    new_b.high[0] = (b.high[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
-    new_b.high[1] = (b.high[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
+    new_b.low[0] = (b.low[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 1);
+    new_b.low[1] = (b.low[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
+    new_b.high[0] = (b.high[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 1);
+    new_b.high[1] = (b.high[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
     return new_b;
 }
 
@@ -487,17 +487,19 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
             //bit_b.print();
             //cout<<bit_b.low[0]<<","<<bit_b.low[1]<<","<<bit_b.high[0]<<","<<bit_b.high[1]<<endl;
             for (uint j = 0; j < config->SSTable_count; j++) {
-                //cerr<<"bitmap_mbrs"<<j<<endl;
-                //bg_run[i].bitmap_mbrs[j].print();
+//                cerr<<"bitmap_mbrs"<<j<<endl;
+//                bg_run[i].bitmap_mbrs[j].print();
                 if(b.intersect(bg_run[i].bitmap_mbrs[j])) {     //real box intersect
-                    //cerr<<"intersect"<<endl;
+                    cerr<<"intersect"<<endl;
+                    cerr<<"bitmap_mbrs"<<j<<endl;
+                    bg_run[i].bitmap_mbrs[j].print();
                     intersect_count++;
                     find = false;
                     for (uint p = bit_b.low[0]-1; (p <= bit_b.high[0]+1) && (!find); p++) {
                         for (uint q = bit_b.low[1]-1; (q <= bit_b.high[1]+1) && (!find); q++) {
                             bit_pos = xy2d(WID_BIT/2, p, q);
                             if (bg_run[i].bitmaps[j * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
-                                //cout << "SSTable_" << j << "bit_pos" << bit_pos << endl;
+                                cerr << "SSTable_" << j << "bit_pos" << bit_pos << endl;
                                 find = true;
                                 ret = true;
                                 break;
@@ -531,7 +533,7 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
 
                             }
                         }
-                        //cout<<this_find<<"finds in sst "<<j<<endl;
+                        cerr<<this_find<<"finds in sst "<<j<<endl;
                     }
                 }
             }

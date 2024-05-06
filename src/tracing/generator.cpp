@@ -270,12 +270,16 @@ void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){             
             }
             meta_data[obj].loc = ret[(count-1)*config->num_objects+obj];
         }else if(meta_data[obj].type == REST){
-            int dur = config->max_rest_time*get_rand_double();
+            if(!meta_data[obj].rest_time){
+                meta_data[obj].rest_time = config->max_rest_time*get_rand_double();
+            }
+            int dur = meta_data[obj].rest_time;
             for(int i=0;i<dur&&count<config->cur_duration;i++){
 //                ret[count].x = meta_data[obj].loc.x;
 //                ret[count].y = meta_data[obj].loc.y;
                 ret[count*config->num_objects+obj] = meta_data[obj].loc;
                 count++;
+                meta_data[obj].rest_time--;
             }
         }
         if(count<config->cur_duration){                //last trip must be finished

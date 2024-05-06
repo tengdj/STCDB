@@ -625,8 +625,8 @@ void cuda_identify_meetings(workbench *bench) {
         pid = getpid1(bench->meeting_buckets[bid].key);
         target = getpid2(bench->meeting_buckets[bid].key);
 
-        uint low0 = (bench->meeting_buckets[bid].mbr.low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
-        uint low1 = (bench->meeting_buckets[bid].mbr.low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
+        uint low0 = (bench->meeting_buckets[bid].mbr.low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 0.01);
+        uint low1 = (bench->meeting_buckets[bid].mbr.low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 0.01);
         //uint high0 = (bench->meeting_buckets[bid].mbr.high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
         //uint high1 = (bench->meeting_buckets[bid].mbr.high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
 
@@ -769,10 +769,10 @@ void write_bitmap(workbench *bench){
     if(kid>=bench->config->kv_restriction){
         return;
     }
-    uint low0 = (bench->kv_boxs[kid].low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
-    uint low1 = (bench->kv_boxs[kid].low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
-    uint high0 = (bench->kv_boxs[kid].high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
-    uint high1 = (bench->kv_boxs[kid].high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
+    uint low0 = (bench->kv_boxs[kid].low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 0.01);
+    uint low1 = (bench->kv_boxs[kid].low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 0.01);
+    uint high0 = (bench->kv_boxs[kid].high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 0.01);
+    uint high1 = (bench->kv_boxs[kid].high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 0.01);
     uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);           //kid/65536
     uint bit_pos = 0;
     for(uint i=low0;i<=high0;i++){
@@ -825,10 +825,10 @@ void mbr_bitmap(workbench *bench){
         }
     }
     if (threadIdx.x == 0) {
-        bench->d_bitmap_mbrs[blockIdx.x].low[0] = (double)local_low[0][0]/(pow(2,WID_BIT/2) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
-        bench->d_bitmap_mbrs[blockIdx.x].low[1] = (double)local_low[0][1]/(pow(2,WID_BIT/2) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];
-        bench->d_bitmap_mbrs[blockIdx.x].high[0] = (double)local_high[0][0]/(pow(2,WID_BIT/2) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
-        bench->d_bitmap_mbrs[blockIdx.x].high[1] = (double)local_high[0][1]/(pow(2,WID_BIT/2) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];
+        bench->d_bitmap_mbrs[blockIdx.x].low[0] = (double)local_low[0][0]/((1ULL << (WID_BIT/2)) - 0.01)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
+        bench->d_bitmap_mbrs[blockIdx.x].low[1] = (double)local_low[0][1]/((1ULL << (WID_BIT/2)) - 0.01)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];
+        bench->d_bitmap_mbrs[blockIdx.x].high[0] = (double)local_high[0][0]/((1ULL << (WID_BIT/2)) - 0.01)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
+        bench->d_bitmap_mbrs[blockIdx.x].high[1] = (double)local_high[0][1]/((1ULL << (WID_BIT/2)) - 0.01)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];
     }
 }
 
@@ -840,11 +840,11 @@ void write_key_mbr(workbench *bench){
     }
     atomicAdd(&bench->all_meeting_mid_x, (double)(bench->kv_boxs[kid].low[0] + bench->kv_boxs[kid].high[0])/2);
     atomicAdd(&bench->all_meeting_mid_y, (double)(bench->kv_boxs[kid].low[1] + bench->kv_boxs[kid].high[1])/2);
-    uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);           //kid/65536
-    uint64_t low0 = (bench->kv_boxs[kid].low[0] - bench->d_bitmap_mbrs[bitmap_id].low[0])/(bench->d_bitmap_mbrs[bitmap_id].high[0] - bench->d_bitmap_mbrs[bitmap_id].low[0]) * (pow(2,MBR_BIT/4) - 1);
-    uint64_t low1 = (bench->kv_boxs[kid].low[1] - bench->d_bitmap_mbrs[bitmap_id].low[1])/(bench->d_bitmap_mbrs[bitmap_id].high[1] - bench->d_bitmap_mbrs[bitmap_id].low[1]) * (pow(2,MBR_BIT/4) - 1);
-    uint64_t high0 = (bench->kv_boxs[kid].high[0] - bench->d_bitmap_mbrs[bitmap_id].low[0])/(bench->d_bitmap_mbrs[bitmap_id].high[0] - bench->d_bitmap_mbrs[bitmap_id].low[0]) * (pow(2,MBR_BIT/4) - 1);
-    uint64_t high1 = (bench->kv_boxs[kid].high[1] - bench->d_bitmap_mbrs[bitmap_id].low[1])/(bench->d_bitmap_mbrs[bitmap_id].high[1] - bench->d_bitmap_mbrs[bitmap_id].low[1]) * (pow(2,MBR_BIT/4) - 1);
+    uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);
+    uint64_t low0 = (bench->kv_boxs[kid].low[0] - bench->d_bitmap_mbrs[bitmap_id].low[0])/(bench->d_bitmap_mbrs[bitmap_id].high[0] - bench->d_bitmap_mbrs[bitmap_id].low[0]) * ((1ULL << (MBR_BIT/4)) - 0.01);
+    uint64_t low1 = (bench->kv_boxs[kid].low[1] - bench->d_bitmap_mbrs[bitmap_id].low[1])/(bench->d_bitmap_mbrs[bitmap_id].high[1] - bench->d_bitmap_mbrs[bitmap_id].low[1]) * ((1ULL << (MBR_BIT/4)) - 0.01);
+    uint64_t high0 = (bench->kv_boxs[kid].high[0] - bench->d_bitmap_mbrs[bitmap_id].low[0])/(bench->d_bitmap_mbrs[bitmap_id].high[0] - bench->d_bitmap_mbrs[bitmap_id].low[0]) * ((1ULL << (MBR_BIT/4)) - 0.01);
+    uint64_t high1 = (bench->kv_boxs[kid].high[1] - bench->d_bitmap_mbrs[bitmap_id].low[1])/(bench->d_bitmap_mbrs[bitmap_id].high[1] - bench->d_bitmap_mbrs[bitmap_id].low[1]) * ((1ULL << (MBR_BIT/4)) - 0.01);
     uint64_t value_mbr = ((uint64_t)low0 << (MBR_BIT/4*3)) + ((uint64_t)low1 << (MBR_BIT/2)) + ((uint64_t)high0 << (MBR_BIT/4)) + (uint64_t)high1;
     bench->d_keys[kid] += (__uint128_t)value_mbr << (DURATION_BIT + END_BIT);
 }
@@ -1498,6 +1498,10 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         box b;
         parse_mbr(bench->h_keys[offset+bench->MemTable_count][10], b, bench->h_bitmap_mbrs[offset+bench->MemTable_count][0]);
         b.print();
+        f_box * temp_f_box = new f_box[20];
+        CUDA_SAFE_CALL(cudaMemcpy(temp_f_box, h_bench.kv_boxs, 20 * sizeof(f_box), cudaMemcpyDeviceToHost));
+        temp_f_box[10].print();
+        cerr << "kv box, real box, and then the bitmap_mbr"<<endl;
         bench->h_bitmap_mbrs[offset+bench->MemTable_count][0].print();
         cerr<<"bitmap_mbrs:"<<endl;
         for(int i = 0; i < bench->config->SSTable_count; i++){
