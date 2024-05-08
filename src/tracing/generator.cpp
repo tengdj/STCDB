@@ -203,6 +203,24 @@ Point trace_generator::get_random_location(int seed){
     }
     double xval = tweets[tid].x + (0.5-get_rand_double())*100*degree_per_meter_longitude(tweets[tid].y);
     double yval = tweets[tid].y + (0.5-get_rand_double())*100*degree_per_meter_latitude;
+    //must in the map mbr
+    box map_mbr = map->getMBR();
+    if(xval < map_mbr.low[0]){
+        double offset = map_mbr.low[0] - xval;
+        xval = map_mbr.low[0] + offset;
+    }
+    if(xval > map_mbr.high[0]){
+        double offset = xval - map_mbr.high[0];
+        xval = map_mbr.high[0] - offset;
+    }
+    if(yval < map_mbr.low[1]){
+        double offset = map_mbr.low[1] - yval;
+        yval = map_mbr.low[1] + offset;
+    }
+    if(yval > map_mbr.high[1]){
+        double offset = yval - map_mbr.high[1];
+        yval = map_mbr.high[1] - offset;
+    }
     return Point(xval, yval);
 }
 

@@ -55,7 +55,7 @@ public:
     uint MemTable_capacity = 2;             //5*2 ,but workbench data[100]
 
     uint big_sorted_run_capacity = 100;
-    uint SSTable_count = 100;              //
+    uint SSTable_count = 10;              //
 
     //bool search_kv = true;
     uint search_single_capacity = 100;
