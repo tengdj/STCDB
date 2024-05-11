@@ -35,11 +35,19 @@ inline double distance(box *b,Point *p){
 }
 
 __device__
-inline double contain(box *b, Point *p){
+inline bool contain(box *b, Point *p){            //?? double  bool
 	return p->x>=b->low[0]&&
 		   p->x<=b->high[0]&&
 		   p->y>=b->low[1]&&
 		   p->y<=b->high[1];
+}
+
+__device__
+inline bool box_contain(box *b, box *target){            //?? double  bool
+    return target->low[0]>=b->low[0]&&
+           target->high[0]<=b->high[0]&&
+           target->low[1]>=b->low[1]&&
+           target->high[1]<=b->high[1];
 }
 
 __device__
@@ -608,6 +616,11 @@ void cuda_identify_meetings(workbench *bench) {
     }
     //bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start >= bench->config->min_meet_time
     if (bench->cur_time - bench->meeting_buckets[bid].start >= bench->config->min_meet_time + 1) {
+        if(!box_contain(&bench->mbr, &bench->meeting_buckets[bid].mbr)){
+            bench->meeting_buckets[bid].key = ULL_MAX;
+            return;
+        }
+
         uint duration = bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start;
         if(duration >= 990){
             if(duration < 2000){
@@ -779,40 +792,16 @@ void write_bitmap(workbench *bench){
     uint low1 = (bench->kv_boxs[kid].low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
     uint high0 = (bench->kv_boxs[kid].high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 1);
     uint high1 = (bench->kv_boxs[kid].high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
-//    if(low0==0){
-//        printf("0\n");
-//    }
-//    if(high0==255){
-//        printf("255\n");
-//    }
 
     uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);           //kid/65536
     uint bit_pos = 0;
     for(uint i=low0;i<=high0;i++){
         for(uint j=low1;j<=high1;j++){
             bit_pos = xy2d(WID_BIT/2,i,j);
-            assert(bit_pos < bench->bit_count);
-            if(i==0 && bitmap_id==9){
-                printf("bug in last %d\n", get_key_wid(bench->d_keys[kid]));
-
-                printf("POLYGON((%f %f, %f %f, %f %f, %f %f, %f %f))\n",
-                       bench->kv_boxs[kid].low[0],bench->kv_boxs[kid].low[1],
-                       bench->kv_boxs[kid].high[0],bench->kv_boxs[kid].low[1],
-                       bench->kv_boxs[kid].high[0],bench->kv_boxs[kid].high[1],
-                       bench->kv_boxs[kid].low[0],bench->kv_boxs[kid].high[1],
-                       bench->kv_boxs[kid].low[0],bench->kv_boxs[kid].low[1]);
-            }
-            if(i==255 && bitmap_id==0){
-                printf("bug in first %d\n", get_key_wid(bench->d_keys[kid]));
-                get_key_wid(bench->d_keys[kid]);
-                printf("POLYGON((%f %f, %f %f, %f %f, %f %f, %f %f))\n",
-                       bench->kv_boxs[kid].low[0],bench->kv_boxs[kid].low[1],
-                       bench->kv_boxs[kid].high[0],bench->kv_boxs[kid].low[1],
-                       bench->kv_boxs[kid].high[0],bench->kv_boxs[kid].high[1],
-                       bench->kv_boxs[kid].low[0],bench->kv_boxs[kid].high[1],
-                       bench->kv_boxs[kid].low[0],bench->kv_boxs[kid].low[1]);
-            }
-            bench->d_bitmaps[bitmap_id*(bench->bit_count/8)+bit_pos/8] |= (1<<(bit_pos%8));
+            //bench->d_bitmaps[bitmap_id*(bench->bit_count/8)+bit_pos/8] |= (1<<(bit_pos%8));
+            //unsigned int *bitmap_ptr = reinterpret_cast<unsigned int *>(&bench->d_bitmaps[bitmap_id * (bench->bit_count / 8) + bit_pos / 32]);
+            unsigned int *bitmap_ptr = reinterpret_cast<unsigned int *>(bench->d_bitmaps);
+            atomicOr(&bitmap_ptr[bitmap_id * (bench->bit_count / 32) + bit_pos / 32], (1 << (bit_pos % 32)));
         }
     }
 }
@@ -1509,8 +1498,12 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
         logt("write_value_mbr: ",start);
 
-        bench->all_meeting_mid_x = h_bench.all_meeting_mid_x/bench->config->kv_restriction;
-        bench->all_meeting_mid_y = h_bench.all_meeting_mid_y/bench->config->kv_restriction;
+        cout<<"h_bench."<<h_bench.all_meeting_mid_x<<" y "<<h_bench.all_meeting_mid_y;
+        if(!bench->all_meeting_mid_x){
+            bench->all_meeting_mid_x = h_bench.all_meeting_mid_x/bench->config->kv_restriction;
+            bench->all_meeting_mid_y = h_bench.all_meeting_mid_y/bench->config->kv_restriction;
+        }
+
 
         if(bench->config->bloom_filter){
             BloomFilter_Add<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);

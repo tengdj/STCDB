@@ -639,20 +639,50 @@ void tracer::process(){
             }
 
 
-            if(bench->cur_time == 850){
+            if(bench->cur_time == 95){
                 while(bench->dumping){
                     sleep(1);
                 }
 
+
+                uint question_count = 10000;
+                bench->wid_filter_count = 0;
+                bench->id_find_count = 0;
+                uint pid = 1000000;
+
+//                string cmd = "sync; sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'";        //sudo!!!
+//                if(system(cmd.c_str())!=0){
+//                    fprintf(stderr, "Error when disable buffer cache\n");
+//                }
+                ofstream q;
+                q.open("search_id.csv", ios::out | ios::trunc);
+                q << "question number" << ',' << "time_consume(ms)" << endl;
+                for(int i = 0; i < question_count; i++){
+                    struct timeval disk_search_time = get_cur_time();
+                    bench->search_in_disk(pid, 15);
+                    pid++;
+                    double time_consume = get_time_elapsed(disk_search_time);
+                    //printf("disk_search_time %.2f\n", time_consume);
+                    q << i << ',' << time_consume << endl;
+                }
+                q.close();
+                cout << "question_count:" << question_count << " id_find_count:" << bench->id_find_count <<" kv_restriction:"<< bench->config->kv_restriction << endl;
+                cout << "wid_filter_count:" << bench->wid_filter_count <<"id_not_find_count"<<bench->id_not_find_count <<endl;
+
+
+
                 double mid_x = bench->all_meeting_mid_x;
                 double mid_y = bench->all_meeting_mid_y;
-
-                double edge_length = 0.001;
-                bench->load_big_sorted_run(0);
+                Point the_mid(mid_x, mid_y);
+                the_mid.print();
+                double edge_length = 0.01;
+                for(int i = 0; i < bench->big_sorted_run_count; i++){
+                    bench->load_big_sorted_run(i);
+                }
                 ofstream p;
                 p.open("search_mbr.csv", ios::out | ios::trunc);
                 p << "search area" << ',' << "find_count" << ',' << "unique_find" << ',' << "intersect_sst_count" << ',' << "time(ms)" << endl;
-                for(int i = 0; i <100 ; i++){
+                for(int i = 0; i <10 ; i++){
                     //cout << fixed << setprecision(6) << mid_x - edge_length/2 <<","<<mid_y - edge_length/2 <<","<<mid_x + edge_length/2 <<","<<mid_y + edge_length/2 <<endl;
                     box search_area(mid_x - edge_length/2, mid_y - edge_length/2, mid_x + edge_length/2, mid_y + edge_length/2);
                     search_area.print();
@@ -661,33 +691,9 @@ void tracer::process(){
                     double time_consume = get_time_elapsed(area_search_time);
                     //printf("area_search_time %.2f\n", time_consume);
                     p << edge_length*edge_length << ',' << bench->mbr_find_count << ',' << bench->mbr_unique_find << ',' << bench->intersect_sst_count << ',' << time_consume << endl;
-                    edge_length += 0.001;
+                    edge_length += 0.01;
                 }
                 p.close();
-
-//                uint question_count = 10000;
-//                bench->wid_filter_count = 0;
-//                bench->id_find_count = 0;
-//                uint pid = 1000000;
-//                //bench->load_big_sorted_run(0);
-//                string cmd = "sync; sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'";
-//                if(system(cmd.c_str())!=0){
-//                    fprintf(stderr, "Error when disable buffer cache\n");
-//                }
-//                ofstream q;
-//                q.open("search_id.csv", ios::out | ios::trunc);
-//                q << "question number" << ',' << "time_consume(ms)" << endl;
-//                for(int i = 0; i < question_count; i++){
-//                    struct timeval disk_search_time = get_cur_time();
-//                    bench->search_in_disk(pid, 15);
-//                    pid++;
-//                    double time_consume = get_time_elapsed(disk_search_time);
-//                    //printf("disk_search_time %.2f\n", time_consume);
-//                    q << i << ',' << time_consume << endl;
-//                }
-//                q.close();
-//                cout << "question_count:" << question_count << " id_find_count:" << bench->id_find_count <<" kv_restriction:"<< bench->config->kv_restriction << endl;
-//                cout << "wid_filter_count:" << bench->wid_filter_count <<"id_not_find_count"<<bench->id_not_find_count <<endl;
             }
 
 

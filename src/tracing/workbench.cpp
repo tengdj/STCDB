@@ -470,7 +470,7 @@ box workbench::parse_to_real_mbr(unsigned short first_low, unsigned short first_
 
 bool workbench::mbr_search_in_disk(box b, uint timestamp) {
     assert(mbr.contain(b));
-    //cout << "mbr disk search" << endl;
+    cout << "mbr disk search" << endl;
     uint find_count = 0, intersect_count = 0;
     unordered_set<uint> uni;
     bool ret = false, find = false;
@@ -481,7 +481,7 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
             if(!bg_run[i].sst){
                 bg_run[i].sst = new SSTable[config->SSTable_count];
             }
-            //cout << "in bg_run" << i << endl;
+            cout << "in bg_run" << i << endl;
             bit_b = bit_box(b);
             //cerr<<"bit_box"<<endl;
             //bit_b.print();
@@ -490,8 +490,8 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
 //                cerr<<"bitmap_mbrs"<<j<<endl;
 //                bg_run[i].bitmap_mbrs[j].print();
                 if(b.intersect(bg_run[i].bitmap_mbrs[j])) {     //real box intersect
-                    cerr<<"intersect"<<endl;
-                    cerr<<"bitmap_mbrs"<<j<<endl;
+//                    cerr<<"intersect"<<endl;
+//                    cerr<<"bitmap_mbrs"<<j<<endl;
                     bg_run[i].bitmap_mbrs[j].print();
                     intersect_count++;
                     find = false;
@@ -499,7 +499,7 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
                         for (uint q = bit_b.low[1]-1; (q <= bit_b.high[1]+1) && (!find); q++) {
                             bit_pos = xy2d(WID_BIT/2, p, q);
                             if (bg_run[i].bitmaps[j * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
-                                cerr << "SSTable_" << j << "bit_pos" << bit_pos << endl;
+//                                cerr << "SSTable_" << j << "bit_pos" << bit_pos << endl;
                                 find = true;
                                 ret = true;
                                 break;
@@ -533,7 +533,7 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
 
                             }
                         }
-                        cerr<<this_find<<"finds in sst "<<j<<endl;
+//                        cerr<<this_find<<"finds in sst "<<j<<endl;
                     }
                 }
             }
