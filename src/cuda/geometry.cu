@@ -861,8 +861,6 @@ void write_key_mbr(workbench *bench){
     if(kid>=bench->config->kv_restriction){
         return;
     }
-    atomicAdd(&bench->all_meeting_mid_x, (double)(bench->kv_boxs[kid].low[0] + bench->kv_boxs[kid].high[0])/2);
-    atomicAdd(&bench->all_meeting_mid_y, (double)(bench->kv_boxs[kid].low[1] + bench->kv_boxs[kid].high[1])/2);
     uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);
     uint64_t low0 = (bench->kv_boxs[kid].low[0] - bench->d_bitmap_mbrs[bitmap_id].low[0])/(bench->d_bitmap_mbrs[bitmap_id].high[0] - bench->d_bitmap_mbrs[bitmap_id].low[0]) * ((1ULL << (MBR_BIT/4)) - 1);
     uint64_t low1 = (bench->kv_boxs[kid].low[1] - bench->d_bitmap_mbrs[bitmap_id].low[1])/(bench->d_bitmap_mbrs[bitmap_id].high[1] - bench->d_bitmap_mbrs[bitmap_id].low[1]) * ((1ULL << (MBR_BIT/4)) - 1);
@@ -1497,13 +1495,6 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         write_key_mbr<<<bench->config->kv_restriction / 1024 + 1, 1024>>>(d_bench);
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
         logt("write_value_mbr: ",start);
-
-        cout<<"h_bench."<<h_bench.all_meeting_mid_x<<" y "<<h_bench.all_meeting_mid_y;
-        if(!bench->all_meeting_mid_x){
-            bench->all_meeting_mid_x = h_bench.all_meeting_mid_x/bench->config->kv_restriction;
-            bench->all_meeting_mid_y = h_bench.all_meeting_mid_y/bench->config->kv_restriction;
-        }
-
 
         if(bench->config->bloom_filter){
             BloomFilter_Add<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);

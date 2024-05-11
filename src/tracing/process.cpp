@@ -639,7 +639,7 @@ void tracer::process(){
             }
 
 
-            if(bench->cur_time == 95){
+            if(bench->cur_time == 1350){
                 while(bench->dumping){
                     sleep(1);
                 }
@@ -670,9 +670,8 @@ void tracer::process(){
                 cout << "wid_filter_count:" << bench->wid_filter_count <<"id_not_find_count"<<bench->id_not_find_count <<endl;
 
 
-
-                double mid_x = bench->all_meeting_mid_x;
-                double mid_y = bench->all_meeting_mid_y;
+                double mid_x = -87.678503;
+                double mid_y = 41.856803;
                 Point the_mid(mid_x, mid_y);
                 the_mid.print();
                 double edge_length = 0.01;
