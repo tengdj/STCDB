@@ -151,8 +151,6 @@ public:
 		}
 	}
 
-
-
 	double distance(Point &p, bool geography = false){
 		if(this->contain(p)){
 			return 0;
@@ -165,7 +163,6 @@ public:
 		}
 		return sqrt(dx * dx + dy * dy);
 	}
-
 
 	double max_distance(Point &p){
 		double md = 0;

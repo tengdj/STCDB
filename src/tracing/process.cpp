@@ -638,12 +638,10 @@ void tracer::process(){
                 //bool findit = searchkv_in_all_place(bench, 2);
             }
 
-
-            if(bench->cur_time == 1350){
+            if(bench->cur_time == 1580){
                 while(bench->dumping){
                     sleep(1);
                 }
-
 
                 uint question_count = 10000;
                 bench->wid_filter_count = 0;

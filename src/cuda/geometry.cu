@@ -62,7 +62,7 @@ inline void print_box_point(box *b, Point *p){
 }
 
 __device__
-inline void print_box(box *b){
+inline void print_box(f_box *b){
 	printf("POLYGON((%f %f, %f %f, %f %f, %f %f, %f %f))\n",
 						b->low[0],b->low[1],
 						b->high[0],b->low[1],
@@ -112,7 +112,8 @@ void update_wid(unsigned short & hilbert_low, uint edge_length, uint low0, uint 
     if(hilbert_low){
         uint old_low0, old_low1;
         d2xy(edge_length, hilbert_low, old_low0, old_low1);
-        uint new_low0 = min(old_low0, low0), new_low1 = min(old_low1, low1);            //always the left bottom
+        //uint new_low0 = min(old_low0, low0), new_low1 = min(old_low1, low1);            //always the left bottom
+        uint new_low0 = old_low0/2 + low0/2, new_low1 = old_low1/2 + low1/2;            //nearly the centroid
         hilbert_low = xy2d(edge_length, new_low0, new_low1);
         if(!hilbert_low){                                                               //0 used to be ambiguous, now 0 -> not appear, 1 is ambiguous
             hilbert_low = 1;
@@ -861,6 +862,12 @@ void write_key_mbr(workbench *bench){
     if(kid>=bench->config->kv_restriction){
         return;
     }
+    if(bench->cur_time > 2000){
+        if(get_key_duration(bench->d_keys[kid]) > 2000){
+            print_box(&bench->kv_boxs[kid]);
+        }
+    }
+
     uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);
     uint64_t low0 = (bench->kv_boxs[kid].low[0] - bench->d_bitmap_mbrs[bitmap_id].low[0])/(bench->d_bitmap_mbrs[bitmap_id].high[0] - bench->d_bitmap_mbrs[bitmap_id].low[0]) * ((1ULL << (MBR_BIT/4)) - 1);
     uint64_t low1 = (bench->kv_boxs[kid].low[1] - bench->d_bitmap_mbrs[bitmap_id].low[1])/(bench->d_bitmap_mbrs[bitmap_id].high[1] - bench->d_bitmap_mbrs[bitmap_id].low[1]) * ((1ULL << (MBR_BIT/4)) - 1);
@@ -1446,7 +1453,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
     //bench->kv_count = h_bench.kv_count;
 	//logt("meeting identify: %d taken %d active %d new meetings found", start, h_bench.num_taken_buckets, h_bench.num_active_meetings, h_bench.meeting_counter);
 
-    if(bench->cur_time == 996){
+    if(bench->cur_time == 2200){
         cout <<"1000~2000 " << h_bench.larger_than_1000s << " 2000~3000 " << h_bench.larger_than_2000s << " 3000~4000 " << h_bench.larger_than_3000s << " >4000 " << h_bench.larger_than_4000s <<endl;
     }
     //4.5 cuda sort

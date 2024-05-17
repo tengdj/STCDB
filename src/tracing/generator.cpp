@@ -87,6 +87,7 @@ trace_generator::trace_generator(generator_configuration *conf, Map *m){
     }
 
     infile.read((char *)&core_count, sizeof(core_count));
+    cout<<"core_count : "<<core_count<<endl;
     cores = new gen_core[core_count];
     for(int i=0;i<core_count;i++){
         cores[i].id = i;
@@ -276,7 +277,8 @@ void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){             
                 meta_data[obj].core = get_core(meta_data[obj].core);
                 meta_data[obj].end = get_random_location(meta_data[obj].core);
             }
-            meta_data[obj].speed = config->drive_speed;
+            //meta_data[obj].speed = config->drive_speed;
+            meta_data[obj].speed = 10 + get_rand_double()*10;           //10~20
             mymap->navigate(ret, meta_data[obj], config->cur_duration, count, config->num_objects, obj);
         }else if(meta_data[obj].type == WALK){
             const double step = config->walk_speed/meta_data[obj].end.distance(meta_data[obj].loc, true);
@@ -291,10 +293,8 @@ void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){             
             if(!meta_data[obj].rest_time){
                 meta_data[obj].rest_time = config->max_rest_time*get_rand_double();
             }
-            int dur = meta_data[obj].rest_time;
-            for(int i=0;i<dur&&count<config->cur_duration;i++){
-//                ret[count].x = meta_data[obj].loc.x;
-//                ret[count].y = meta_data[obj].loc.y;
+            //int dur = meta_data[obj].rest_time;
+            while(meta_data[obj].rest_time>0 && count<config->cur_duration){
                 ret[count*config->num_objects+obj] = meta_data[obj].loc;
                 count++;
                 meta_data[obj].rest_time--;
