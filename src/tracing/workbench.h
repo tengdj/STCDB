@@ -96,8 +96,8 @@ typedef struct reach_unit{
 
 class workbench{
 	pthread_mutex_t *insert_lk;
-	void *data[100];
-	size_t data_size[100];
+	void *data[200];
+	size_t data_size[200];
 	uint data_index = 0;
 	void *allocate(size_t size);
 public:
@@ -221,6 +221,7 @@ public:
     uint end_time_max = 0;
     uint SSTable_kv_capacity = 0;
     bool dumping = false;
+    uint merge_sstable_count = 0;
 
     //s
     //uint s_of_all_mbr = 0;
