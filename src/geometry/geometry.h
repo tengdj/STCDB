@@ -105,6 +105,13 @@ public:
 		update(Point(b.high[0],b.high[1]));
 	}
 
+//    void init(){
+//        low[0] = 100000.0;
+//        low[1] = 100000.0;
+//        high[0] = -100000.0;
+//        high[1] = -100000.0;
+//    }
+
 	bool intersect(box &target){
 		return !(target.low[0]>high[0]||            //target is at the right of this
 				 target.high[0]<low[0]||            //... left...

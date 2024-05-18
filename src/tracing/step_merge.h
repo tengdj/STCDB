@@ -28,6 +28,7 @@ public:
 
     ~SSTable();
     uint search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_capacity, uint &search_multi_length, uint *search_multi_pid);
+    uint search_SSTable(uint64_t wp, uint SSTable_kv_capacity, vector<__uint128_t> & v_keys, vector<uint> & v_indices);
 };
 
 class sorted_run {                          //10G

@@ -794,7 +794,7 @@ void write_bitmap(workbench *bench){
     uint high0 = (bench->kv_boxs[kid].high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 1);
     uint high1 = (bench->kv_boxs[kid].high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
 
-    uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);           //kid/65536
+    uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);
     uint bit_pos = 0;
     for(uint i=low0;i<=high0;i++){
         for(uint j=low1;j<=high1;j++){

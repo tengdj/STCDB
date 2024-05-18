@@ -216,25 +216,26 @@ void *merge_dump(void *arg){
 
     uint sst_count = 0;
     cout<<"sst_capacity:"<<bench->SSTable_kv_capacity<<endl;
-    uint64_t total_length = bench->SSTable_kv_capacity * bench->config->MemTable_capacity/2;
-    __uint128_t *temp_keys = new __uint128_t[total_length];
+    bench->merge_kv_capacity = bench->SSTable_kv_capacity * bench->config->MemTable_capacity/2;
+    __uint128_t *temp_keys = new __uint128_t[bench->merge_kv_capacity];
+    box *temp_real_mbrs = new box[bench->merge_kv_capacity];
     uint64_t total_index = 0;
-    bench->merge_sstable_count = total_length / bench->config->SSTable_count;
+    uint sst_index = 0;
+    bench->merge_sstable_count = bench->merge_kv_capacity / bench->config->SSTable_count;
     bench->bg_run[old_big].wids = new unsigned short[bench->config->num_objects];
     bench->bg_run[old_big].bitmaps = new unsigned char[bench->bit_count/8*bench->merge_sstable_count];
-    bench->bg_run[old_big].bitmap_mbrs = new box[bench->bit_count/8*bench->merge_sstable_count];
-
+    bench->bg_run[old_big].bitmap_mbrs = new box[bench->merge_sstable_count];
 
 
     struct timeval bg_start = get_cur_time();
-    box new_bitmap_mbr;
-
     vector<__uint128_t> keys_with_this_pid;
     vector<box> mbrs_with_this_pid;
+    vector<uint> indices_with_this_pid;
     for(uint i = 0; i < bench->config->num_objects; i++){
         uint64_t wp = 0;
         uint x = 0, y = 0, not_zero_count = 0;
 
+        //search and get
         for(uint j = 0; j < bench->config->MemTable_capacity/2; j++){
             if(bench->h_wids[j][i] == 0){
                 continue;
@@ -246,44 +247,57 @@ void *merge_dump(void *arg){
             not_zero_count++;
 
             wp = ((uint64_t)bench->h_wids[j][i] << PID_BIT) + i;
-            search_h_keys(keys_with_this_pid , mbrs_with_this_pid);
-
-
-
-
+            SSTable temp_sst;
+            temp_sst.keys = bench->h_keys[j];
+            uint find_count = temp_sst.search_SSTable(wp, bench->SSTable_kv_capacity, keys_with_this_pid, indices_with_this_pid);
+            uint old_keys_count = keys_with_this_pid.size() - indices_with_this_pid.size();
+            if(find_count){
+                for(uint a = 0; a < indices_with_this_pid.size(); a++){
+                    uint bitmap_id = indices_with_this_pid[a]/bench->SSTable_kv_capacity;
+                    box temp_mbr;
+                    parse_mbr(keys_with_this_pid[old_keys_count+a], temp_mbr, bench->h_bitmap_mbrs[j][bitmap_id]);
+                    mbrs_with_this_pid.push_back(temp_mbr);
+                }
+                indices_with_this_pid.clear();
+            }
         }
         if(keys_with_this_pid.empty()){
             continue;
         }
+
+        //rewrite wid, bitmap and its mar
         x /= not_zero_count;
         y /= not_zero_count;
         bench->bg_run[old_big].wids[i] = xy2d(WID_BIT/2, x, y);
         for(uint k = 0; k < keys_with_this_pid.size(); k++){
             keys_with_this_pid[k] = (keys_with_this_pid[k] & (((__uint128_t)1 << (PID_BIT*2 + MBR_BIT + DURATION_BIT + END_BIT)) - 1))
                                  + ((__uint128_t)bench->bg_run[old_big].wids[i] << (PID_BIT*2 + MBR_BIT + DURATION_BIT + END_BIT));
-
-
             uint low0 = (mbrs_with_this_pid[k].low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 1);
             uint low1 = (mbrs_with_this_pid[k].low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
             uint high0 = (mbrs_with_this_pid[k].high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 1);
             uint high1 = (mbrs_with_this_pid[k].high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
-            uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);           //kid/65536
             uint bit_pos = 0;
-            for(uint i=low0;i<=high0;i++){
-                for(uint j=low1;j<=high1;j++){
-                    bit_pos = xy2d(WID_BIT/2,i,j);
-                    //bench->d_bitmaps[bitmap_id*(bench->bit_count/8)+bit_pos/8] |= (1<<(bit_pos%8));
-                    //unsigned int *bitmap_ptr = reinterpret_cast<unsigned int *>(&bench->d_bitmaps[bitmap_id * (bench->bit_count / 8) + bit_pos / 32]);
-                    unsigned int *bitmap_ptr = reinterpret_cast<unsigned int *>(bench->d_bitmaps);
-                    atomicOr(&bitmap_ptr[bitmap_id * (bench->bit_count / 32) + bit_pos / 32], (1 << (bit_pos % 32)));
+            for(uint m=low0;m<=high0;m++){
+                for(uint n=low1;n<=high1;n++){
+                    bit_pos = xy2d(WID_BIT/2,m,n);
+                    bench->bg_run[old_big].bitmaps[sst_index*(bench->bit_count/8)+bit_pos/8] |= (1<<(bit_pos%8));
                 }
             }
-
+            bench->bg_run[old_big].bitmap_mbrs[sst_index].update(mbrs_with_this_pid[k]);        //not use bitmap
+            temp_keys[total_index] = keys_with_this_pid[k];
+            temp_real_mbrs[total_index] = mbrs_with_this_pid[k];
+            total_index++;
+            if(total_index % bench->SSTable_kv_capacity == 0){
+                sst_index++;
+            }
         }
 
+
+        keys_with_this_pid.clear();
+        mbrs_with_this_pid.clear();
     }
 
-
+    write_key_mbr
 
 
     fprintf(stdout,"\tmerge sort:\t%.2f\n",bench->pro.bg_merge_time);
@@ -298,7 +312,6 @@ void *merge_dump(void *arg){
     //dump
     //merge sort
     ofstream SSTable_of;
-
 
 
 

@@ -69,6 +69,59 @@ uint SSTable::search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_cap
     return count;
 }
 
+uint SSTable::search_SSTable(uint64_t wp, uint SSTable_kv_capacity, vector<__uint128_t> & v_keys, vector<uint> & v_indices){
+    uint count = 0;
+    //cout<<"into search_SSTable"<<endl;
+    int find = -1;
+    int low = 0;
+    int high = SSTable_kv_capacity - 1;
+    int mid;
+    uint64_t temp_wp;
+    while (low <= high) {
+        mid = (low + high) / 2;
+        temp_wp = keys[mid] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
+        if (temp_wp == wp){
+            find = mid;
+            break;
+        }
+        else if (temp_wp > wp){
+            high = mid - 1;
+        }
+        else {
+            low = mid + 1;
+        }
+    }
+    if(find==-1){
+        //cout<<"cannot find"<<endl;
+        return 0;
+    }
+    //cout<<"exactly find"<<endl;
+    uint cursor = find;
+    while(temp_wp == wp && cursor >= 1){
+        cursor--;
+        temp_wp = keys[cursor] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
+    }
+    if(temp_wp == wp && cursor == 0){
+        count++;
+        v_keys.push_back(keys[cursor]);
+        v_indices.push_back(cursor);
+    }
+    while(cursor+1<SSTable_kv_capacity){
+        cursor++;
+        temp_wp = keys[cursor] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
+        if(temp_wp == wp){
+            count++;
+            v_keys.push_back(keys[cursor]);
+            v_indices.push_back(cursor);
+        }
+        else break;
+    }
+    //cout<<"find !"<<endl;
+    return count;
+}
+
+
+
 sorted_run::~sorted_run(){
     delete []sst;
     delete []first_widpid;

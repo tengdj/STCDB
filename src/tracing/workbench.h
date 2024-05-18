@@ -222,6 +222,7 @@ public:
     uint SSTable_kv_capacity = 0;
     bool dumping = false;
     uint merge_sstable_count = 0;
+    uint merge_kv_capacity = 0;
 
     //s
     //uint s_of_all_mbr = 0;
