@@ -165,6 +165,26 @@ uint get_key_end(__uint128_t key){
     return (uint)(key & ((1ULL << END_BIT) - 1));
 }
 
+__host__ __device__
+uint64_t serialize_mbr(box* b, box* bitmap_mbr){
+    uint64_t low0 = (b->low[0] - bitmap_mbr->low[0])/(bitmap_mbr->high[0] - bitmap_mbr->low[0]) * ((1ULL << (MBR_BIT/4)) - 1);
+    uint64_t low1 = (b->low[1] - bitmap_mbr->low[1])/(bitmap_mbr->high[1] - bitmap_mbr->low[1]) * ((1ULL << (MBR_BIT/4)) - 1);
+    uint64_t high0 = (b->high[0] - bitmap_mbr->low[0])/(bitmap_mbr->high[0] - bitmap_mbr->low[0]) * ((1ULL << (MBR_BIT/4)) - 1);
+    uint64_t high1 = (b->high[1] - bitmap_mbr->low[1])/(bitmap_mbr->high[1] - bitmap_mbr->low[1]) * ((1ULL << (MBR_BIT/4)) - 1);
+    uint64_t value_mbr = ((uint64_t)low0 << (MBR_BIT/4*3)) + ((uint64_t)low1 << (MBR_BIT/2)) + ((uint64_t)high0 << (MBR_BIT/4)) + (uint64_t)high1;
+    return value_mbr;
+}
+
+__host__ __device__
+uint64_t serialize_mbr(f_box* b, box* bitmap_mbr){
+    uint64_t low0 = (b->low[0] - bitmap_mbr->low[0])/(bitmap_mbr->high[0] - bitmap_mbr->low[0]) * ((1ULL << (MBR_BIT/4)) - 1);
+    uint64_t low1 = (b->low[1] - bitmap_mbr->low[1])/(bitmap_mbr->high[1] - bitmap_mbr->low[1]) * ((1ULL << (MBR_BIT/4)) - 1);
+    uint64_t high0 = (b->high[0] - bitmap_mbr->low[0])/(bitmap_mbr->high[0] - bitmap_mbr->low[0]) * ((1ULL << (MBR_BIT/4)) - 1);
+    uint64_t high1 = (b->high[1] - bitmap_mbr->low[1])/(bitmap_mbr->high[1] - bitmap_mbr->low[1]) * ((1ULL << (MBR_BIT/4)) - 1);
+    uint64_t value_mbr = ((uint64_t)low0 << (MBR_BIT/4*3)) + ((uint64_t)low1 << (MBR_BIT/2)) + ((uint64_t)high0 << (MBR_BIT/4)) + (uint64_t)high1;
+    return value_mbr;
+}
+
 /*
  *
  * kernel functions
@@ -325,7 +345,6 @@ void cuda_filtering(workbench *bench, int start_idx, int batch_size, bool includ
 			break;
 		}
 		if(busy){
-
 			uint pid = cur_stack[2*stack_index];
 			uint curnode = cur_stack[2*stack_index+1];
 			Point *p = bench->points+pid;
@@ -763,6 +782,13 @@ void write_wid(workbench *bench){
         bench->d_keys[kid] = (bench->d_keys[kid] & (((__uint128_t)1 << (PID_BIT*2 + MBR_BIT + DURATION_BIT + END_BIT)) - 1))
                 + ((__uint128_t)bench->d_wids[pid] << (PID_BIT*2 + MBR_BIT + DURATION_BIT + END_BIT));
     }
+    else {
+        //new wid : 0 -> old_wid
+        uint old_wid = get_key_wid(bench->d_keys[kid]);
+        if(old_wid){
+            bench->d_wids[pid] = old_wid;
+        }
+    }
 }
 
 __global__
@@ -869,11 +895,7 @@ void write_key_mbr(workbench *bench){
     }
 
     uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);
-    uint64_t low0 = (bench->kv_boxs[kid].low[0] - bench->d_bitmap_mbrs[bitmap_id].low[0])/(bench->d_bitmap_mbrs[bitmap_id].high[0] - bench->d_bitmap_mbrs[bitmap_id].low[0]) * ((1ULL << (MBR_BIT/4)) - 1);
-    uint64_t low1 = (bench->kv_boxs[kid].low[1] - bench->d_bitmap_mbrs[bitmap_id].low[1])/(bench->d_bitmap_mbrs[bitmap_id].high[1] - bench->d_bitmap_mbrs[bitmap_id].low[1]) * ((1ULL << (MBR_BIT/4)) - 1);
-    uint64_t high0 = (bench->kv_boxs[kid].high[0] - bench->d_bitmap_mbrs[bitmap_id].low[0])/(bench->d_bitmap_mbrs[bitmap_id].high[0] - bench->d_bitmap_mbrs[bitmap_id].low[0]) * ((1ULL << (MBR_BIT/4)) - 1);
-    uint64_t high1 = (bench->kv_boxs[kid].high[1] - bench->d_bitmap_mbrs[bitmap_id].low[1])/(bench->d_bitmap_mbrs[bitmap_id].high[1] - bench->d_bitmap_mbrs[bitmap_id].low[1]) * ((1ULL << (MBR_BIT/4)) - 1);
-    uint64_t value_mbr = ((uint64_t)low0 << (MBR_BIT/4*3)) + ((uint64_t)low1 << (MBR_BIT/2)) + ((uint64_t)high0 << (MBR_BIT/4)) + (uint64_t)high1;
+    uint64_t value_mbr = serialize_mbr(&bench->kv_boxs[kid], &bench->d_bitmap_mbrs[bitmap_id]);
     bench->d_keys[kid] += (__uint128_t)value_mbr << (DURATION_BIT + END_BIT);
 }
 
@@ -1531,10 +1553,10 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         temp_f_box[10].print();
         cerr << "kv box, real box, and then the bitmap_mbr"<<endl;
         bench->h_bitmap_mbrs[offset+bench->MemTable_count][0].print();
-        cerr<<"bitmap_mbrs:"<<endl;
-        for(int i = 0; i < bench->config->SSTable_count; i++){
-            bench->h_bitmap_mbrs[offset+bench->MemTable_count][i].print();
-        }
+//        cerr<<"bitmap_mbrs:"<<endl;
+//        for(int i = 0; i < bench->config->SSTable_count; i++){
+//            bench->h_bitmap_mbrs[offset+bench->MemTable_count][i].print();
+//        }
 
         //init
         h_bench.start_time_min = (1ULL<<32) -1;
@@ -1543,6 +1565,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         cudaMemset(h_bench.d_bitmaps, 0, bench->bitmaps_size);
         cudaMemset(h_bench.d_bitmap_mbrs, 0, bench->config->SSTable_count*sizeof(box));
         bench->MemTable_count++;
+        cout << "bench->MemTable_count " << bench->MemTable_count << "MemTable_capacity" << bench->config->MemTable_capacity <<endl;
         int overflow = h_bench.kv_count - bench->config->kv_restriction;
         CUDA_SAFE_CALL(cudaMemcpy(h_bench.d_keys, h_bench.d_keys + bench->config->kv_restriction, overflow * sizeof(__uint128_t), cudaMemcpyDeviceToDevice));              //for the overflow part
         CUDA_SAFE_CALL(cudaMemcpy(h_bench.kv_boxs, h_bench.kv_boxs + bench->config->kv_restriction, overflow * sizeof(f_box), cudaMemcpyDeviceToDevice));

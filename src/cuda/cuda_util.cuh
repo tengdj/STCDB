@@ -148,6 +148,12 @@ uint get_key_duration(__uint128_t key);
 __host__ __device__
 uint get_key_end(__uint128_t key);
 
+__host__ __device__
+uint64_t serialize_mbr(box* b, box* bitmap_mbr);
+
+__host__ __device__
+uint64_t serialize_mbr(f_box* b, box* bitmap_mbr);
+
 __host__
 inline void print_parse_key(__uint128_t key){
     print_128(key);

@@ -300,7 +300,7 @@ public:
 
     box bit_box(box b);
 
-    bool search_memtable(uint64_t pid);
+    bool search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vector<uint> & v_indices);
     bool search_in_disk(uint pid, uint timestamp);
     bool mbr_search_in_disk(box b, uint timestamp);
 

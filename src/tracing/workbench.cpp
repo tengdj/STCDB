@@ -213,71 +213,61 @@ void workbench::load_big_sorted_run(uint b){
 
 }
 
-bool workbench::search_memtable(uint64_t pid){          //wid_pid
-    cout<<"memtable search"<<pid<<endl;
+bool workbench::search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vector<uint> & v_indices){          //wid_pid       //for dump
+    cout<<"memtable search "<<pid<<endl;
     uint offset = 0;
     if(big_sorted_run_count%2==1){
         offset = config->MemTable_capacity/2;
     }
     bool ret = false;
-//    for(int i=0;i<MemTable_count;i++) {
-//        int find = -1;
-//        int low = 0;
-//        int high = config->kv_restriction - 1;
-//        int mid;
-//        uint64_t temp_pid;
-//        //box temp_box;
-//        while (low <= high) {
-//            mid = (low + high) / 2;
-//            temp_pid = (h_keys[offset+i][mid] >> 23) ;
-//            if (temp_pid == pid) {
-//                find = mid;
-//                ret = true;
-//                break;
-//            } else if (temp_pid > pid) {
-//                high = mid - 1;
-//            } else {
-//                low = mid + 1;
-//            }
-//        }
-//        if (find == -1) {
-//            cout << "cannot find" << endl;
-//            break;
-//        }
-//        cout << "exactly find" << endl;
-//        uint cursor = find;
-//        while (temp_pid == pid && cursor >= 1) {
-//            cursor--;
-//            temp_pid = (h_keys[offset+i][cursor] >> 23) ;
-//        }
-//        if (temp_pid == pid && cursor == 0) {
-//            //print_128(h_keys[offset+i][0]);
-//            cout<<"duration:"<<(uint)(h_values[offset+i][0] >> 113)<<endl;
-//            cout<<"target:"<<(uint)((h_values[offset+i][0] >> 88) & ((1ULL << 25) - 1))<<endl;
-//            box temp_box(h_values[offset+i][0]);
-//            temp_box.print();
-//            if(search_multi){
-//                search_multi_pid[search_multi_length] = (h_keys[offset+i][0] >> 23) ;       //real pid
-//                search_multi_length++;
-//            }
-//        }
-//        while (cursor + 1 < config->kv_restriction) {
-//            cursor++;
-//            temp_pid = (h_keys[offset+i][cursor] >> 23) & ((1ULL << 25) - 1);
-//            if (temp_pid == pid) {
-//                //cout<<h_keys[offset+i][cursor];
-//                print_128(h_keys[offset+i][cursor]);
-//                cout<<"duration:"<<(uint)(h_values[offset+i][cursor] >> 113)<<endl;
-//                cout<<"target:"<<(uint)((h_values[offset+i][cursor] >> 88) & ((1ULL << 25) - 1))<<endl;
-//                box temp_box(h_values[offset+i][cursor]);
-//                temp_box.print();
-//                if(search_multi) {
-//                    search_multi_pid[search_multi_length] = (h_keys[offset+i][cursor] >> 23);
-//                    search_multi_length++;
-//                }
-//            }
-//        }
-//    }
+    for(int i=0;i<MemTable_count;i++) {                                         //i<MemTable_count
+        uint64_t wp = ((uint64_t)h_wids[offset+i][pid] << PID_BIT) + pid;
+        cout << "wp " << wp << endl;
+        int find = -1;
+        int low = 0;
+        int high = config->kv_restriction - 1;
+        int mid;
+        uint64_t temp_wp;
+        //box temp_box;
+        while (low <= high) {
+            mid = (low + high) / 2;
+            temp_wp = (h_keys[offset+i][mid] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT)) ;
+            cout << "temp_wp" << temp_wp <<endl;
+            if (temp_wp == wp) {
+                find = mid;
+                ret = true;
+                break;
+            } else if (temp_wp > wp) {
+                high = mid - 1;
+            } else {
+                low = mid + 1;
+            }
+        }
+        if (find == -1) {
+            cout << "cannot find" << endl;
+            break;
+        }
+        cout << "exactly find" << endl;
+        uint cursor = find;
+        while (temp_wp == wp && cursor >= 1) {
+            ret = true;
+            cursor--;
+            temp_wp = (h_keys[offset+i][cursor] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT)) ;
+        }
+        if (temp_wp == wp && cursor == 0) {
+            v_keys.push_back(h_keys[offset+i][cursor]);
+            v_indices.push_back(cursor);
+
+        }
+        while (cursor + 1 < config->kv_restriction) {
+            cursor++;
+            temp_wp = (h_keys[offset+i][cursor] >> 23) & ((1ULL << 25) - 1);
+            if (temp_wp == wp) {
+                v_keys.push_back(h_keys[offset+i][cursor]);
+                v_indices.push_back(cursor);
+            }
+        }
+    }
     return ret;
 }
 

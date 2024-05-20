@@ -28,7 +28,7 @@ public:
 
     ~SSTable();
     uint search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_capacity, uint &search_multi_length, uint *search_multi_pid);
-    uint search_SSTable(uint64_t wp, uint SSTable_kv_capacity, vector<__uint128_t> & v_keys, vector<uint> & v_indices);
+    //uint search_SSTable(uint64_t wp, uint SSTable_kv_capacity, vector<__uint128_t> & v_keys, vector<uint> & v_indices);
 };
 
 class sorted_run {                          //10G
@@ -36,7 +36,7 @@ class sorted_run {                          //10G
 public:
     SSTable * sst = NULL;
 
-    //uint SSTable_count = 0;
+    uint SSTable_count = 0;
     //uint SSTable_size = 10*1024*1024;       //10M   useless
     uint64_t *first_widpid = NULL;
     unsigned short * wids = NULL;
@@ -51,7 +51,7 @@ public:
     void print_meta(){
         fprintf(stdout,"start_time:%d~%d,end_time:%d~%d\n",start_time_min,start_time_max,end_time_min,end_time_max);
     }
-    //bool search_in_disk(uint big_sort_id, uint pid);
+    //uint search_in_sorted_run(uint big_sort_id, uint pid);
 };
 
 #endif
