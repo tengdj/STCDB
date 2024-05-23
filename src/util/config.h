@@ -50,8 +50,8 @@ public:
     //added
     bool load_data = true;
 
-    uint kv_capacity = 13421778 + 1000000;            //134217728 + 1000000
-    uint kv_restriction = 13421778;                  //2*1024*1024*1024/16 = 134217728
+    uint kv_capacity = 134217728 + 1000000;            //134217728 + 1000000
+    uint kv_restriction = 134217728;                  //2*1024*1024*1024/16 = 134217728
     uint MemTable_capacity = 10;             //5*2 ,but workbench data[100]
 
 

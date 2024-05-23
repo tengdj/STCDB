@@ -271,8 +271,6 @@ void *merge_dump(void *arg){
     bench->merge_kv_capacity = bench->config->kv_restriction * bench->config->MemTable_capacity/2;
     __uint128_t *temp_keys = new __uint128_t[bench->merge_kv_capacity];
     box *temp_real_mbrs = new box[bench->merge_kv_capacity];
-    uint64_t total_index = 0;
-    uint sst_index = 0;
     bench->merge_sstable_count = bench->config->SSTable_count * bench->config->MemTable_capacity/2;
     bench->bg_run[old_big].wids = new unsigned short[bench->config->num_objects];
     bench->bg_run[old_big].bitmaps = new unsigned char[bench->bit_count/8*bench->merge_sstable_count];
@@ -280,8 +278,10 @@ void *merge_dump(void *arg){
     bench->bg_run[old_big].first_widpid = new uint64_t[bench->merge_sstable_count];
 
 
-    uint wrong_count = 0;
+    vector< vector<__uint128_t> > keys_with_wid(bench->bit_count);
+    vector< vector<box> > mbrs_with_wid(bench->bit_count);
     struct timeval bg_start = get_cur_time();
+    uint wrong_count = 0;
     vector<__uint128_t> keys_with_this_pid;
     vector<box> mbrs_with_this_pid;
     vector<uint> indices_with_this_pid;
@@ -327,40 +327,96 @@ void *merge_dump(void *arg){
         x /= not_zero_count;
         y /= not_zero_count;
         bench->bg_run[old_big].wids[i] = xy2d(WID_BIT/2, x, y);
+        if(bench->bg_run[old_big].wids[i]==0){
+            bench->bg_run[old_big].wids[i] = 1;
+        }
         for(uint k = 0; k < keys_with_this_pid.size(); k++){
             keys_with_this_pid[k] = (keys_with_this_pid[k] & (((__uint128_t)1 << (PID_BIT*2 + MBR_BIT + DURATION_BIT + END_BIT)) - 1))
                                  + ((__uint128_t)bench->bg_run[old_big].wids[i] << (PID_BIT*2 + MBR_BIT + DURATION_BIT + END_BIT));
-            uint low0 = (mbrs_with_this_pid[k].low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 1);
-            uint low1 = (mbrs_with_this_pid[k].low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
-            uint high0 = (mbrs_with_this_pid[k].high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 1);
-            uint high1 = (mbrs_with_this_pid[k].high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
-            uint bit_pos = 0;
-            for(uint m=low0;m<=high0;m++){
-                for(uint n=low1;n<=high1;n++){
-                    bit_pos = xy2d(WID_BIT/2,m,n);
-                    bench->bg_run[old_big].bitmaps[sst_index*(bench->bit_count/8)+bit_pos/8] |= (1<<(bit_pos%8));
-                }
-            }
-            bench->bg_run[old_big].bitmap_mbrs[sst_index].update(mbrs_with_this_pid[k]);        //not use bitmap
-            temp_keys[total_index] = keys_with_this_pid[k];
-            temp_real_mbrs[total_index] = mbrs_with_this_pid[k];
-            total_index++;
-            if(total_index % bench->SSTable_kv_capacity == 0){
-                sst_index++;
-            }
+
+
+
+            keys_with_wid[bench->bg_run[old_big].wids[i]].push_back(keys_with_this_pid[k]);
+            mbrs_with_wid[bench->bg_run[old_big].wids[i]].push_back(mbrs_with_this_pid[k]);
+
+
+//            temp_keys[total_index] = keys_with_this_pid[k];
+//            temp_real_mbrs[total_index] = mbrs_with_this_pid[k];
+//            total_index++;
+//            if(total_index % bench->SSTable_kv_capacity == 0){
+//                sst_index++;
+//            }
         }
         keys_with_this_pid.clear();
         mbrs_with_this_pid.clear();
     }
+
+    double form_vec_time = get_time_elapsed(bg_start,false);
+    fprintf(stdout,"\tform_vec_time:\t%.2f\n",form_vec_time);
+    //unroll
+    uint64_t total_index = 0;
+    for(uint i = 0; i < bench->bit_count; i++){
+        if(!keys_with_wid[i].empty()){
+            copy(keys_with_wid[i].begin(), keys_with_wid[i].end(), temp_keys + total_index);
+            copy(mbrs_with_wid[i].begin(), mbrs_with_wid[i].end(), temp_real_mbrs + total_index);
+            total_index += keys_with_wid[i].size();
+        }
+    }
     bench->pro.bg_merge_time += get_time_elapsed(bg_start,true);
-    cout << "total_index " << total_index << " bench->merge_kv_capacity " << bench->merge_kv_capacity << endl;
+    cout << "total_index " << total_index << " bench->merge_kv_capacity " << bench->merge_kv_capacity << endl;          //but why??? after this, still merge_kv_capacity
     cout << "wrong_count" << wrong_count << endl;
 
+//    for(uint i = 0; i < 100; i++){
+//        print_parse_key(temp_keys[i]);
+//    }
+
+    //especially slow wirte_bitmap
+    //#pragma omp parallel for num_threads(64)
+    for(uint i = 0; i < total_index; i++){             //i < bench->merge_kv_capacity
+        uint low0 = (temp_real_mbrs[i].low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 1);
+        uint low1 = (temp_real_mbrs[i].low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
+        uint high0 = (temp_real_mbrs[i].high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 1);
+        uint high1 = (temp_real_mbrs[i].high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
+        uint bitmap_id = i/bench->SSTable_kv_capacity;
+        for(uint m=low0;m<=high0;m++){
+            for(uint n=low1;n<=high1;n++){
+                uint bit_pos = xy2d(WID_BIT/2,m,n);
+                bench->bg_run[old_big].bitmaps[bitmap_id*(bench->bit_count/8)+bit_pos/8] |= (1<<(bit_pos%8));
+            }
+        }
+        //bench->bg_run[old_big].bitmap_mbrs[bitmap_id].update(temp_real_mbrs[i]);        //not use bitmap
+//        if(i%100000==0){
+//            cout << i << endl;
+//        }
+    }
+    double write_bitmap_time = get_time_elapsed(bg_start,true);
+    fprintf(stdout,"\twrite_bitmap_time:\t%.2f\n",write_bitmap_time);
+
+
+//#pragma omp parallel for num_threads(bench->config->num_threads)
+    for(uint i = 0; i < bench->merge_sstable_count; i++){
+        box temp_bitbox;
+        for(uint j = 0; j < bench->bit_count; j++){
+            if(bench->bg_run[old_big].bitmaps[i*(bench->bit_count/8) + j/8] & (1<<(j%8)) ){
+                uint x, y;
+                d2xy(WID_BIT/2, j, x, y);
+                Point temp_p(x, y);
+                temp_bitbox.update(temp_p);
+            }
+        }
+
+        bench->bg_run[old_big].bitmap_mbrs[i].low[0] = temp_bitbox.low[0] / ((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
+        bench->bg_run[old_big].bitmap_mbrs[i].low[1] = temp_bitbox.low[1] / ((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];
+        bench->bg_run[old_big].bitmap_mbrs[i].high[0] = temp_bitbox.high[0] / ((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
+        bench->bg_run[old_big].bitmap_mbrs[i].high[1] = temp_bitbox.high[1] / ((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];
+    }
+    double bitmap_mbr_time = get_time_elapsed(bg_start,true);
+    fprintf(stdout,"\tbitmap_mbr_time:\t%.2f\n",bitmap_mbr_time);
 
     for(uint i = 0; i < bench->merge_sstable_count; i ++) {
         bench->bg_run[old_big].bitmap_mbrs[i].print();
     }
-    cout << "bit box print" << endl;
+    get_time_elapsed(bg_start,true);
 
     //write kv_mbr
     for(uint i = 0; i < bench->merge_kv_capacity; i++){
@@ -369,10 +425,8 @@ void *merge_dump(void *arg){
         temp_keys[i] = (temp_keys[i] &~( ( ( (__uint128_t)1 << MBR_BIT) - 1) << (DURATION_BIT + END_BIT) ) )
                                 + (value_mbr << (DURATION_BIT + END_BIT));
     }
-
-    cout << "bitmap right" << endl;
-
-
+    double write_kv_mbr_time = get_time_elapsed(bg_start,true);
+    fprintf(stdout,"\twrite_kv_mbr_time:\t%.2f\n",write_kv_mbr_time);
 
     //init
     bench->big_sorted_run_count++;
@@ -382,10 +436,9 @@ void *merge_dump(void *arg){
     //merge sort
     ofstream SSTable_of;
     for(uint i = 0; i < bench->merge_kv_capacity; i += bench->SSTable_kv_capacity) {
-
         uint sst_id = i / bench->SSTable_kv_capacity;
         bench->bg_run[old_big].first_widpid[sst_id] = temp_keys[i] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
-        print_parse_key(temp_keys[i]);
+        //print_parse_key(temp_keys[i]);
         SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_id), ios::out | ios::trunc);
         bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
         SSTable_of.write((char *)(temp_keys + i), sizeof(__uint128_t)*bench->SSTable_kv_capacity);
@@ -394,25 +447,20 @@ void *merge_dump(void *arg){
         bench->pro.bg_flush_time += get_time_elapsed(bg_start,true);
     }
 
-
-
-
-
-    fprintf(stdout,"\tmerge sort:\t%.2f\n",bench->pro.bg_merge_time);
+    fprintf(stdout,"\tmerge :\t%.2f\n",bench->pro.bg_merge_time);
     fprintf(stdout,"\tflush:\t%.2f\n",bench->pro.bg_flush_time);
     fprintf(stdout,"\topen:\t%.2f\n",bench->pro.bg_open_time);
-
-
-
-
 
     bench->bg_run[old_big].start_time_min = bench->start_time_min;
     bench->bg_run[old_big].start_time_max = bench->start_time_max;
     bench->bg_run[old_big].end_time_min = bench->end_time_min;
     bench->bg_run[old_big].end_time_max = bench->end_time_max;
     bench->end_time_min = bench->end_time_max;              //new min = old max
+    bench->start_time_min = (1ULL<<32) -1;
+    bench->start_time_max = 0;
     delete[] temp_keys, temp_real_mbrs;
     bench->bg_run[old_big].print_meta();
+    bench->dumping = false;
     //logt("merge sort and flush", bg_start);
     return NULL;
 }
@@ -778,7 +826,7 @@ void tracer::process(){
                 //bool findit = searchkv_in_all_place(bench, 2);
             }
 
-            if(bench->cur_time == 1580){
+            if(bench->cur_time == 1620){
                 while(bench->dumping){
                     sleep(1);
                 }
@@ -797,7 +845,10 @@ void tracer::process(){
                 q << "question number" << ',' << "time_consume(ms)" << endl;
                 for(int i = 0; i < question_count; i++){
                     struct timeval disk_search_time = get_cur_time();
+                    uint temp = bench->config->SSTable_count;
+                    bench->config->SSTable_count = bench->merge_sstable_count;
                     bench->search_in_disk(pid, 15);
+                    bench->config->SSTable_count = temp;
                     pid++;
                     double time_consume = get_time_elapsed(disk_search_time);
                     //printf("disk_search_time %.2f\n", time_consume);
@@ -824,7 +875,10 @@ void tracer::process(){
                     box search_area(mid_x - edge_length/2, mid_y - edge_length/2, mid_x + edge_length/2, mid_y + edge_length/2);
                     search_area.print();
                     struct timeval area_search_time = get_cur_time();
+                    uint temp = bench->config->SSTable_count;
+                    bench->config->SSTable_count = bench->merge_sstable_count;
                     bench->mbr_search_in_disk(search_area, 15);
+                    bench->config->SSTable_count = temp;
                     double time_consume = get_time_elapsed(area_search_time);
                     //printf("area_search_time %.2f\n", time_consume);
                     p << edge_length*edge_length << ',' << bench->mbr_find_count << ',' << bench->mbr_unique_find << ',' << bench->intersect_sst_count << ',' << time_consume << endl;

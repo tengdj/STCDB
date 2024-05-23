@@ -1482,8 +1482,9 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
     if(h_bench.kv_count>bench->config->kv_restriction){
         cout <<"1000~2000 " << h_bench.larger_than_1000s << " 2000~3000 " << h_bench.larger_than_2000s << " 3000~4000 " << h_bench.larger_than_3000s << " >4000 " << h_bench.larger_than_4000s <<endl;
         bench->meeting_cut_count = h_bench.meeting_cut_count;
-        bench->start_time_min = h_bench.start_time_min;
-        bench->start_time_max = h_bench.start_time_max;
+        bench->start_time_min = min(bench->start_time_min, h_bench.start_time_min);
+        bench->start_time_max = max(bench->start_time_max, h_bench.start_time_max);
+
         uint offset = 0;
         if(bench->big_sorted_run_count%2==1){
             offset = bench->config->MemTable_capacity/2;
