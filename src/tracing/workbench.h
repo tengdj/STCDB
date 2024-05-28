@@ -180,6 +180,7 @@ public:
     uint search_multi_length = 0;
     uint *search_multi_pid = NULL;
     uint search_single_pid = 0;
+    bool do_some_sedarch = false;
     //uint search_count = 0;
     uint single_find_count = 0;
     uint multi_find_count = 0;
@@ -202,6 +203,7 @@ public:
     uint bitmap_edge_length = 0;
     uint bit_count = 0;         //256*256=65536  SSTable_count bitmap
     uint bitmaps_size = 0;
+    uint bit_find_count = 0;
     unsigned short * d_wids = NULL;
     unsigned short ** h_wids = NULL;
     f_box * kv_boxs = NULL;                           //real box, 1:1 kv

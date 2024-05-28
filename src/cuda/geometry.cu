@@ -888,12 +888,11 @@ void write_key_mbr(workbench *bench){
     if(kid>=bench->config->kv_restriction){
         return;
     }
-    if(bench->cur_time > 2000){
-        if(get_key_duration(bench->d_keys[kid]) > 2000){
-            print_box(&bench->kv_boxs[kid]);
-        }
-    }
-
+//    if(bench->cur_time > 2000){
+//        if(get_key_duration(bench->d_keys[kid]) > 2000){
+//            print_box(&bench->kv_boxs[kid]);
+//        }
+//    }
     uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);
     uint64_t value_mbr = serialize_mbr(&bench->kv_boxs[kid], &bench->d_bitmap_mbrs[bitmap_id]);
     bench->d_keys[kid] += (__uint128_t)value_mbr << (DURATION_BIT + END_BIT);
@@ -1552,6 +1551,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         f_box * temp_f_box = new f_box[20];
         CUDA_SAFE_CALL(cudaMemcpy(temp_f_box, h_bench.kv_boxs, 20 * sizeof(f_box), cudaMemcpyDeviceToHost));
         temp_f_box[10].print();
+        delete[] temp_f_box;
         cerr << "kv box, real box, and then the bitmap_mbr"<<endl;
         bench->h_bitmap_mbrs[offset+bench->MemTable_count][0].print();
 //        cerr<<"bitmap_mbrs:"<<endl;

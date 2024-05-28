@@ -277,8 +277,8 @@ void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){             
                 meta_data[obj].core = get_core(meta_data[obj].core);
                 meta_data[obj].end = get_random_location(meta_data[obj].core);
             }
-            //meta_data[obj].speed = config->drive_speed;
-            meta_data[obj].speed = 10 + get_rand_double()*10;           //10~20
+            meta_data[obj].speed = config->drive_speed;
+            //meta_data[obj].speed = 10 + get_rand_double()*10;           //10~20
             mymap->navigate(ret, meta_data[obj], config->cur_duration, count, config->num_objects, obj);
         }else if(meta_data[obj].type == WALK){
             const double step = config->walk_speed/meta_data[obj].end.distance(meta_data[obj].loc, true);

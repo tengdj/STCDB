@@ -263,8 +263,6 @@ void *merge_dump(void *arg){
     }
     bench->bg_run[old_big].sst = NULL;
 
-
-
     //new
 
     cout<<"sst_capacity:"<<bench->SSTable_kv_capacity<<endl;
@@ -333,19 +331,8 @@ void *merge_dump(void *arg){
         for(uint k = 0; k < keys_with_this_pid.size(); k++){
             keys_with_this_pid[k] = (keys_with_this_pid[k] & (((__uint128_t)1 << (PID_BIT*2 + MBR_BIT + DURATION_BIT + END_BIT)) - 1))
                                  + ((__uint128_t)bench->bg_run[old_big].wids[i] << (PID_BIT*2 + MBR_BIT + DURATION_BIT + END_BIT));
-
-
-
             keys_with_wid[bench->bg_run[old_big].wids[i]].push_back(keys_with_this_pid[k]);
             mbrs_with_wid[bench->bg_run[old_big].wids[i]].push_back(mbrs_with_this_pid[k]);
-
-
-//            temp_keys[total_index] = keys_with_this_pid[k];
-//            temp_real_mbrs[total_index] = mbrs_with_this_pid[k];
-//            total_index++;
-//            if(total_index % bench->SSTable_kv_capacity == 0){
-//                sst_index++;
-//            }
         }
         keys_with_this_pid.clear();
         mbrs_with_this_pid.clear();
@@ -371,7 +358,7 @@ void *merge_dump(void *arg){
 //    }
 
     //especially slow wirte_bitmap
-    //#pragma omp parallel for num_threads(64)
+#pragma omp parallel for num_threads(64)
     for(uint i = 0; i < total_index; i++){             //i < bench->merge_kv_capacity
         uint low0 = (temp_real_mbrs[i].low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 1);
         uint low1 = (temp_real_mbrs[i].low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
@@ -392,7 +379,34 @@ void *merge_dump(void *arg){
     double write_bitmap_time = get_time_elapsed(bg_start,true);
     fprintf(stdout,"\twrite_bitmap_time:\t%.2f\n",write_bitmap_time);
 
+    //output bitmap
+    cerr << "output picked bitmap" << endl;
+    Point * bit_points = new Point[bench->bit_count];
+    uint count_p;
+    for(uint i = 100; i < 110; i++) {
+        cerr << endl;
+        count_p = 0;
+        for (uint j = 0; j < bench->bit_count; j++) {
+            if (bench->bg_run[old_big].bitmaps[i * (bench->bit_count / 8) + j / 8] & (1 << (j % 8))) {
+                Point bit_p;
+                uint x = 0, y = 0;
+                d2xy(WID_BIT / 2, j, x, y);
+                bit_p.x = (double) x / ((1ULL << (WID_BIT / 2)) - 1) * (bench->mbr.high[0] - bench->mbr.low[0]) +
+                          bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
+                bit_p.y = (double) y / ((1ULL << (WID_BIT / 2)) - 1) * (bench->mbr.high[1] - bench->mbr.low[1]) +
+                          bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
+                bit_points[count_p] = bit_p;
+                count_p++;
+            }
+        }
+        cout << "bit_points.size():" << count_p << endl;
+        print_points(bit_points, count_p);
+    }
+    delete[] bit_points;
+    double output_bitmap = get_time_elapsed(bg_start,true);
+    fprintf(stdout,"\toutput_bitmap:\t%.2f\n",output_bitmap);
 
+    //bitmap mbr
 //#pragma omp parallel for num_threads(bench->config->num_threads)
     for(uint i = 0; i < bench->merge_sstable_count; i++){
         box temp_bitbox;
@@ -404,7 +418,6 @@ void *merge_dump(void *arg){
                 temp_bitbox.update(temp_p);
             }
         }
-
         bench->bg_run[old_big].bitmap_mbrs[i].low[0] = temp_bitbox.low[0] / ((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
         bench->bg_run[old_big].bitmap_mbrs[i].low[1] = temp_bitbox.low[1] / ((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];
         bench->bg_run[old_big].bitmap_mbrs[i].high[0] = temp_bitbox.high[0] / ((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
@@ -428,12 +441,7 @@ void *merge_dump(void *arg){
     double write_kv_mbr_time = get_time_elapsed(bg_start,true);
     fprintf(stdout,"\twrite_kv_mbr_time:\t%.2f\n",write_kv_mbr_time);
 
-    //init
-    bench->big_sorted_run_count++;
-    bench->MemTable_count = 0;
-
     //dump
-    //merge sort
     ofstream SSTable_of;
     for(uint i = 0; i < bench->merge_kv_capacity; i += bench->SSTable_kv_capacity) {
         uint sst_id = i / bench->SSTable_kv_capacity;
@@ -796,7 +804,7 @@ void tracer::process(){
 //                                cout<<i<<"in SST"<<j<<endl;
 //                                is_print = true;
 //                            }
-//                            Point bit_p = new Point;
+//                            Point bit_p;
 //                            uint x=0,y=0;
 //                            d2xy(WID_BIT/2,i,x,y);
 //                            bit_p.x = (double)x/((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
@@ -808,6 +816,7 @@ void tracer::process(){
 //                    cout<<"bit_points.size():"<<count_p<<endl;
 //                    print_points(bit_points,count_p);
 //                }
+//                delete[] bit_points;
 
                 bench->end_time_max = bench->cur_time;              //old max
                 cout<<"meeting_cut_count:"<<bench->meeting_cut_count<<endl;
@@ -822,11 +831,15 @@ void tracer::process(){
 //                pthread_detach(bg_thread);
                 merge_dump((void *)bench);
 
+                //init
+                bench->big_sorted_run_count++;
+                bench->MemTable_count = 0;
 
                 //bool findit = searchkv_in_all_place(bench, 2);
             }
 
-            if(bench->cur_time == 1620){
+            if(!bench->do_some_sedarch && bench->big_sorted_run_count == 1){
+                bench->do_some_sedarch = true;
                 while(bench->dumping){
                     sleep(1);
                 }
@@ -835,7 +848,6 @@ void tracer::process(){
                 bench->wid_filter_count = 0;
                 bench->id_find_count = 0;
                 uint pid = 1000000;
-
 //                string cmd = "sync; sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'";        //sudo!!!
 //                if(system(cmd.c_str())!=0){
 //                    fprintf(stderr, "Error when disable buffer cache\n");
@@ -856,7 +868,7 @@ void tracer::process(){
                 }
                 q.close();
                 cout << "question_count:" << question_count << " id_find_count:" << bench->id_find_count <<" kv_restriction:"<< bench->config->kv_restriction << endl;
-                cout << "wid_filter_count:" << bench->wid_filter_count <<"id_not_find_count"<<bench->id_not_find_count <<endl;
+                cout << "wid_filter_count:" << bench->wid_filter_count <<"id_not_find_count"<<bench->id_not_find_count<<endl;
 
 
                 double mid_x = -87.678503;
@@ -869,7 +881,7 @@ void tracer::process(){
                 }
                 ofstream p;
                 p.open("search_mbr.csv", ios::out | ios::trunc);
-                p << "search area" << ',' << "find_count" << ',' << "unique_find" << ',' << "intersect_sst_count" << ',' << "time(ms)" << endl;
+                p << "search area" << ',' << "find_count" << ',' << "unique_find" << ',' << "intersect_sst_count" << ',' << "bit_find_count" << ',' << "time(ms)" << endl;
                 for(int i = 0; i <10 ; i++){
                     //cout << fixed << setprecision(6) << mid_x - edge_length/2 <<","<<mid_y - edge_length/2 <<","<<mid_x + edge_length/2 <<","<<mid_y + edge_length/2 <<endl;
                     box search_area(mid_x - edge_length/2, mid_y - edge_length/2, mid_x + edge_length/2, mid_y + edge_length/2);
@@ -881,7 +893,12 @@ void tracer::process(){
                     bench->config->SSTable_count = temp;
                     double time_consume = get_time_elapsed(area_search_time);
                     //printf("area_search_time %.2f\n", time_consume);
-                    p << edge_length*edge_length << ',' << bench->mbr_find_count << ',' << bench->mbr_unique_find << ',' << bench->intersect_sst_count << ',' << time_consume << endl;
+                    p << edge_length*edge_length << ',' << bench->mbr_find_count << ',' << bench->mbr_unique_find << ','
+                        << bench->intersect_sst_count <<',' << bench->bit_find_count << ',' << time_consume << endl;
+                    bench->mbr_find_count = 0;
+                    bench->mbr_unique_find = 0;
+                    bench->intersect_sst_count = 0;
+                    bench->bit_find_count = 0;
                     edge_length += 0.01;
                 }
                 p.close();

@@ -461,7 +461,6 @@ box workbench::parse_to_real_mbr(unsigned short first_low, unsigned short first_
 bool workbench::mbr_search_in_disk(box b, uint timestamp) {
     assert(mbr.contain(b));
     cout << "mbr disk search" << endl;
-    uint find_count = 0, intersect_count = 0;
     unordered_set<uint> uni;
     bool ret = false, find = false;
     box bit_b;
@@ -482,8 +481,8 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
                 if(b.intersect(bg_run[i].bitmap_mbrs[j])) {     //real box intersect
 //                    cerr<<"intersect"<<endl;
 //                    cerr<<"bitmap_mbrs"<<j<<endl;
-                    bg_run[i].bitmap_mbrs[j].print();
-                    intersect_count++;
+//                    bg_run[i].bitmap_mbrs[j].print();
+                    intersect_sst_count++;
                     find = false;
                     for (uint p = bit_b.low[0]-1; (p <= bit_b.high[0]+1) && (!find); p++) {
                         for (uint q = bit_b.low[1]-1; (q <= bit_b.high[1]+1) && (!find); q++) {
@@ -497,6 +496,7 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
                         }
                     }
                     if(find){
+                        bit_find_count++;
                         if(!bg_run[i].sst[j].keys){
                             ifstream read_sst;
                             string filename = "../store/SSTable_"+to_string(i)+"-"+to_string(j);
@@ -517,7 +517,7 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
                             if(b.intersect(key_box)){
                                 uni.insert(pid);
                                 this_find++;
-                                find_count++;
+                                mbr_find_count++;
                                 //cout<<"box find!"<<endl;
                                 //key_box.print();
 
@@ -529,9 +529,7 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
             }
         }
     }
-    mbr_find_count = find_count;
     mbr_unique_find = uni.size();
-    intersect_sst_count = intersect_count;
     uni.clear();
     return ret;
 }
