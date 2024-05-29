@@ -563,7 +563,7 @@ void *straight_dump(void *arg){
     assert(bench->config->MemTable_capacity%2==0);
     uint old_big = bench->big_sorted_run_count;                 //atomic add
     cout<<"old big_sorted_run_count: "<<old_big<<endl;
-    bench->big_sorted_run_count++;
+    //bench->big_sorted_run_count++;
     bench->dumping = true;
     if(old_big%2==1){
         offset = bench->config->MemTable_capacity/2;
@@ -791,32 +791,32 @@ void tracer::process(){
                     offset = bench->config->MemTable_capacity/2;
                 }
 
-//                Point * bit_points = new Point[bench->bit_count];
-//                uint count_p;
-//                for(uint j = 0;j<bench->config->SSTable_count;j++){
-//                    //cerr<<"bitmap"<<j<<endl;
-//                    cerr<<endl;
-//                    count_p = 0;
-//                    bool is_print = false;
-//                    for(uint i=0;i<bench->bit_count;i++){
-//                        if(bench->h_bitmaps[offset][j*(bench->bit_count/8) + i/8] & (1<<(i%8))){
-//                            if(!is_print){
-//                                cout<<i<<"in SST"<<j<<endl;
-//                                is_print = true;
-//                            }
-//                            Point bit_p;
-//                            uint x=0,y=0;
-//                            d2xy(WID_BIT/2,i,x,y);
-//                            bit_p.x = (double)x/((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
-//                            bit_p.y = (double)y/((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
-//                            bit_points[count_p] = bit_p;
-//                            count_p++;
-//                        }
-//                    }
-//                    cout<<"bit_points.size():"<<count_p<<endl;
-//                    print_points(bit_points,count_p);
-//                }
-//                delete[] bit_points;
+                Point * bit_points = new Point[bench->bit_count];
+                uint count_p;
+                for(uint j = 0;j<bench->config->SSTable_count;j++){
+                    //cerr<<"bitmap"<<j<<endl;
+                    cerr<<endl;
+                    count_p = 0;
+                    bool is_print = false;
+                    for(uint i=0;i<bench->bit_count;i++){
+                        if(bench->h_bitmaps[offset][j*(bench->bit_count/8) + i/8] & (1<<(i%8))){
+                            if(!is_print){
+                                cout<<i<<"in SST"<<j<<endl;
+                                is_print = true;
+                            }
+                            Point bit_p;
+                            uint x=0,y=0;
+                            d2xy(WID_BIT/2,i,x,y);
+                            bit_p.x = (double)x/((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
+                            bit_p.y = (double)y/((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
+                            bit_points[count_p] = bit_p;
+                            count_p++;
+                        }
+                    }
+                    cout<<"bit_points.size():"<<count_p<<endl;
+                    print_points(bit_points,count_p);
+                }
+                delete[] bit_points;
 
                 bench->end_time_max = bench->cur_time;              //old max
                 cout<<"meeting_cut_count:"<<bench->meeting_cut_count<<endl;
@@ -829,17 +829,42 @@ void tracer::process(){
 //                    fprintf(stderr, "pthread_create:%s\n", strerror(ret));
 //                }
 //                pthread_detach(bg_thread);
-                merge_dump((void *)bench);
+
+
+
+                ofstream p;
+                string filename = "longer_edges" + to_string(bench->big_sorted_run_count) + ".csv";
+                cout << filename << endl;
+                p.open(filename, ios::out | ios::trunc);
+                p << "percent(%)" << ',' << "edge_length" << endl;
+                int this_count = 0;
+                for(int i = 0 ; i < bench->config->kv_restriction; i += 1342177){
+                    p << i/1342177 << ',' << bench->h_longer_edges[i] << endl;
+//                    if(i%1000000==0){
+//                        cout << i/1000000 << " " << bench->h_longer_edges[i] << endl;
+//                    }
+                }
+                p.close();
+
+
+                if(config->MemTable_capacity==2){
+                    straight_dump((void *)bench);
+                }
+                else{
+                    merge_dump((void *)bench);
+                }
+
 
                 //init
                 bench->big_sorted_run_count++;
                 bench->MemTable_count = 0;
+                bench->do_some_search = false;
 
                 //bool findit = searchkv_in_all_place(bench, 2);
             }
 
-            if(!bench->do_some_sedarch && bench->big_sorted_run_count == 1){
-                bench->do_some_sedarch = true;
+            if(!bench->do_some_search && bench->big_sorted_run_count >= 1){            // !bench->do_some_search && bench->big_sorted_run_count == 1
+                bench->do_some_search = true;
                 while(bench->dumping){
                     sleep(1);
                 }

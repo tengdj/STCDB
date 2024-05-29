@@ -180,7 +180,7 @@ public:
     uint search_multi_length = 0;
     uint *search_multi_pid = NULL;
     uint search_single_pid = 0;
-    bool do_some_sedarch = false;
+    bool do_some_search = false;
     //uint search_count = 0;
     uint single_find_count = 0;
     uint multi_find_count = 0;
@@ -196,6 +196,8 @@ public:
     uint larger_than_3000s = 0;
     uint larger_than_4000s = 0;
 
+    float * h_longer_edges = NULL;
+    float * d_longer_edges = NULL;
 
     //space for where id
     unsigned char * d_bitmaps = NULL;                 //1024  256*256
@@ -223,7 +225,7 @@ public:
     uint end_time_max = 0;
     uint SSTable_kv_capacity = 0;
     bool dumping = false;
-    uint merge_sstable_count = 0;
+    uint merge_sstable_count = 100;
     uint merge_kv_capacity = 0;
 
     //s

@@ -48,15 +48,16 @@ public:
     bool profile = false;
 
     //added
-    bool load_data = true;
+    bool load_data = false;
+    uint SSTable_kv_capacity = 1342177;             //1342177  20.5MB
 
-    uint kv_capacity = 134217728/2 + 1000000;            //134217728 + 1000000
-    uint kv_restriction = 134217728/2;                  //2*1024*1024*1024/16 = 134217728
-    uint MemTable_capacity = 4*2 ;             //5*2 ,and workbench data[100] is not enough
+    uint kv_capacity = 0;            //134217728 + 1000000
+    uint kv_restriction = 0;                  //2*1024*1024*1024/16 = 134217728
+    uint MemTable_capacity = 2 ;             //5*2 ,and workbench data[100] is not enough
 
 
-    uint big_sorted_run_capacity = 100;
-    uint SSTable_count = 100;              //
+    uint big_sorted_run_capacity = 100;     //can be made to vector
+    uint SSTable_count = 100;              //default 2G
 
     //bool search_kv = true;
     uint search_single_capacity = 100;
@@ -64,6 +65,12 @@ public:
 
     bool bloom_filter = false;
     double false_positive_rate = 0.0004;
+
+    void update(){
+        assert(MemTable_capacity%2==0);
+        kv_restriction = SSTable_kv_capacity * SSTable_count;
+        kv_capacity = kv_restriction + 1000000;
+    }
 
     void print(){
         fprintf(stderr,"configuration:\n");
@@ -105,6 +112,7 @@ inline configuration get_parameters(int argc, char **argv){
             ("disable_phased_filter", "disable phased filter")
             ("disable_unroll,u", "disable unroll the refinement")
             ("disable_dynamic_schema", "the schema is not dynamically updated")
+
 
             ("analyze_reach", "analyze the reaches statistics")
             ("analyze_grid", "analyze the grid statistics")
@@ -226,6 +234,7 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
             ("disable_phased_filter", "disable phased filter")
             ("disable_unroll,u", "disable unroll the refinement")
             ("disable_dynamic_schema", "the schema is not dynamically updated")
+            ("load_data", "the schema is not dynamically updated")
 
             ("analyze_reach", "analyze the reaches statistics")
             ("analyze_grid", "analyze the grid statistics")
@@ -248,6 +257,8 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
             ("trace_path,t", po::value<string>(&config.trace_path), "path to the trace file")
 
             ("memTable_capacity", po::value<uint>(&config.MemTable_capacity), "MemTable_capacity/2 is the dumping threshold")
+            ("sstable_count", po::value<uint>(&config.SSTable_count), "number of SSTable")
+
             ;
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -269,6 +280,9 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
     }
     if(vm.count("profile")){
         config.profile = true;
+    }
+    if(vm.count("load_data")){
+        config.load_data = true;
     }
 
     if(!vm.count("zone_capacity")||!vm.count("gpu")){
@@ -292,7 +306,9 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
     }
 
     assert(config.walk_rate+config.drive_rate<=1);
+    config.update();
     config.print();
+
     return config;
 }
 
