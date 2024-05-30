@@ -66,9 +66,6 @@ tracer::tracer(configuration *conf){
 #endif
 }
 tracer::~tracer(){
-	if(owned_trace){
-		free(trace);
-	}
 	if(part){
 		delete part;
 	}
@@ -155,7 +152,6 @@ void tracer::loadData(const char *path, int st, int duration) {
 
 	in.close();
 	logt("loaded %d objects last for %d seconds start from %d time from %s",start_time, config->num_objects, duration, st, path);
-	owned_trace = true;
 }
 
 void tracer::print(){
@@ -668,12 +664,11 @@ void tracer::process(){
             bench->start_time_max = 0;
 
             //command
-            pthread_t command_thread;
             int ret1;
-            if ((ret1 = pthread_create(&command_thread, NULL, commandThreadFunction, (void *) bench)) != 0) {
+            if ((ret1 = pthread_create(&bench->command_thread, NULL, commandThreadFunction, (void *) bench)) != 0) {
                 fprintf(stderr, "pthread_create:%s\n", strerror(ret1));
             }
-            pthread_detach(command_thread);
+            pthread_detach(bench->command_thread);
 #ifdef USE_GPU
 			if(config->gpu){
 				d_bench = cuda_create_device_bench(bench, gpu);
@@ -686,7 +681,8 @@ void tracer::process(){
 			bench->points = trace+t*config->num_objects;
 			bench->cur_time = st + t;
             if(bench->cur_time==config->start_time+config->duration-1){         //finish and all dump
-                bench->crash_consistency = true;
+                pthread_cancel(bench->command_thread);
+                //bench->crash_consistency = true;
             }
 			// process the coordinate in this time point
 
@@ -832,19 +828,19 @@ void tracer::process(){
 
 
 
-                ofstream p;
-                string filename = "longer_edges" + to_string(bench->big_sorted_run_count) + ".csv";
-                cout << filename << endl;
-                p.open(filename, ios::out | ios::trunc);
-                p << "percent(%)" << ',' << "edge_length" << endl;
-                int this_count = 0;
-                for(int i = 0 ; i < bench->config->kv_restriction; i += 1342177){
-                    p << i/1342177 << ',' << bench->h_longer_edges[i] << endl;
-//                    if(i%1000000==0){
-//                        cout << i/1000000 << " " << bench->h_longer_edges[i] << endl;
-//                    }
-                }
-                p.close();
+//                ofstream p;
+//                string filename = "longer_edges" + to_string(bench->big_sorted_run_count) + ".csv";
+//                cout << filename << endl;
+//                p.open(filename, ios::out | ios::trunc);
+//                p << "percent(%)" << ',' << "edge_length" << endl;
+//                int this_count = 0;
+//                for(int i = 0 ; i < bench->config->kv_restriction; i += 1342177){
+//                    p << i/1342177 << ',' << bench->h_longer_edges[i] << endl;
+////                    if(i%1000000==0){
+////                        cout << i/1000000 << " " << bench->h_longer_edges[i] << endl;
+////                    }
+//                }
+//                p.close();
 
 
                 if(config->MemTable_capacity==2){
@@ -863,7 +859,7 @@ void tracer::process(){
                 //bool findit = searchkv_in_all_place(bench, 2);
             }
 
-            if(!bench->do_some_search && bench->big_sorted_run_count >= 1){            // !bench->do_some_search && bench->big_sorted_run_count == 1
+            if(!bench->do_some_search && bench->big_sorted_run_count == 1){            // !bench->do_some_search && bench->big_sorted_run_count == 1
                 bench->do_some_search = true;
                 while(bench->dumping){
                     sleep(1);
@@ -878,7 +874,7 @@ void tracer::process(){
 //                    fprintf(stderr, "Error when disable buffer cache\n");
 //                }
                 ofstream q;
-                q.open("search_id.csv", ios::out | ios::trunc);
+                q.open(to_string(config->MemTable_capacity/2)+"search_id.csv", ios::out | ios::trunc);
                 q << "question number" << ',' << "time_consume(ms)" << endl;
                 for(int i = 0; i < question_count; i++){
                     struct timeval disk_search_time = get_cur_time();
@@ -905,7 +901,7 @@ void tracer::process(){
                     bench->load_big_sorted_run(i);
                 }
                 ofstream p;
-                p.open("search_mbr.csv", ios::out | ios::trunc);
+                p.open(to_string(config->MemTable_capacity/2)+"search_mbr.csv", ios::out | ios::trunc);        //config->SSTable_count/50
                 p << "search area" << ',' << "find_count" << ',' << "unique_find" << ',' << "intersect_sst_count" << ',' << "bit_find_count" << ',' << "time(ms)" << endl;
                 for(int i = 0; i <10 ; i++){
                     //cout << fixed << setprecision(6) << mid_x - edge_length/2 <<","<<mid_y - edge_length/2 <<","<<mid_x + edge_length/2 <<","<<mid_y + edge_length/2 <<endl;

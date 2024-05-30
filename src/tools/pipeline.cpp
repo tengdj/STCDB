@@ -16,8 +16,10 @@ int main(int argc, char **argv){
     t->process();
 
     delete []traces;
-    delete gen;
     delete t;
+    delete gen;
     delete m;
+    cout<<"delete right"<<endl;
+    cerr<<"delete right"<<endl;
     return 0;
 }

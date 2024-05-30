@@ -160,8 +160,8 @@ void workbench::claim_space(){
         }
     }
 
-    size = config->kv_capacity * sizeof(float);
-    h_longer_edges = (float *)allocate(size);
+//    size = config->kv_capacity * sizeof(float);
+//    h_longer_edges = (float *)allocate(size);
 
 
     size = config->big_sorted_run_capacity*sizeof(sorted_run);

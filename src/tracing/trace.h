@@ -24,7 +24,7 @@ using namespace std;
 class tracer{
 	// the statistic for the data set
 	Point *trace = NULL;
-	bool owned_trace = false;
+	//bool owned_trace = false;
 	// for query
 	configuration *config = NULL;
 	partitioner *part = NULL;

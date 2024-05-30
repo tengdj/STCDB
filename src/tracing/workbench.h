@@ -96,8 +96,8 @@ typedef struct reach_unit{
 
 class workbench{
 	pthread_mutex_t *insert_lk;
-	void *data[200];
-	size_t data_size[200];
+	void *data[500];
+	size_t data_size[500];
 	uint data_index = 0;
 	void *allocate(size_t size);
 public:
@@ -212,6 +212,7 @@ public:
     box * d_bitmap_mbrs = NULL;
     box ** h_bitmap_mbrs = NULL;
 
+    pthread_t command_thread;
     pthread_mutex_t mutex_i;
     bool interrupted = false;
     uint valid_timestamp = 0;
