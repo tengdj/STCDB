@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for i in {4..10}; do
+for i in {1..10}; do
     echo "Run #$i"
 
     # 动态调整 --sstable_count 参数

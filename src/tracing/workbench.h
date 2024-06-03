@@ -196,8 +196,10 @@ public:
     uint larger_than_3000s = 0;
     uint larger_than_4000s = 0;
 
-    float * h_longer_edges = NULL;
-    float * d_longer_edges = NULL;
+//    float * h_longer_edges = NULL;
+//    float * d_longer_edges = NULL;
+    uint long_meeting_count = 0;
+    uint long_oid_count = 0;
 
     //space for where id
     unsigned char * d_bitmaps = NULL;                 //1024  256*256

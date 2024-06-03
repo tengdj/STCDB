@@ -112,8 +112,8 @@ void update_wid(unsigned short & hilbert_low, uint edge_length, uint low0, uint 
     if(hilbert_low){
         uint old_low0, old_low1;
         d2xy(edge_length, hilbert_low, old_low0, old_low1);
-        //uint new_low0 = min(old_low0, low0), new_low1 = min(old_low1, low1);            //always the left bottom
-        uint new_low0 = old_low0/2 + low0/2, new_low1 = old_low1/2 + low1/2;            //nearly the centroid
+        uint new_low0 = min(old_low0, low0), new_low1 = min(old_low1, low1);            //always the left bottom
+        //uint new_low0 = old_low0/2 + low0/2, new_low1 = old_low1/2 + low1/2;            //nearly the centroid
         hilbert_low = xy2d(edge_length, new_low0, new_low1);
         if(!hilbert_low){                                                               //0 used to be ambiguous, now 0 -> not appear, 1 is ambiguous
             hilbert_low = 1;
@@ -123,6 +123,9 @@ void update_wid(unsigned short & hilbert_low, uint edge_length, uint low0, uint 
         hilbert_low = xy2d(edge_length, low0, low1);
         if(!hilbert_low){
             hilbert_low = 1;
+        }
+        if(hilbert_low==((1ULL << (WID_BIT)) - 1)){
+            hilbert_low = ((1ULL << (WID_BIT)) - 2);
         }
     }
 }
@@ -640,11 +643,28 @@ void cuda_identify_meetings(workbench *bench) {
             bench->meeting_buckets[bid].key = ULL_MAX;
             return;
         }
-        float longer_edge = max(bench->meeting_buckets[bid].mbr.high[1] - bench->meeting_buckets[bid].mbr.low[1] , bench->meeting_buckets[bid].mbr.high[0] - bench->meeting_buckets[bid].mbr.low[0]);
-        if(longer_edge > 0.007){
+
+        float longer_edge = (bench->meeting_buckets[bid].mbr.high[1] - bench->meeting_buckets[bid].mbr.low[1])*(bench->meeting_buckets[bid].mbr.high[0] - bench->meeting_buckets[bid].mbr.low[0]);
+        //area
+        if(longer_edge > 0.00005){              //0.007*0.007
             bench->meeting_buckets[bid].key = ULL_MAX;
+//            uint pid, target;
+//            pid = getpid1(bench->meeting_buckets[bid].key);
+//            target = getpid2(bench->meeting_buckets[bid].key);
+//            bench->d_wids[pid] = ((1ULL << (WID_BIT)) - 1);             //right top
+//            bench->d_wids[target] = ((1ULL << (WID_BIT)) - 1);             //right top
+//            bench->meeting_buckets[bid].key = ULL_MAX;
+//
+//            atomicAdd(&bench->long_meeting_count, 2);
+//            atomicAdd(&bench->long_oid_count, 1);
             return;
         }
+
+//        float longer_edge = max(bench->meeting_buckets[bid].mbr.high[1] - bench->meeting_buckets[bid].mbr.low[1] , bench->meeting_buckets[bid].mbr.high[0] - bench->meeting_buckets[bid].mbr.low[0]);
+//        if(longer_edge > 0.01){
+//            bench->meeting_buckets[bid].key = ULL_MAX;
+//            return;
+//        }
 
         uint duration = bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start;
         if(duration >= 990){
@@ -668,6 +688,12 @@ void cuda_identify_meetings(workbench *bench) {
         uint pid, target;
         pid = getpid1(bench->meeting_buckets[bid].key);
         target = getpid2(bench->meeting_buckets[bid].key);
+
+        if(bench->d_wids[pid] == ((1ULL << (WID_BIT)) - 1) || bench->d_wids[target] == ((1ULL << (WID_BIT)) - 1)){
+            bench->meeting_buckets[bid].key = ULL_MAX;
+            //atomicAdd(&bench->long_meeting_count, 1);
+            return;
+        }
 
         uint low0 = (bench->meeting_buckets[bid].mbr.low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 1);
         uint low1 = (bench->meeting_buckets[bid].mbr.low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
@@ -1560,18 +1586,25 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         box b;
         parse_mbr(bench->h_keys[offset+bench->MemTable_count][10], b, bench->h_bitmap_mbrs[offset+bench->MemTable_count][0]);
         b.print();
-        f_box * temp_f_box = new f_box[20];
-        CUDA_SAFE_CALL(cudaMemcpy(temp_f_box, h_bench.kv_boxs, 20 * sizeof(f_box), cudaMemcpyDeviceToHost));
-        temp_f_box[10].print();
-        delete[] temp_f_box;
-        cerr << "kv box, real box, and then the bitmap_mbr"<<endl;
-        bench->h_bitmap_mbrs[offset+bench->MemTable_count][0].print();
+
+//        if(bench->cur_time > 1200){
+//            cerr << "output the real boxes of a sst" << endl;
+//            f_box * temp_f_box = new f_box[bench->config->SSTable_kv_capacity];
+//            CUDA_SAFE_CALL(cudaMemcpy(temp_f_box, h_bench.kv_boxs + 25*bench->config->SSTable_kv_capacity, bench->config->SSTable_kv_capacity * sizeof(f_box), cudaMemcpyDeviceToHost));
+//            for(uint i = 0; i < bench->config->SSTable_kv_capacity; i++){
+//                temp_f_box[i].print();
+//            }
+//            delete[] temp_f_box;
+//        }
+
+//        cerr << "kv box, real box, and then the bitmap_mbr"<<endl;
+//        bench->h_bitmap_mbrs[offset+bench->MemTable_count][0].print();
 //        cerr<<"bitmap_mbrs:"<<endl;
 //        for(int i = 0; i < bench->config->SSTable_count; i++){
 //            bench->h_bitmap_mbrs[offset+bench->MemTable_count][i].print();
 //        }
 
-//        //longer edges sort
+        //longer edges sort
 //        thrust::device_ptr<float> d_vec_edges = thrust::device_pointer_cast(h_bench.d_longer_edges);
 //        thrust::sort(d_vec_edges, d_vec_edges + bench->config->kv_restriction);
 //        check_execution();
@@ -1581,6 +1614,10 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 //        logt("cuda_sort_time: ",start);
 //        CUDA_SAFE_CALL(cudaMemcpy(bench->h_longer_edges, h_bench.d_longer_edges, bench->config->kv_restriction*sizeof(float), cudaMemcpyDeviceToHost));
 //        cout << "longest edge " <<bench->h_longer_edges[bench->config->kv_restriction-1] << endl;
+//        cout << "long_meeting_count: " << h_bench.long_meeting_count << endl;
+//        cout << "long_oid_count: " << h_bench.long_oid_count << endl;
+//        h_bench.long_meeting_count = 0;
+//        h_bench.long_oid_count = 0;
 
         //init
         h_bench.start_time_min = (1ULL<<32) -1;

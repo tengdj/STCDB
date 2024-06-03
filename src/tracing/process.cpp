@@ -379,7 +379,7 @@ void *merge_dump(void *arg){
     cerr << "output picked bitmap" << endl;
     Point * bit_points = new Point[bench->bit_count];
     uint count_p;
-    for(uint i = 100; i < 110; i++) {
+    for(uint i = 0; i < bench->merge_sstable_count; i++) {
         cerr << endl;
         count_p = 0;
         for (uint j = 0; j < bench->bit_count; j++) {
@@ -787,32 +787,34 @@ void tracer::process(){
                     offset = bench->config->MemTable_capacity/2;
                 }
 
-                Point * bit_points = new Point[bench->bit_count];
-                uint count_p;
-                for(uint j = 0;j<bench->config->SSTable_count;j++){
-                    //cerr<<"bitmap"<<j<<endl;
-                    cerr<<endl;
-                    count_p = 0;
-                    bool is_print = false;
-                    for(uint i=0;i<bench->bit_count;i++){
-                        if(bench->h_bitmaps[offset][j*(bench->bit_count/8) + i/8] & (1<<(i%8))){
-                            if(!is_print){
-                                cout<<i<<"in SST"<<j<<endl;
-                                is_print = true;
-                            }
-                            Point bit_p;
-                            uint x=0,y=0;
-                            d2xy(WID_BIT/2,i,x,y);
-                            bit_p.x = (double)x/((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
-                            bit_p.y = (double)y/((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
-                            bit_points[count_p] = bit_p;
-                            count_p++;
-                        }
-                    }
-                    cout<<"bit_points.size():"<<count_p<<endl;
-                    print_points(bit_points,count_p);
-                }
-                delete[] bit_points;
+
+//                Point * bit_points = new Point[bench->bit_count];
+//                uint count_p;
+//                for(uint j = 0;j<bench->config->SSTable_count;j++){
+//                    //cerr<<"bitmap"<<j<<endl;
+//                    cerr<<endl;
+//                    count_p = 0;
+//                    bool is_print = false;
+//                    for(uint i=0;i<bench->bit_count;i++){
+//                        if(bench->h_bitmaps[offset][j*(bench->bit_count/8) + i/8] & (1<<(i%8))){
+//                            if(!is_print){
+//                                cout<<i<<"in SST"<<j<<endl;
+//                                is_print = true;
+//                            }
+//                            Point bit_p;
+//                            uint x=0,y=0;
+//                            d2xy(WID_BIT/2,i,x,y);
+//                            bit_p.x = (double)x/((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
+//                            bit_p.y = (double)y/((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
+//                            bit_points[count_p] = bit_p;
+//                            count_p++;
+//                        }
+//                    }
+//                    cout<<"bit_points.size():"<<count_p<<endl;
+//                    print_points(bit_points,count_p);
+//                    cerr << "process output bitmap finish" << endl;
+//                }
+//                delete[] bit_points;
 
                 bench->end_time_max = bench->cur_time;              //old max
                 cout<<"meeting_cut_count:"<<bench->meeting_cut_count<<endl;
@@ -923,6 +925,7 @@ void tracer::process(){
                     edge_length += 0.01;
                 }
                 p.close();
+                return;
             }
 
 
