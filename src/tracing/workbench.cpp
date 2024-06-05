@@ -191,10 +191,10 @@ void workbench::claim_space(){
 
 box workbench::bit_box(box b){
     box new_b;
-    new_b.low[0] = (b.low[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 1);
-    new_b.low[1] = (b.low[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
-    new_b.high[0] = (b.high[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 1);
-    new_b.high[1] = (b.high[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
+    new_b.low[0] = (b.low[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * ((1ULL << (SID_BIT / 2)) - 1);
+    new_b.low[1] = (b.low[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * ((1ULL << (SID_BIT / 2)) - 1);
+    new_b.high[0] = (b.high[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * ((1ULL << (SID_BIT / 2)) - 1);
+    new_b.high[1] = (b.high[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * ((1ULL << (SID_BIT / 2)) - 1);
     return new_b;
 }
 
@@ -225,7 +225,7 @@ bool workbench::search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vect
     }
     bool ret = false;
     for(int i=0;i<MemTable_count;i++) {                                         //i<MemTable_count
-        uint64_t wp = ((uint64_t)h_wids[offset+i][pid] << PID_BIT) + pid;
+        uint64_t wp = ((uint64_t)h_wids[offset+i][pid] << OID_BIT) + pid;
         cout << "wp " << wp << endl;
         int find = -1;
         int low = 0;
@@ -235,7 +235,7 @@ bool workbench::search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vect
         //box temp_box;
         while (low <= high) {
             mid = (low + high) / 2;
-            temp_wp = (h_keys[offset+i][mid] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT)) ;
+            temp_wp = (h_keys[offset+i][mid] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT)) ;
             cout << "temp_wp" << temp_wp <<endl;
             if (temp_wp == wp) {
                 find = mid;
@@ -256,7 +256,7 @@ bool workbench::search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vect
         while (temp_wp == wp && cursor >= 1) {
             ret = true;
             cursor--;
-            temp_wp = (h_keys[offset+i][cursor] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT)) ;
+            temp_wp = (h_keys[offset+i][cursor] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT)) ;
         }
         if (temp_wp == wp && cursor == 0) {
             v_keys.push_back(h_keys[offset+i][cursor]);
@@ -297,7 +297,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                 continue;
             }
             else{
-                wp += ((uint64_t)bg_run[i].wids[pid] << PID_BIT);
+                wp += ((uint64_t)bg_run[i].wids[pid] << OID_BIT);
                 //cout<<"wp: "<<wp<<endl;
             }
             if(!bg_run[i].sst){
@@ -490,7 +490,7 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
                     find = false;
                     for (uint p = bit_b.low[0]-1; (p <= bit_b.high[0]+1) && (!find); p++) {
                         for (uint q = bit_b.low[1]-1; (q <= bit_b.high[1]+1) && (!find); q++) {
-                            bit_pos = xy2d(WID_BIT/2, p, q);
+                            bit_pos = xy2d(SID_BIT / 2, p, q);
                             if (bg_run[i].bitmaps[j * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
 //                                cerr << "SSTable_" << j << "bit_pos" << bit_pos << endl;
                                 find = true;

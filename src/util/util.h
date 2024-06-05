@@ -40,8 +40,8 @@ namespace{
 #define __MGAIC_CODE__          (0x01464C42)
 #define MIX_UINT64(v)       ((uint32_t)((v>>32)^(v)))
 
-#define WID_BIT 16
-#define PID_BIT 26
+#define SID_BIT 16
+#define OID_BIT 26
 #define MBR_BIT 36
 #define DURATION_BIT 12
 #define END_BIT 12

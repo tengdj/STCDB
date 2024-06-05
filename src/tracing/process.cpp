@@ -201,7 +201,7 @@ uint search_keys_by_pid(__uint128_t* keys, uint64_t wp, uint capacity, vector<__
     uint64_t temp_wp;
     while (low <= high) {
         mid = (low + high) / 2;
-        temp_wp = keys[mid] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
+        temp_wp = keys[mid] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
 //        cout << get_key_wid(keys[mid]) <<'-' << get_key_pid(keys[mid]) << endl;
 //        cout << "temp_wp" << temp_wp << endl;
         if (temp_wp == wp){
@@ -223,7 +223,7 @@ uint search_keys_by_pid(__uint128_t* keys, uint64_t wp, uint capacity, vector<__
     uint cursor = find;
     while(temp_wp == wp && cursor >= 1){
         cursor--;
-        temp_wp = keys[cursor] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
+        temp_wp = keys[cursor] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
     }
     if(temp_wp == wp && cursor == 0){
         count++;
@@ -232,7 +232,7 @@ uint search_keys_by_pid(__uint128_t* keys, uint64_t wp, uint capacity, vector<__
     }
     while(cursor+1<capacity){
         cursor++;
-        temp_wp = keys[cursor] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
+        temp_wp = keys[cursor] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
         if(temp_wp == wp){
             count++;
             v_keys.push_back(keys[cursor]);
@@ -290,12 +290,12 @@ void *merge_dump(void *arg){
                 continue;
             }
             uint temp_x, temp_y;
-            d2xy(WID_BIT/2, bench->h_wids[offset+j][i], temp_x, temp_y);
+            d2xy(SID_BIT / 2, bench->h_wids[offset + j][i], temp_x, temp_y);
             x += temp_x;
             y += temp_y;
             not_zero_count++;
 
-            wp = ((uint64_t)bench->h_wids[offset+j][i] << PID_BIT) + i;
+            wp = ((uint64_t)bench->h_wids[offset+j][i] << OID_BIT) + i;
             //cout << bench->h_wids[offset+j][i] <<'-'<< i << endl;
             uint find_count = search_keys_by_pid(bench->h_keys[offset+j], wp, bench->config->kv_restriction, keys_with_this_pid, indices_with_this_pid);
             uint old_keys_count = keys_with_this_pid.size() - indices_with_this_pid.size();
@@ -320,13 +320,13 @@ void *merge_dump(void *arg){
         //rewrite wid, bitmap and its mbr
         x /= not_zero_count;
         y /= not_zero_count;
-        bench->bg_run[old_big].wids[i] = xy2d(WID_BIT/2, x, y);
+        bench->bg_run[old_big].wids[i] = xy2d(SID_BIT / 2, x, y);
         if(bench->bg_run[old_big].wids[i]==0){
             bench->bg_run[old_big].wids[i] = 1;
         }
         for(uint k = 0; k < keys_with_this_pid.size(); k++){
-            keys_with_this_pid[k] = (keys_with_this_pid[k] & (((__uint128_t)1 << (PID_BIT*2 + MBR_BIT + DURATION_BIT + END_BIT)) - 1))
-                                 + ((__uint128_t)bench->bg_run[old_big].wids[i] << (PID_BIT*2 + MBR_BIT + DURATION_BIT + END_BIT));
+            keys_with_this_pid[k] = (keys_with_this_pid[k] & (((__uint128_t)1 << (OID_BIT * 2 + MBR_BIT + DURATION_BIT + END_BIT)) - 1))
+                                 + ((__uint128_t)bench->bg_run[old_big].wids[i] << (OID_BIT * 2 + MBR_BIT + DURATION_BIT + END_BIT));
             keys_with_wid[bench->bg_run[old_big].wids[i]].push_back(keys_with_this_pid[k]);
             mbrs_with_wid[bench->bg_run[old_big].wids[i]].push_back(mbrs_with_this_pid[k]);
         }
@@ -356,14 +356,14 @@ void *merge_dump(void *arg){
     //especially slow wirte_bitmap
 #pragma omp parallel for num_threads(64)
     for(uint i = 0; i < total_index; i++){             //i < bench->merge_kv_capacity
-        uint low0 = (temp_real_mbrs[i].low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 1);
-        uint low1 = (temp_real_mbrs[i].low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
-        uint high0 = (temp_real_mbrs[i].high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (WID_BIT/2)) - 1);
-        uint high1 = (temp_real_mbrs[i].high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (WID_BIT/2)) - 1);
+        uint low0 = (temp_real_mbrs[i].low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (SID_BIT / 2)) - 1);
+        uint low1 = (temp_real_mbrs[i].low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (SID_BIT / 2)) - 1);
+        uint high0 = (temp_real_mbrs[i].high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (SID_BIT / 2)) - 1);
+        uint high1 = (temp_real_mbrs[i].high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (SID_BIT / 2)) - 1);
         uint bitmap_id = i/bench->SSTable_kv_capacity;
         for(uint m=low0;m<=high0;m++){
             for(uint n=low1;n<=high1;n++){
-                uint bit_pos = xy2d(WID_BIT/2,m,n);
+                uint bit_pos = xy2d(SID_BIT / 2, m, n);
                 bench->bg_run[old_big].bitmaps[bitmap_id*(bench->bit_count/8)+bit_pos/8] |= (1<<(bit_pos%8));
             }
         }
@@ -386,10 +386,10 @@ void *merge_dump(void *arg){
             if (bench->bg_run[old_big].bitmaps[i * (bench->bit_count / 8) + j / 8] & (1 << (j % 8))) {
                 Point bit_p;
                 uint x = 0, y = 0;
-                d2xy(WID_BIT / 2, j, x, y);
-                bit_p.x = (double) x / ((1ULL << (WID_BIT / 2)) - 1) * (bench->mbr.high[0] - bench->mbr.low[0]) +
+                d2xy(SID_BIT / 2, j, x, y);
+                bit_p.x = (double) x / ((1ULL << (SID_BIT / 2)) - 1) * (bench->mbr.high[0] - bench->mbr.low[0]) +
                           bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
-                bit_p.y = (double) y / ((1ULL << (WID_BIT / 2)) - 1) * (bench->mbr.high[1] - bench->mbr.low[1]) +
+                bit_p.y = (double) y / ((1ULL << (SID_BIT / 2)) - 1) * (bench->mbr.high[1] - bench->mbr.low[1]) +
                           bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
                 bit_points[count_p] = bit_p;
                 count_p++;
@@ -409,15 +409,15 @@ void *merge_dump(void *arg){
         for(uint j = 0; j < bench->bit_count; j++){
             if(bench->bg_run[old_big].bitmaps[i*(bench->bit_count/8) + j/8] & (1<<(j%8)) ){
                 uint x, y;
-                d2xy(WID_BIT/2, j, x, y);
+                d2xy(SID_BIT / 2, j, x, y);
                 Point temp_p(x, y);
                 temp_bitbox.update(temp_p);
             }
         }
-        bench->bg_run[old_big].bitmap_mbrs[i].low[0] = temp_bitbox.low[0] / ((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
-        bench->bg_run[old_big].bitmap_mbrs[i].low[1] = temp_bitbox.low[1] / ((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];
-        bench->bg_run[old_big].bitmap_mbrs[i].high[0] = temp_bitbox.high[0] / ((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
-        bench->bg_run[old_big].bitmap_mbrs[i].high[1] = temp_bitbox.high[1] / ((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];
+        bench->bg_run[old_big].bitmap_mbrs[i].low[0] = temp_bitbox.low[0] / ((1ULL << (SID_BIT / 2)) - 1) * (bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
+        bench->bg_run[old_big].bitmap_mbrs[i].low[1] = temp_bitbox.low[1] / ((1ULL << (SID_BIT / 2)) - 1) * (bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];
+        bench->bg_run[old_big].bitmap_mbrs[i].high[0] = temp_bitbox.high[0] / ((1ULL << (SID_BIT / 2)) - 1) * (bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
+        bench->bg_run[old_big].bitmap_mbrs[i].high[1] = temp_bitbox.high[1] / ((1ULL << (SID_BIT / 2)) - 1) * (bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];
     }
     double bitmap_mbr_time = get_time_elapsed(bg_start,true);
     fprintf(stdout,"\tbitmap_mbr_time:\t%.2f\n",bitmap_mbr_time);
@@ -441,7 +441,7 @@ void *merge_dump(void *arg){
     ofstream SSTable_of;
     for(uint i = 0; i < bench->merge_kv_capacity; i += bench->SSTable_kv_capacity) {
         uint sst_id = i / bench->SSTable_kv_capacity;
-        bench->bg_run[old_big].first_widpid[sst_id] = temp_keys[i] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
+        bench->bg_run[old_big].first_widpid[sst_id] = temp_keys[i] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
         //print_parse_key(temp_keys[i]);
         SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_id), ios::out | ios::trunc);
         bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
@@ -586,7 +586,7 @@ void *straight_dump(void *arg){
     uint sst_count = 0;
     struct timeval bg_start = get_cur_time();
     for(sst_count=0; sst_count<bench->config->SSTable_count; sst_count++){
-        bench->bg_run[old_big].first_widpid[sst_count] = bench->h_keys[offset][total_index] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
+        bench->bg_run[old_big].first_widpid[sst_count] = bench->h_keys[offset][total_index] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
 //        cout<<bench->bg_run[old_big].first_widpid[sst_count]<<endl;
 //        cout<<get_key_wid(bench->h_keys[offset][total_index])<<endl;
 //        cout<<get_key_pid(bench->h_keys[offset][total_index])<<endl<<endl;

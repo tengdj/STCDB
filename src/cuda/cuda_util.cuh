@@ -114,24 +114,33 @@ inline uint64_t d_MurmurHash2_x64( const void * key, int len, uint32_t seed ){
 
 __device__
 inline uint float_to_uint(float xy) {
-//    uint ret = 0;
-//    if(xy<0){
-//        ret = 10000000;
-//        xy = 0-xy;
-//    }
-////        uint inte = (uint)xy;
-////        uint decimals = (xy - inte)*10000;
-//    ret += (uint)(xy*10000);
-//    return ret;
     xy += 180;
     return (uint)(xy*10000);
 }
 
-__host__ __device__
-float uint_to_float(uint f);
+__device__
+inline float uint_to_float(uint f){
+    float ret = (float)f/10000 - 180;
+    return ret;
+}
+
+__device__
+inline uint64_t write_mid_xy(box *b){
+    float mid_x = b->low[0]/2 + b->high[0]/2;
+    float mid_y = b->low[1]/2 + b->high[1]/2;
+    return ( (uint64_t)float_to_uint(mid_x) << 32 ) + (uint64_t)float_to_uint(mid_y);
+}
+
+__device__
+inline void parse_mid_xy(uint64_t mid_xy, double & mid_x, double & mid_y){
+    uint x = mid_xy >> 32;
+    uint y = mid_xy & ((1ULL << 32) - 1);
+    mid_x = uint_to_float(x);
+    mid_y = uint_to_float(y);
+}
 
 __host__ __device__
-uint get_key_wid(__uint128_t key);
+uint get_key_sid(__uint128_t key);
 
 __host__ __device__
 uint get_key_pid(__uint128_t key);
@@ -158,9 +167,9 @@ __host__
 inline void print_parse_key(__uint128_t key){
     print_128(key);
     cout<<endl;
-    uint wid = get_key_wid(key);
+    uint wid = get_key_sid(key);
     uint first_low0, first_low1;
-    d2xy(WID_BIT, wid, first_low0, first_low1);
+    d2xy(SID_BIT, wid, first_low0, first_low1);
     cout<<"wid:"<<wid<<" "<<first_low0<<"-"<<first_low1<<endl;
     cout<<"pid:"<<get_key_pid(key)<<endl;
     //mbr
@@ -182,6 +191,20 @@ inline void parse_mbr(__uint128_t key, box &b, box bitmap_mbr){
     b.high[0] = (double)high0/((1ULL << (MBR_BIT/4)) - 1) * (bitmap_mbr.high[0] - bitmap_mbr.low[0]) + bitmap_mbr.low[0];
     b.high[1] = (double)high1/((1ULL << (MBR_BIT/4)) - 1) * (bitmap_mbr.high[1] - bitmap_mbr.low[1]) + bitmap_mbr.low[1];
 }
+
+//__host__
+//inline void parse_mbr(__uint128_t key, box &b, box bitmap_mbr){
+//    uint64_t mbr_code = get_key_mbr_code(key);
+//    uint64_t low0 = mbr_code >> (MBR_BIT/4*3);
+//    uint64_t low1 = (mbr_code >> (MBR_BIT/2)) & ((1ULL << (MBR_BIT/4)) - 1);
+//    uint64_t high0 = (mbr_code >> (MBR_BIT/4)) & ((1ULL << (MBR_BIT/4)) - 1);
+//    uint64_t high1 = mbr_code & ((1ULL << (MBR_BIT/4)) - 1);
+//
+//    b.low[0] = (double)low0/((1ULL << (MBR_BIT/4)) - 1) * (bitmap_mbr.high[0] - bitmap_mbr.low[0]) + bitmap_mbr.low[0];
+//    b.low[1] = (double)low1/((1ULL << (MBR_BIT/4)) - 1) * (bitmap_mbr.high[1] - bitmap_mbr.low[1]) + bitmap_mbr.low[1];
+//    b.high[0] = (double)high0/((1ULL << (MBR_BIT/4)) - 1) * (bitmap_mbr.high[0] - bitmap_mbr.low[0]) + bitmap_mbr.low[0];
+//    b.high[1] = (double)high1/((1ULL << (MBR_BIT/4)) - 1) * (bitmap_mbr.high[1] - bitmap_mbr.low[1]) + bitmap_mbr.low[1];
+//}
 
 
 #endif /* CUDA_UTIL_CUH_ */

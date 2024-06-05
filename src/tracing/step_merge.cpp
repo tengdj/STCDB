@@ -22,7 +22,7 @@ uint SSTable::search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_cap
     uint64_t temp_wp;
     while (low <= high) {
         mid = (low + high) / 2;
-        temp_wp = keys[mid] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
+        temp_wp = keys[mid] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
         if (temp_wp == wp){
             find = mid;
             break;
@@ -42,7 +42,7 @@ uint SSTable::search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_cap
     uint cursor = find;
     while(temp_wp == wp && cursor >= 1){
         cursor--;
-        temp_wp = keys[cursor] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
+        temp_wp = keys[cursor] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
     }
     if(temp_wp == wp && cursor == 0){
         count++;
@@ -54,7 +54,7 @@ uint SSTable::search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_cap
     }
     while(cursor+1<SSTable_kv_capacity){
         cursor++;
-        temp_wp = keys[cursor] >> (PID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
+        temp_wp = keys[cursor] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
         if(temp_wp == wp){
             count++;
             //cout<<get_key_target(keys[cursor])<<endl;

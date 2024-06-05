@@ -69,7 +69,7 @@ workbench *partitioner::build_schema(Point *points, size_t num_objects){
              << " bench->dwFilterSize :" << bench->dwFilterSize << endl;
     }
     if(true){
-        bench->bit_count = (1ULL << (WID_BIT/2)) * (1ULL << (WID_BIT/2));
+        bench->bit_count = (1ULL << (SID_BIT / 2)) * (1ULL << (SID_BIT / 2));
         bench->bitmaps_size = bench->bit_count/8*bench->config->SSTable_count;
 
     }

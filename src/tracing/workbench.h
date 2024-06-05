@@ -201,18 +201,11 @@ public:
     uint long_meeting_count = 0;
     uint long_oid_count = 0;
 
-    //space for where id
-    unsigned char * d_bitmaps = NULL;                 //1024  256*256
-    unsigned char ** h_bitmaps = NULL;
-    uint bitmap_edge_length = 0;
-    uint bit_count = 0;         //256*256=65536  SSTable_count bitmap
-    uint bitmaps_size = 0;
-    uint bit_find_count = 0;
-    unsigned short * d_wids = NULL;
-    unsigned short ** h_wids = NULL;
-    f_box * kv_boxs = NULL;                           //real box, 1:1 kv
-    box * d_bitmap_mbrs = NULL;
-    box ** h_bitmap_mbrs = NULL;
+    //space for spatial id
+    uint64_t * mid_xys = NULL;
+    uint split_num = 10;
+    float * x_axis_of_parts = NULL;
+    float ** y_axis_of_parts = NULL;
 
     pthread_t command_thread;
     pthread_mutex_t mutex_i;
