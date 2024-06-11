@@ -48,7 +48,7 @@ uint SSTable::search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_cap
         count++;
         //cout<<wp<<endl;
         if(search_multi){
-            search_multi_pid[search_multi_length] = get_key_pid(keys[0]);
+            search_multi_pid[search_multi_length] = get_key_oid(keys[0]);
             search_multi_length++;
         }
     }
@@ -59,7 +59,7 @@ uint SSTable::search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_cap
             count++;
             //cout<<get_key_target(keys[cursor])<<endl;
             if(search_multi){
-                search_multi_pid[search_multi_length] = get_key_pid(keys[cursor]);
+                search_multi_pid[search_multi_length] = get_key_oid(keys[cursor]);
                 search_multi_length++;
             }
         }

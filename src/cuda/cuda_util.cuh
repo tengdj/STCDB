@@ -124,26 +124,11 @@ inline float uint_to_float(uint f){
     return ret;
 }
 
-__device__
-inline uint64_t write_mid_xy(box *b){
-    float mid_x = b->low[0]/2 + b->high[0]/2;
-    float mid_y = b->low[1]/2 + b->high[1]/2;
-    return ( (uint64_t)float_to_uint(mid_x) << 32 ) + (uint64_t)float_to_uint(mid_y);
-}
-
-__device__
-inline void parse_mid_xy(uint64_t mid_xy, double & mid_x, double & mid_y){
-    uint x = mid_xy >> 32;
-    uint y = mid_xy & ((1ULL << 32) - 1);
-    mid_x = uint_to_float(x);
-    mid_y = uint_to_float(y);
-}
-
 __host__ __device__
 uint get_key_sid(__uint128_t key);
 
 __host__ __device__
-uint get_key_pid(__uint128_t key);
+uint get_key_oid(__uint128_t key);
 
 __host__ __device__
 uint get_key_target(__uint128_t key);
@@ -168,10 +153,8 @@ inline void print_parse_key(__uint128_t key){
     print_128(key);
     cout<<endl;
     uint wid = get_key_sid(key);
-    uint first_low0, first_low1;
-    d2xy(SID_BIT, wid, first_low0, first_low1);
-    cout<<"wid:"<<wid<<" "<<first_low0<<"-"<<first_low1<<endl;
-    cout<<"pid:"<<get_key_pid(key)<<endl;
+    cout<<"wid:"<< wid <<endl;
+    cout << "pid:" << get_key_oid(key) << endl;
     //mbr
     cout<<"target:"<<get_key_target(key)<<endl;
     cout<<"duration:"<<get_key_duration(key)<<endl;

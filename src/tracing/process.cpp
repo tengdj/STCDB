@@ -286,17 +286,17 @@ void *merge_dump(void *arg){
 
         //search and get
         for(uint j = 0; j < bench->config->MemTable_capacity/2; j++){
-            if(bench->h_wids[offset+j][i] == 0){
+            if(bench->h_sids[offset+j][i] == 0){
                 continue;
             }
             uint temp_x, temp_y;
-            d2xy(SID_BIT / 2, bench->h_wids[offset + j][i], temp_x, temp_y);
+            d2xy(SID_BIT / 2, bench->h_sids[offset + j][i], temp_x, temp_y);
             x += temp_x;
             y += temp_y;
             not_zero_count++;
 
-            wp = ((uint64_t)bench->h_wids[offset+j][i] << OID_BIT) + i;
-            //cout << bench->h_wids[offset+j][i] <<'-'<< i << endl;
+            wp = ((uint64_t)bench->h_sids[offset+j][i] << OID_BIT) + i;
+            //cout << bench->h_sids[offset+j][i] <<'-'<< i << endl;
             uint find_count = search_keys_by_pid(bench->h_keys[offset+j], wp, bench->config->kv_restriction, keys_with_this_pid, indices_with_this_pid);
             uint old_keys_count = keys_with_this_pid.size() - indices_with_this_pid.size();
             if(find_count){
@@ -572,7 +572,7 @@ void *straight_dump(void *arg){
     bench->end_time_min = bench->end_time_max;              //new min = old max
     bench->bg_run[old_big].first_widpid = new uint64_t[bench->config->SSTable_count];
     bench->bg_run[old_big].wids = new unsigned short[bench->config->num_objects];
-    copy(bench->h_wids[offset], bench->h_wids[offset] + bench->config->num_objects, bench->bg_run[old_big].wids);
+    copy(bench->h_sids[offset], bench->h_sids[offset] + bench->config->num_objects, bench->bg_run[old_big].wids);
     bench->bg_run[old_big].bitmaps = new unsigned char[bench->bitmaps_size];
     copy(bench->h_bitmaps[offset], bench->h_bitmaps[offset] + bench->bitmaps_size, bench->bg_run[old_big].bitmaps);
     bench->bg_run[old_big].bitmap_mbrs = new box[bench->config->SSTable_count];

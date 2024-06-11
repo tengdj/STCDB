@@ -203,9 +203,25 @@ public:
 
     //space for spatial id
     uint64_t * mid_xys = NULL;
-    uint split_num = 10;
+    uint split_num = 3;
     float * x_axis_of_parts = NULL;
     float ** y_axis_of_parts = NULL;
+    short * same_pid_count = NULL;
+    unsigned short * d_sids = NULL;
+    unsigned short ** h_sids = NULL;
+    f_box * kv_boxs = NULL;                           //real box, 1:1 kv
+    unsigned char * d_bitmaps = NULL;                 //1024  256*256
+    unsigned char ** h_bitmaps = NULL;
+    uint bitmap_edge_length = 0;
+    uint bit_count = 0;         //256*256=65536  SSTable_count bitmap
+    uint bitmaps_size = 0;
+    uint bit_find_count = 0;
+    box * d_bitmap_mbrs = NULL;
+    box ** h_bitmap_mbrs = NULL;
+    uint * d_oids = NULL;
+    uint sid_count = 0;
+    uint * d_CTF_capacity_prefix_sum = NULL;
+
 
     pthread_t command_thread;
     pthread_mutex_t mutex_i;
