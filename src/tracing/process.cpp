@@ -577,11 +577,20 @@ void *straight_dump(void *arg){
     copy(bench->h_bitmaps[offset], bench->h_bitmaps[offset] + bench->bitmaps_size, bench->bg_run[old_big].bitmaps);
     bench->bg_run[old_big].bitmap_mbrs = new box[bench->config->SSTable_count];
     copy(bench->h_bitmap_mbrs[offset], bench->h_bitmap_mbrs[offset] + bench->config->SSTable_count, bench->bg_run[old_big].bitmap_mbrs);
+    bench->bg_run[old_big].CTF_capacity = new uint[bench->config->SSTable_count];
+    copy(bench->h_CTF_capacity[offset], bench->h_CTF_capacity[offset] + bench->config->SSTable_count, bench->bg_run[old_big].CTF_capacity);
 
-    cout<<"sst_capacity:"<<bench->SSTable_kv_capacity<<endl;
+    cout << "CTF_capacitys:" << endl;
+    for(uint i = 0; i < bench->config->SSTable_count; i++){
+        cout << bench->bg_run[old_big].CTF_capacity[i] << endl;
+    }
+    cerr << "all bitmap_mbrs" << endl;
+    for(uint i = 0; i < bench->config->SSTable_count; i++){
+        bench->bg_run[old_big].bitmap_mbrs[i].print();
+    }
+
     ofstream SSTable_of;
-
-    __uint128_t * keys = new __uint128_t[bench->SSTable_kv_capacity];
+    __uint128_t * keys = new __uint128_t[bench->SSTable_kv_capacity*5];         //over size
     uint total_index = 0;
     uint sst_count = 0;
     struct timeval bg_start = get_cur_time();
@@ -590,13 +599,13 @@ void *straight_dump(void *arg){
 //        cout<<bench->bg_run[old_big].first_widpid[sst_count]<<endl;
 //        cout<<get_key_wid(bench->h_keys[offset][total_index])<<endl;
 //        cout<<get_key_pid(bench->h_keys[offset][total_index])<<endl<<endl;
-        copy(bench->h_keys[offset] + total_index, bench->h_keys[offset] + total_index + bench->SSTable_kv_capacity, keys);
-        total_index += bench->SSTable_kv_capacity;
-        assert(total_index<=bench->config->kv_restriction);
+        copy(bench->h_keys[offset] + total_index, bench->h_keys[offset] + total_index + bench->h_CTF_capacity[offset][sst_count], keys);
+        total_index += bench->h_CTF_capacity[offset][sst_count];
+        //assert(total_index<=bench->config->kv_restriction);
         bench->pro.bg_merge_time += get_time_elapsed(bg_start,true);
         SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out | ios::trunc);
         bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
-        SSTable_of.write((char *)keys, sizeof(__uint128_t)*bench->SSTable_kv_capacity);
+        SSTable_of.write((char *)keys, sizeof(__uint128_t)*bench->h_CTF_capacity[offset][sst_count]);
         SSTable_of.flush();
         SSTable_of.close();
         bench->pro.bg_flush_time += get_time_elapsed(bg_start,true);
@@ -787,34 +796,33 @@ void tracer::process(){
                     offset = bench->config->MemTable_capacity/2;
                 }
 
-
-//                Point * bit_points = new Point[bench->bit_count];
-//                uint count_p;
-//                for(uint j = 0;j<bench->config->SSTable_count;j++){
-//                    //cerr<<"bitmap"<<j<<endl;
-//                    cerr<<endl;
-//                    count_p = 0;
-//                    bool is_print = false;
-//                    for(uint i=0;i<bench->bit_count;i++){
-//                        if(bench->h_bitmaps[offset][j*(bench->bit_count/8) + i/8] & (1<<(i%8))){
-//                            if(!is_print){
-//                                cout<<i<<"in SST"<<j<<endl;
-//                                is_print = true;
-//                            }
-//                            Point bit_p;
-//                            uint x=0,y=0;
-//                            d2xy(WID_BIT/2,i,x,y);
-//                            bit_p.x = (double)x/((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
-//                            bit_p.y = (double)y/((1ULL << (WID_BIT/2)) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
-//                            bit_points[count_p] = bit_p;
-//                            count_p++;
-//                        }
-//                    }
-//                    cout<<"bit_points.size():"<<count_p<<endl;
-//                    print_points(bit_points,count_p);
-//                    cerr << "process output bitmap finish" << endl;
-//                }
-//                delete[] bit_points;
+                Point * bit_points = new Point[bench->bit_count];
+                uint count_p;
+                for(uint j = 0;j<bench->config->SSTable_count;j++){
+                    //cerr<<"bitmap"<<j<<endl;
+                    cerr<<endl;
+                    count_p = 0;
+                    bool is_print = false;
+                    for(uint i=0;i<bench->bit_count;i++){
+                        if(bench->h_bitmaps[offset][j*(bench->bit_count/8) + i/8] & (1<<(i%8))){
+                            if(!is_print){
+                                cout<<i<<"in SST"<<j<<endl;
+                                is_print = true;
+                            }
+                            Point bit_p;
+                            uint x=0,y=0;
+                            d2xy(SID_BIT/2,i,x,y);
+                            bit_p.x = (double)x/((1ULL << (SID_BIT/2)) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
+                            bit_p.y = (double)y/((1ULL << (SID_BIT/2)) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
+                            bit_points[count_p] = bit_p;
+                            count_p++;
+                        }
+                    }
+                    cout<<"bit_points.size():"<<count_p<<endl;
+                    print_points(bit_points,count_p);
+                    //cerr << "process output bitmap finish" << endl;
+                }
+                delete[] bit_points;
 
                 bench->end_time_max = bench->cur_time;              //old max
                 cout<<"meeting_cut_count:"<<bench->meeting_cut_count<<endl;
@@ -845,12 +853,14 @@ void tracer::process(){
 //                p.close();
 
 
-                if(config->MemTable_capacity==2){
-                    straight_dump((void *)bench);
-                }
-                else{
-                    merge_dump((void *)bench);
-                }
+//                if(config->MemTable_capacity==2){
+//                    straight_dump((void *)bench);
+//                }
+//                else{
+//                    merge_dump((void *)bench);
+//                }
+
+                straight_dump((void *)bench);
 
 
                 //init
@@ -880,10 +890,10 @@ void tracer::process(){
                 q << "question number" << ',' << "time_consume(ms)" << endl;
                 for(int i = 0; i < question_count; i++){
                     struct timeval disk_search_time = get_cur_time();
-                    uint temp = bench->config->SSTable_count;
-                    bench->config->SSTable_count = bench->merge_sstable_count;
+//                    uint temp = bench->config->SSTable_count;
+//                    bench->config->SSTable_count = bench->merge_sstable_count;
                     bench->search_in_disk(pid, 15);
-                    bench->config->SSTable_count = temp;
+//                    bench->config->SSTable_count = temp;
                     pid++;
                     double time_consume = get_time_elapsed(disk_search_time);
                     //printf("disk_search_time %.2f\n", time_consume);
@@ -892,7 +902,6 @@ void tracer::process(){
                 q.close();
                 cout << "question_count:" << question_count << " id_find_count:" << bench->id_find_count <<" kv_restriction:"<< bench->config->kv_restriction << endl;
                 cout << "wid_filter_count:" << bench->wid_filter_count <<"id_not_find_count"<<bench->id_not_find_count<<endl;
-
 
                 double mid_x = -87.678503;
                 double mid_y = 41.856803;
@@ -910,10 +919,10 @@ void tracer::process(){
                     box search_area(mid_x - edge_length/2, mid_y - edge_length/2, mid_x + edge_length/2, mid_y + edge_length/2);
                     search_area.print();
                     struct timeval area_search_time = get_cur_time();
-                    uint temp = bench->config->SSTable_count;
-                    bench->config->SSTable_count = bench->merge_sstable_count;
+//                    uint temp = bench->config->SSTable_count;
+//                    bench->config->SSTable_count = bench->merge_sstable_count;
                     bench->mbr_search_in_disk(search_area, 15);
-                    bench->config->SSTable_count = temp;
+//                    bench->config->SSTable_count = temp;
                     double time_consume = get_time_elapsed(area_search_time);
                     //printf("area_search_time %.2f\n", time_consume);
                     p << edge_length*edge_length << ',' << bench->mbr_find_count << ',' << bench->mbr_unique_find << ','

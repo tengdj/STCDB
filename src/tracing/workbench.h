@@ -203,7 +203,7 @@ public:
 
     //space for spatial id
     uint64_t * mid_xys = NULL;
-    uint split_num = 3;
+    uint split_num = 10;
     float * x_axis_of_parts = NULL;
     float ** y_axis_of_parts = NULL;
     short * same_pid_count = NULL;
@@ -220,7 +220,8 @@ public:
     box ** h_bitmap_mbrs = NULL;
     uint * d_oids = NULL;
     uint sid_count = 0;
-    uint * d_CTF_capacity_prefix_sum = NULL;
+    uint * d_CTF_capacity = NULL;
+    uint ** h_CTF_capacity = NULL;
 
 
     pthread_t command_thread;

@@ -42,6 +42,7 @@ public:
     unsigned short * wids = NULL;
     unsigned char * bitmaps = NULL;
     box * bitmap_mbrs = NULL;
+    uint * CTF_capacity = NULL;
     uint start_time_min = 0;
     uint start_time_max = 0;
     uint end_time_min = 0;
