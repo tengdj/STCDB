@@ -19,7 +19,7 @@ public:
     uint num_threads = 1;
     uint duration = 1000;
     uint num_objects = 1000;
-    string trace_path = "default.tr";              //"/gisdata/chicago/traces"
+    string trace_path = "../data/points/";              //"/gisdata/chicago/traces"      // "../data/points/"
     uint cur_duration = 0;
 
     uint file_size = 3600;                             // data in x seconds is put into file
@@ -51,13 +51,13 @@ public:
     bool load_data = false;
     uint SSTable_kv_capacity = 1342177;             //1342177  20.5MB
 
-    uint kv_capacity = 0;            //134217728 + 1000000
-    uint kv_restriction = 0;                  //2*1024*1024*1024/16 = 134217728
+    uint kv_capacity = 134217728 + 1000000;            //134217728 + 1000000
+    uint kv_restriction = 134217728;                  //2*1024*1024*1024/16 = 134217728
     uint MemTable_capacity = 2 ;             //5*2 ,and workbench data[100] is not enough
 
 
     uint big_sorted_run_capacity = 100;     //can be made to vector
-    uint SSTable_count = 100;              //default 2G
+    uint SSTable_count = 49;              //default 2G
 
     //bool search_kv = true;
     uint search_single_capacity = 100;
@@ -66,10 +66,12 @@ public:
     bool bloom_filter = false;
     double false_positive_rate = 0.0004;
 
+    bool save_meetings_pers = false;
+
     void update(){
         assert(MemTable_capacity%2==0);
-        kv_restriction = SSTable_kv_capacity * SSTable_count;
-        kv_capacity = kv_restriction + 1000000;
+//        kv_restriction = SSTable_kv_capacity * SSTable_count;
+//        kv_capacity = kv_restriction + 1000000;
     }
 
     void print(){
@@ -185,11 +187,12 @@ inline configuration get_parameters(int argc, char **argv){
 class generator_configuration:public configuration{
 public:
     // how many percent of the initial points are evenly distributed
-    double walk_rate = 0.4;
+    double walk_rate = 0.9;
     double walk_speed = 1.0;
-    double drive_rate = 0.2;
-    double drive_speed = 15.0;
-    int max_rest_time = 600;
+    double drive_rate = 0.04;
+    double drive_speed = 10.0;
+    int max_rest_time = 200;
+    int max_walk_time = 100;
 
     string map_path = "/gisdata/chicago/streets";
     string meta_path = "/gisdata/chicago/tweet.dat";

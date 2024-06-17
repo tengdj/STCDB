@@ -116,7 +116,7 @@ public:
     TripType type;
     Point loc;
     //int last_time;
-    uint rest_time = 0;
+    uint time_remaining = 0;
 
     int core = -2;
     Point end;

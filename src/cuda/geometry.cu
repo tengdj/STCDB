@@ -609,7 +609,7 @@ void cuda_identify_meetings(workbench *bench) {
         }
 
         float longer_edge = max(bench->meeting_buckets[bid].mbr.high[1] - bench->meeting_buckets[bid].mbr.low[1] , bench->meeting_buckets[bid].mbr.high[0] - bench->meeting_buckets[bid].mbr.low[0]);
-        if(longer_edge > 0.01){
+        if(longer_edge > 0.007){
             bench->meeting_buckets[bid].key = ULL_MAX;
             return;
         }
@@ -1243,7 +1243,6 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
         log("\t%.2f MB\td_pstFilter", 1.0 * size / 1024 / 1024);
         cudaMemset(h_bench.d_pstFilter, 0, bench->dwFilterSize);
     }
-
 
     if(true) {
         h_bench.d_sids = (unsigned short*)gpu->allocate(bench->config->num_objects*sizeof(unsigned short));

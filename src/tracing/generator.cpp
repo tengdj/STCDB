@@ -110,7 +110,10 @@ trace_generator::trace_generator(generator_configuration *conf, Map *m){
     meta_data = new Trace_Meta[config->num_objects];
 }
 trace_generator::~trace_generator(){
-    map = NULL;
+    //map = NULL;
+    if(map){
+        delete map;
+    }
     if(tweets){
         delete []tweets;
     }
@@ -278,26 +281,30 @@ void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){             
                 meta_data[obj].end = get_random_location(meta_data[obj].core);
             }
             //meta_data[obj].speed = config->drive_speed;
-            meta_data[obj].speed = 14 + get_rand_double()*2;           //10~20
+            meta_data[obj].speed = config->drive_speed + get_rand_double()*2;           //10~20
             mymap->navigate(ret, meta_data[obj], config->cur_duration, count, config->num_objects, obj);
         }else if(meta_data[obj].type == WALK){
+            if(!meta_data[obj].time_remaining){
+                meta_data[obj].time_remaining = config->max_walk_time * get_rand_double() + 100;
+            }
             const double step = config->walk_speed/meta_data[obj].end.distance(meta_data[obj].loc, true);
-            for(double portion = step;portion<(1+step)&&count<config->cur_duration;){
+            for(double portion = step;portion<(1+step) && count<config->cur_duration && meta_data[obj].time_remaining > 0;){
                 ret[count*config->num_objects+obj].x = meta_data[obj].loc.x+portion*(meta_data[obj].end.x - meta_data[obj].loc.x);
                 ret[count*config->num_objects+obj].y = meta_data[obj].loc.y+portion*(meta_data[obj].end.y - meta_data[obj].loc.y);
                 count++;
+                meta_data[obj].time_remaining--;
                 portion += step;
             }
             meta_data[obj].loc = ret[(count-1)*config->num_objects+obj];
         }else if(meta_data[obj].type == REST){
-            if(!meta_data[obj].rest_time){
-                meta_data[obj].rest_time = config->max_rest_time*get_rand_double();
+            if(!meta_data[obj].time_remaining){
+                meta_data[obj].time_remaining = config->max_rest_time * get_rand_double() + 100;
             }
             //int dur = meta_data[obj].rest_time;
-            while(meta_data[obj].rest_time>0 && count<config->cur_duration){
+            while(meta_data[obj].time_remaining > 0 && count < config->cur_duration){
                 ret[count*config->num_objects+obj] = meta_data[obj].loc;
                 count++;
-                meta_data[obj].rest_time--;
+                meta_data[obj].time_remaining--;
             }
         }
         if(count<config->cur_duration){                //last trip must be finished

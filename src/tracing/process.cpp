@@ -43,7 +43,7 @@ tracer::tracer(configuration *conf, box &b, Point *t, trace_generator *gen){
 }
 tracer::tracer(configuration *conf){
 	config = conf;
-	loadMeta(config->trace_path.c_str());
+	//loadMeta(config->trace_path.c_str());
 	part = new partitioner(mbr,config);
 #ifdef USE_GPU
 	if(config->gpu){
@@ -72,12 +72,22 @@ tracer::~tracer(){
 	if(bench){
 		delete bench;
 	}
+    if(trace){
+        delete trace;
+    }
+    if(generator){
+        delete generator;
+    }
+    if(config){
+        delete config;
+    }
 #ifdef USE_GPU
 	if(gpu){
 		delete gpu;
 	}
 #endif
 }
+
 void tracer::dumpTo(const char *path) {
 	struct timeval start_time = get_cur_time();
 	ofstream wf(path, ios::out|ios::binary|ios::trunc);
@@ -91,25 +101,43 @@ void tracer::dumpTo(const char *path) {
 	logt("dumped to %s",start_time,path);
 }
 
-void tracer::loadMeta(const char *path) {
+//void tracer::loadMeta(const char *path) {
+//
+//	uint true_num_objects;
+//	uint true_duration;
+//	ifstream in(path, ios::in | ios::binary);
+//	if(!in.is_open()){
+//		log("%s cannot be opened",path);
+//		exit(0);
+//	}
+//	in.read((char *)&true_num_objects, sizeof(true_num_objects));
+//	in.read((char *)&true_duration, sizeof(true_duration));
+//	log("%d objects last for %d seconds in file",true_num_objects,true_duration);
+//	in.read((char *)&mbr, sizeof(mbr));
+//	mbr.to_squre(true);
+//	mbr.print();
+//	assert((size_t)config->num_objects*(config->start_time+config->duration)<=(size_t)true_num_objects*true_duration);
+//	//assert(config->num_objects<=true_num_objects);
+//	assert(config->start_time+config->duration<=true_duration);
+//	in.close();
+//}
 
-	uint true_num_objects;
-	uint true_duration;
-	ifstream in(path, ios::in | ios::binary);
-	if(!in.is_open()){
-		log("%s cannot be opened",path);
-		exit(0);
-	}
-	in.read((char *)&true_num_objects, sizeof(true_num_objects));
-	in.read((char *)&true_duration, sizeof(true_duration));
-	log("%d objects last for %d seconds in file",true_num_objects,true_duration);
-	in.read((char *)&mbr, sizeof(mbr));
-	mbr.to_squre(true);
-	mbr.print();
-	assert((size_t)config->num_objects*(config->start_time+config->duration)<=(size_t)true_num_objects*true_duration);
-	//assert(config->num_objects<=true_num_objects);
-	assert(config->start_time+config->duration<=true_duration);
-	in.close();
+void tracer::loadData(const char *path, int st) {
+    log("loading locations from %d to %d",st, st + 100);
+    struct timeval start_time = get_cur_time();
+    string filename = path + to_string(st) + "_" + to_string(config->num_objects) + ".tr";
+    ifstream in(path, ios::in | ios::binary);
+    if(!in.is_open()){
+        log("%s cannot be opened",filename.c_str());
+        exit(0);
+    }
+    if(!trace){
+        //trace = (Point *)malloc(min((uint)100,config->duration)*config->num_objects*sizeof(Point));
+        trace = new Point[config->num_objects*100];
+    }
+    in.read((char *)trace, config->num_objects * 100 * sizeof(Point));
+    in.close();
+    logt("loaded %d objects last for 100 seconds start from %d time from %s",start_time, config->num_objects, st, filename.c_str());
 }
 
 void tracer::loadData(const char *path, int st, int duration) {
@@ -135,7 +163,8 @@ void tracer::loadData(const char *path, int st, int duration) {
 
 	in.seekg(st*true_num_objects*sizeof(Point), ios_base::cur);
 	if(!trace){
-		trace = (Point *)malloc(min((uint)100,config->duration)*config->num_objects*sizeof(Point));
+        //trace = (Point *)malloc(min((uint)100,config->duration)*config->num_objects*sizeof(Point));
+        trace = new Point[config->num_objects*100];
 	}
 
 	uint loaded = 0;
@@ -443,7 +472,7 @@ void *merge_dump(void *arg){
         uint sst_id = i / bench->SSTable_kv_capacity;
         bench->bg_run[old_big].first_widpid[sst_id] = temp_keys[i] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
         //print_parse_key(temp_keys[i]);
-        SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_id), ios::out | ios::trunc);
+        SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_id), ios::out|ios::binary|ios::trunc);
         bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
         SSTable_of.write((char *)(temp_keys + i), sizeof(__uint128_t)*bench->SSTable_kv_capacity);
         SSTable_of.flush();
@@ -501,7 +530,7 @@ void *merge_dump(void *arg){
 //    struct timeval bg_start = get_cur_time();
 //    while(finish<bench->MemTable_count){
 //        if(kv_count==0){
-//            SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out | ios::trunc);
+//            SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out|ios::binary|ios::trunc);
 //            assert(SSTable_of.is_open());
 //            bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
 //        }
@@ -603,7 +632,7 @@ void *straight_dump(void *arg){
         total_index += bench->h_CTF_capacity[offset][sst_count];
         //assert(total_index<=bench->config->kv_restriction);
         bench->pro.bg_merge_time += get_time_elapsed(bg_start,true);
-        SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out | ios::trunc);
+        SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out|ios::binary|ios::trunc);
         bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
         SSTable_of.write((char *)keys, sizeof(__uint128_t)*bench->h_CTF_capacity[offset][sst_count]);
         SSTable_of.flush();
@@ -659,7 +688,8 @@ void tracer::process(){
 	for(int st=config->start_time;st<config->start_time+config->duration;st+=100){
         config->cur_duration = min((config->start_time+config->duration-st),(uint)100);
         if(config->load_data){
-            loadData(config->trace_path.c_str(),st,config->cur_duration);
+            //loadData(config->trace_path.c_str(),st,config->cur_duration);
+            loadData(config->trace_path.c_str(),st);
         }
         else{
             generator->generate_trace(trace);
@@ -841,7 +871,7 @@ void tracer::process(){
 //                ofstream p;
 //                string filename = "longer_edges" + to_string(bench->big_sorted_run_count) + ".csv";
 //                cout << filename << endl;
-//                p.open(filename, ios::out | ios::trunc);
+//                p.open(filename, ios::out|ios::binary|ios::trunc);
 //                p << "percent(%)" << ',' << "edge_length" << endl;
 //                int this_count = 0;
 //                for(int i = 0 ; i < bench->config->kv_restriction; i += 1342177){
@@ -886,7 +916,7 @@ void tracer::process(){
 //                    fprintf(stderr, "Error when disable buffer cache\n");
 //                }
                 ofstream q;
-                q.open(to_string(config->MemTable_capacity/2)+"search_id.csv", ios::out | ios::trunc);
+                q.open(to_string(config->MemTable_capacity/2)+"search_id.csv", ios::out|ios::binary|ios::trunc);
                 q << "question number" << ',' << "time_consume(ms)" << endl;
                 for(int i = 0; i < question_count; i++){
                     struct timeval disk_search_time = get_cur_time();
@@ -912,7 +942,7 @@ void tracer::process(){
                     bench->load_big_sorted_run(i);
                 }
                 ofstream p;
-                p.open(to_string(config->MemTable_capacity/2)+"search_mbr.csv", ios::out | ios::trunc);        //config->SSTable_count/50
+                p.open(to_string(config->MemTable_capacity/2)+"search_mbr.csv", ios::out|ios::binary|ios::trunc);        //config->SSTable_count/50
                 p << "search area" << ',' << "find_count" << ',' << "unique_find" << ',' << "intersect_sst_count" << ',' << "bit_find_count" << ',' << "time(ms)" << endl;
                 for(int i = 0; i <10 ; i++){
                     //cout << fixed << setprecision(6) << mid_x - edge_length/2 <<","<<mid_y - edge_length/2 <<","<<mid_x + edge_length/2 <<","<<mid_y + edge_length/2 <<endl;
@@ -1043,7 +1073,7 @@ void tracer::process(){
 ////                //merge sort can be optimized, since they are always kv_restriction now.
 ////
 ////                ofstream SSTable_of;
-////                SSTable_of.open("../store/SSTable_of" + to_string(t), ios::out | ios::trunc);           //config.DBPath
+////                SSTable_of.open("../store/SSTable_of" + to_string(t), ios::out|ios::binary|ios::trunc);           //config.DBPath
 ////                uint *key_index = new uint[bench->config->MemTable_capacity]{0};
 ////                int finish = 0;
 ////                clock_t time1,time2;

@@ -48,7 +48,7 @@ int main(){
     struct timeval bg_start = get_cur_time();
     while(finish<5){
         if(kv_count==0){
-            SSTable_of.open("../../store/SSTable_"+to_string(sst_count), ios::out | ios::trunc);
+            SSTable_of.open("../../store/SSTable_"+to_string(sst_count), ios::out|ios::binary|ios::trunc);
             assert(SSTable_of.is_open());
             bg_open_time += get_time_elapsed(bg_start,true);
         }

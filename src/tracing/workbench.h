@@ -140,7 +140,8 @@ public:
 	uint filter_list_capacity = 0;
 
 	// the space for the overall meeting information maintaining now
-	meeting_unit *meeting_buckets = NULL;
+	meeting_unit * meeting_buckets = NULL;
+    meeting_unit * d_meetings_ps = NULL;
 
 	size_t num_taken_buckets = 0;
 	size_t num_active_meetings = 0;
@@ -203,7 +204,7 @@ public:
 
     //space for spatial id
     uint64_t * mid_xys = NULL;
-    uint split_num = 10;
+    uint split_num = 7;
     float * x_axis_of_parts = NULL;
     float ** y_axis_of_parts = NULL;
     short * same_pid_count = NULL;

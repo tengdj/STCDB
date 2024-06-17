@@ -15,10 +15,7 @@ int main(int argc, char **argv){
     tracer *t = new tracer(&config, *m->getMBR(), traces, gen);
     t->process();
 
-    delete []traces;
     delete t;
-    delete gen;
-    delete m;
     cout<<"delete right"<<endl;
     cerr<<"delete right"<<endl;
     return 0;
