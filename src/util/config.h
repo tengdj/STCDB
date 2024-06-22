@@ -57,7 +57,7 @@ public:
 
 
     uint big_sorted_run_capacity = 100;     //can be made to vector
-    uint SSTable_count = 49;              //default 2G
+    uint SSTable_count = 100;              //default 2G
 
     //bool search_kv = true;
     uint search_single_capacity = 100;
@@ -67,6 +67,7 @@ public:
     double false_positive_rate = 0.0004;
 
     bool save_meetings_pers = false;
+    bool load_meetings_pers = false;
 
     void update(){
         assert(MemTable_capacity%2==0);
@@ -187,15 +188,15 @@ inline configuration get_parameters(int argc, char **argv){
 class generator_configuration:public configuration{
 public:
     // how many percent of the initial points are evenly distributed
-    double walk_rate = 0.9;
+    double walk_rate = 0.25;
     double walk_speed = 1.0;
-    double drive_rate = 0.04;
+    double drive_rate = 0.0067;
     double drive_speed = 10.0;
-    int max_rest_time = 200;
-    int max_walk_time = 100;
+    uint max_rest_time = 1200;
+    uint max_walk_time = 100;
 
-    string map_path = "/gisdata/chicago/streets";
-    string meta_path = "/gisdata/chicago/tweet.dat";
+    string map_path = "../data/streets.map";
+    string meta_path = "../data/chicago.mt";
 
     void print(){
         fprintf(stderr, "generator configuration:\n");

@@ -26,7 +26,6 @@ void dumpTo(generator_configuration * config, uint st, Point * trace) {
 }
 
 int main(int argc, char **argv){
-
 	generator_configuration config = get_generator_parameters(argc, argv);
     //config.cur_duration = 500;
 	Map *m = new Map(config.map_path);
@@ -34,6 +33,7 @@ int main(int argc, char **argv){
 	trace_generator *gen = new trace_generator(&config,m);
 	Point *traces = new Point [100*config.num_objects];
     for(uint i = 0; i < config.duration; i+= 100){          //always whole 100
+        config.cur_duration = min((config.start_time+config.duration-i),(uint)100);
         gen->generate_trace(traces);
         dumpTo(&config, i, traces);
     }

@@ -72,7 +72,7 @@ inline void print_box(f_box *b){
 }
 
 __device__
-inline void mbr_update(box &mbr, Point *p){
+inline void mbr_update_by_point(box &mbr, Point *p){
     if(mbr.low[0]>p->x){
         mbr.low[0] = p->x;
     }
@@ -85,6 +85,23 @@ inline void mbr_update(box &mbr, Point *p){
     }
     if(mbr.high[1]<p->y){
         mbr.high[1] = p->y;
+    }
+}
+
+__device__
+inline void mbr_update_by_mbr(box &mbr, box &b){
+    if(mbr.low[0] > b.low[0]){
+        mbr.low[0] = b.low[0];
+    }
+    if(mbr.high[0] < b.high[0]){
+        mbr.high[0] = b.high[0];
+    }
+
+    if(mbr.low[1] > b.low[1]){
+        mbr.low[1] = b.low[1];
+    }
+    if(mbr.high[1] < b.high[1]){
+        mbr.high[1] = b.high[1];
     }
 }
 
@@ -423,6 +440,19 @@ void cuda_refinement(workbench *bench){
             uint pid1 = min(pid,target_pid);
             uint pid2 = max(target_pid,pid);
             size_t key = ((size_t)pid1+pid2)*(pid1+pid2+1)/2+pid2;
+            if(bench->config->save_meetings_pers){
+                uint meeting_idx = atomicAdd(&bench->num_active_meetings,1);
+                bench->d_meetings_ps[meeting_idx].key = key;
+                bench->d_meetings_ps[meeting_idx].start = bench->cur_time;
+                bench->d_meetings_ps[meeting_idx].end = bench->cur_time;
+                bench->d_meetings_ps[meeting_idx].mbr.low[0] = 100000.0;
+                bench->d_meetings_ps[meeting_idx].mbr.low[1] = 100000.0;
+                bench->d_meetings_ps[meeting_idx].mbr.high[0] = -100000.0;
+                bench->d_meetings_ps[meeting_idx].mbr.high[1] = -100000.0;
+                mbr_update_by_point(bench->d_meetings_ps[meeting_idx].mbr, p1);
+                mbr_update_by_point(bench->d_meetings_ps[meeting_idx].mbr, p2);
+            }
+
             size_t slot = key%bench->config->num_meeting_buckets;
             int ite = 0;
             while (ite++<5){
@@ -431,8 +461,8 @@ void cuda_refinement(workbench *bench){
                 if(prev == key){
                     bench->meeting_buckets[slot].end = bench->cur_time;
                     //mbr_update(bench->meeting_buckets[slot].mbr, bench->points[pid]);                     //"Point::~Point"
-                    mbr_update(bench->meeting_buckets[slot].mbr, p1);
-                    mbr_update(bench->meeting_buckets[slot].mbr, p2);
+                    mbr_update_by_point(bench->meeting_buckets[slot].mbr, p1);
+                    mbr_update_by_point(bench->meeting_buckets[slot].mbr, p2);
                     break;
                 }else if (prev == ULL_MAX){
                     bench->meeting_buckets[slot].key = key;
@@ -442,8 +472,8 @@ void cuda_refinement(workbench *bench){
                     bench->meeting_buckets[slot].mbr.low[1] = 100000.0;
                     bench->meeting_buckets[slot].mbr.high[0] = -100000.0;
                     bench->meeting_buckets[slot].mbr.high[1] = -100000.0;
-                    mbr_update(bench->meeting_buckets[slot].mbr, p1);
-                    mbr_update(bench->meeting_buckets[slot].mbr, p2);
+                    mbr_update_by_point(bench->meeting_buckets[slot].mbr, p1);
+                    mbr_update_by_point(bench->meeting_buckets[slot].mbr, p2);
 
                     break;
                 }
@@ -495,6 +525,30 @@ void cuda_refinement_unroll(workbench *bench, uint offset){
 			}
 		}
 	}
+}
+
+__global__
+void insert_meetings_to_buckets(workbench *bench){
+    size_t mid = blockIdx.x*blockDim.x + threadIdx.x;
+    size_t slot = bench->d_meetings_ps[mid].key % bench->config->num_meeting_buckets;
+    int ite = 0;
+    while (ite++<5){
+        unsigned long long prev = atomicCAS((unsigned long long *)&bench->meeting_buckets[slot].key, ULL_MAX, (unsigned long long)bench->d_meetings_ps[mid].key);
+        //printf("%ld\n",prev,ULL_MAX,bench->meeting_buckets[bench->current_bucket][slot].key);
+        if(prev == bench->d_meetings_ps[mid].key){
+            bench->meeting_buckets[slot].end = bench->cur_time;
+            mbr_update_by_mbr(bench->meeting_buckets[slot].mbr, bench->d_meetings_ps[mid].mbr);
+            break;
+        }else if (prev == ULL_MAX){
+            bench->meeting_buckets[slot].key = bench->d_meetings_ps[mid].key;
+            bench->meeting_buckets[slot].start = bench->cur_time;
+            bench->meeting_buckets[slot].end = bench->cur_time;
+            bench->meeting_buckets[slot].mbr = bench->d_meetings_ps[mid].mbr;
+            break;
+        }
+        slot = (slot + 1)%bench->config->num_meeting_buckets;
+    }
+
 }
 
 /*
@@ -1199,6 +1253,16 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
 	size = bench->config->num_meeting_buckets*sizeof(meeting_unit);
 	log("\t%.2f MB\thash table",1.0*size/1024/1024);
 
+    if(bench->config->save_meetings_pers || bench->config->load_meetings_pers){
+        h_bench.d_meetings_ps = (meeting_unit *)gpu->allocate(bench->config->num_objects / 10 * sizeof(meeting_unit));
+        size = bench->config->num_objects / 10 *sizeof(meeting_unit);
+        log("\t%.2f MB\t d_meetings_ps",1.0*size/1024/1024);
+
+        h_bench.active_meeting_count_ps = (uint *)gpu->allocate(100 * sizeof(uint));
+        size = 100 * sizeof(uint);
+        log("\t%.2f MB\t active_meeting_count_ps",1.0*size/1024/1024);
+    }
+
 //	h_bench.meetings = (meeting_unit *)gpu->allocate(bench->meeting_capacity*sizeof(meeting_unit));
 //	size = bench->meeting_capacity*sizeof(meeting_unit);
 //	log("\t%.2f MB\tmeetings",1.0*size/1024/1024);
@@ -1243,6 +1307,7 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
         log("\t%.2f MB\td_pstFilter", 1.0 * size / 1024 / 1024);
         cudaMemset(h_bench.d_pstFilter, 0, bench->dwFilterSize);
     }
+
 
     if(true) {
         h_bench.d_sids = (unsigned short*)gpu->allocate(bench->config->num_objects*sizeof(unsigned short));
@@ -1332,124 +1397,152 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 	h_bench.cur_time = bench->cur_time;
     h_bench.end_time_min = bench->end_time_min;
 	CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));
-	CUDA_SAFE_CALL(cudaMemcpy(h_bench.points, bench->points, bench->config->num_objects*sizeof(Point), cudaMemcpyHostToDevice));
-	bench->pro.copy_time += get_time_elapsed(start,false);
-	logt("copy in data", start);
 
-	if(!bench->config->dynamic_schema){
-		struct timeval newstart = get_cur_time();
-		cuda_clean_cells<<<one_dim*one_dim/1024+1,1024>>>(d_bench);
-		cuda_build_qtree<<<bench->config->num_objects/1024+1,1024>>>(d_bench);
+    if(bench->config->load_meetings_pers){
+        CUDA_SAFE_CALL(cudaMemcpy(h_bench.active_meeting_count_ps, bench->active_meeting_count_ps, 100 * sizeof(uint), cudaMemcpyHostToDevice));
+        uint prefix_sum = 0;
+        uint second_index = bench->cur_time % 100;
+        for(uint i = 1; i < bench->cur_time % 100 ; i++){
+            prefix_sum += bench->active_meeting_count_ps[i - 1];
+        }
+        CUDA_SAFE_CALL(cudaMemcpy(h_bench.d_meetings_ps, bench->h_meetings_ps + prefix_sum, bench->active_meeting_count_ps[second_index] * sizeof(meeting_unit), cudaMemcpyHostToDevice));
+        bench->pro.copy_time += get_time_elapsed(start,false);
+        logt("copy in meetings_ps", start);
+
+        insert_meetings_to_buckets<<<bench->active_meeting_count_ps[second_index]/1024+1,1024>>>(d_bench);
+        check_execution();
+        cudaDeviceSynchronize();
+    }
+    else{
+        CUDA_SAFE_CALL(cudaMemcpy(h_bench.points, bench->points, bench->config->num_objects*sizeof(Point), cudaMemcpyHostToDevice));
+        bench->pro.copy_time += get_time_elapsed(start,false);
+        logt("copy in points", start);
+
+        if(!bench->config->dynamic_schema){
+            struct timeval newstart = get_cur_time();
+            cuda_clean_cells<<<one_dim*one_dim/1024+1,1024>>>(d_bench);
+            cuda_build_qtree<<<bench->config->num_objects/1024+1,1024>>>(d_bench);
 //		check_execution();
 //		cudaDeviceSynchronize();
 //		logt("build qtree", newstart);
 
-		for(uint i=1;i<=one_dim;i*=2){
-			uint num = one_dim*one_dim/(i*i);
-			cuda_merge_qtree<<<num/1024+1,1024>>>(d_bench,i);
+            for(uint i=1;i<=one_dim;i*=2){
+                uint num = one_dim*one_dim/(i*i);
+                cuda_merge_qtree<<<num/1024+1,1024>>>(d_bench,i);
 //			check_execution();
 //			cudaDeviceSynchronize();
 //			CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
 //			logt("merge qtree %d %d %d %d", newstart,i, h_bench.schema_stack_index, h_bench.grids_stack_index, h_bench.grid_check_counter);
-		}
-		CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-		cudaDeviceSynchronize();
-		bench->pro.index_update_time += get_time_elapsed(start,false);
-		logt("build qtree %d nodes %d partitions", start, h_bench.schema_stack_index, h_bench.grids_stack_index);
-		//exit(0);
-	}
+            }
+            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+            cudaDeviceSynchronize();
+            bench->pro.index_update_time += get_time_elapsed(start,false);
+            logt("build qtree %d nodes %d partitions", start, h_bench.schema_stack_index, h_bench.grids_stack_index);
+            //exit(0);
+        }
 
-	/* 2. filtering */
-	if(bench->config->phased_lookup){
-		// do the partition
-		cuda_partition<<<bench->config->num_objects/1024+1,1024>>>(d_bench);
+        /* 2. filtering */
+        if(bench->config->phased_lookup){
+            // do the partition
+            cuda_partition<<<bench->config->num_objects/1024+1,1024>>>(d_bench);
 
-		CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-		bench->pro.partition_time += get_time_elapsed(start,false);
-		logt("partition data %d still need lookup", start,h_bench.filter_list_index);
-		bench->filter_list_index = h_bench.filter_list_index;
-	}else{
-		cuda_pack_lookup<<<bench->config->num_objects/1024+1,1024>>>(d_bench);
-		check_execution();
-		cudaDeviceSynchronize();
-		CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-	}
+            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+            bench->pro.partition_time += get_time_elapsed(start,false);
+            logt("partition data %d still need lookup", start,h_bench.filter_list_index);
+            bench->filter_list_index = h_bench.filter_list_index;
+        }else{
+            cuda_pack_lookup<<<bench->config->num_objects/1024+1,1024>>>(d_bench);
+            check_execution();
+            cudaDeviceSynchronize();
+            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        }
 
-	uint batch_size = bench->tmp_space_capacity/(PER_STACK_SIZE*2+1);
-	for(int i=0;i<h_bench.filter_list_index;i+=batch_size){
-		int bs = min(batch_size,h_bench.filter_list_index-i);
-		cuda_filtering<<<bs/1024+1,1024>>>(d_bench, i, bs, !bench->config->phased_lookup);
-		check_execution();
-		cudaDeviceSynchronize();
-	}
-	CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-	bench->pro.filter_time += get_time_elapsed(start,false);
-	logt("filtering with %d checkings", start,h_bench.grid_check_counter);
+        uint batch_size = bench->tmp_space_capacity/(PER_STACK_SIZE*2+1);
+        for(int i=0;i<h_bench.filter_list_index;i+=batch_size){
+            int bs = min(batch_size,h_bench.filter_list_index-i);
+            cuda_filtering<<<bs/1024+1,1024>>>(d_bench, i, bs, !bench->config->phased_lookup);
+            check_execution();
+            cudaDeviceSynchronize();
+        }
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->pro.filter_time += get_time_elapsed(start,false);
+        logt("filtering with %d checkings", start,h_bench.grid_check_counter);
 
-	/* 3. refinement step */
-	if(false){
-		for(uint offset=0;offset<bench->grid_capacity;offset+=bench->config->zone_capacity){
-			struct timeval ss = get_cur_time();
-			bench->grid_check_counter = h_bench.grid_check_counter;
-			uint thread_y = bench->config->zone_capacity;
-			uint thread_x = 1024/thread_y;
-			dim3 block(thread_x, thread_y);
-			cuda_refinement_unroll<<<h_bench.grid_check_counter/thread_x+1,block>>>(d_bench,offset);
-			check_execution();
-			cudaDeviceSynchronize();
-			logt("process %d",ss,offset);
-		}
-		CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-		bench->pro.refine_time += get_time_elapsed(start,false);
-		logt("refinement step", start);
-	}else{
-		if(bench->config->unroll){
-			cuda_unroll<<<h_bench.grid_check_counter/1024+1,1024>>>(d_bench,h_bench.grid_check_counter);
-			check_execution();
-			cudaDeviceSynchronize();
-			CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-			bench->pro.refine_time += get_time_elapsed(start,false);
-			logt("%d pid-grid-offset tuples need be checked", start,h_bench.grid_check_counter);
-		}
+        /* 3. refinement step */
+        if(false){
+            for(uint offset=0;offset<bench->grid_capacity;offset+=bench->config->zone_capacity){
+                struct timeval ss = get_cur_time();
+                bench->grid_check_counter = h_bench.grid_check_counter;
+                uint thread_y = bench->config->zone_capacity;
+                uint thread_x = 1024/thread_y;
+                dim3 block(thread_x, thread_y);
+                cuda_refinement_unroll<<<h_bench.grid_check_counter/thread_x+1,block>>>(d_bench,offset);
+                check_execution();
+                cudaDeviceSynchronize();
+                logt("process %d",ss,offset);
+            }
+            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+            bench->pro.refine_time += get_time_elapsed(start,false);
+            logt("refinement step", start);
+        }else{
+            if(bench->config->unroll){
+                cuda_unroll<<<h_bench.grid_check_counter/1024+1,1024>>>(d_bench,h_bench.grid_check_counter);
+                check_execution();
+                cudaDeviceSynchronize();
+                CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+                bench->pro.refine_time += get_time_elapsed(start,false);
+                logt("%d pid-grid-offset tuples need be checked", start,h_bench.grid_check_counter);
+            }
 
-		bench->grid_check_counter = h_bench.grid_check_counter;
-		uint thread_y = bench->config->unroll?bench->config->zone_capacity:bench->grid_capacity;
-		uint thread_x = 1024/thread_y;
-		dim3 block(thread_x, thread_y);
-		cuda_refinement<<<h_bench.grid_check_counter/thread_x+1,block>>>(d_bench);
-		check_execution();
-		cudaDeviceSynchronize();
-		CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-		bench->pro.refine_time += get_time_elapsed(start,false);
-		logt("refinement step", start);
-	}
-
-	/* 4. identify the completed meetings */
-	if(bench->config->profile){
-		cuda_profile_meetings<<<bench->config->num_meeting_buckets/1024+1,1024>>>(d_bench);
-		check_execution();
-		cudaDeviceSynchronize();
-		logt("profile meetings",start);
-	}
-    int before_kv = h_bench.kv_count;
-	cuda_identify_meetings<<<bench->config->num_meeting_buckets/1024+1,1024>>>(d_bench);
-	check_execution();
-	cudaDeviceSynchronize();
-	CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-    bench->pro.meeting_identify_time += get_time_elapsed(start,false);
-    int kv_increase = h_bench.kv_count-before_kv;
-    printf("second %d finished meetings : %d\n",bench->cur_time , kv_increase);
-    //cout<<"ave_s_mbr"<<(float)h_bench.s_of_all_mbr/100<<endl;
-    //h_bench.s_of_all_mbr = 0;
-    logt("meeting identify: %d meetings", start, kv_increase);
-	bench->num_active_meetings = h_bench.num_active_meetings;
-	bench->num_taken_buckets = h_bench.num_taken_buckets;
-    //bench->kv_count = h_bench.kv_count;
-	//logt("meeting identify: %d taken %d active %d new meetings found", start, h_bench.num_taken_buckets, h_bench.num_active_meetings, h_bench.meeting_counter);
-
-    if(bench->cur_time == 2200){
-        cout <<"1000~2000 " << h_bench.larger_than_1000s << " 2000~3000 " << h_bench.larger_than_2000s << " 3000~4000 " << h_bench.larger_than_3000s << " >4000 " << h_bench.larger_than_4000s <<endl;
+            bench->grid_check_counter = h_bench.grid_check_counter;
+            uint thread_y = bench->config->unroll?bench->config->zone_capacity:bench->grid_capacity;
+            uint thread_x = 1024/thread_y;
+            dim3 block(thread_x, thread_y);
+            cuda_refinement<<<h_bench.grid_check_counter/thread_x+1,block>>>(d_bench);
+            check_execution();
+            cudaDeviceSynchronize();
+            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+            bench->pro.refine_time += get_time_elapsed(start,false);
+            logt("refinement step", start);
+        }
     }
+
+    if(bench->config->save_meetings_pers){
+        bench->num_active_meetings = h_bench.num_active_meetings;
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_meetings_ps + bench->h_meetings_count, h_bench.d_meetings_ps, bench->num_active_meetings * sizeof(meeting_unit), cudaMemcpyDeviceToHost));
+        uint index = bench->cur_time % 100;
+        bench->active_meeting_count_ps[index] = bench->num_active_meetings;
+        bench->total_meetings_this100s += bench->num_active_meetings;
+    }
+    else{             //if save_meetings_pers, skip
+        /* 4. identify the completed meetings */
+        if(bench->config->profile){
+            cuda_profile_meetings<<<bench->config->num_meeting_buckets/1024+1,1024>>>(d_bench);
+            check_execution();
+            cudaDeviceSynchronize();
+            logt("profile meetings",start);
+        }
+        int before_kv = h_bench.kv_count;
+        cuda_identify_meetings<<<bench->config->num_meeting_buckets/1024+1,1024>>>(d_bench);
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->pro.meeting_identify_time += get_time_elapsed(start,false);
+        int kv_increase = h_bench.kv_count-before_kv;
+        printf("second %d finished meetings : %d\n",bench->cur_time , kv_increase);
+        //cout<<"ave_s_mbr"<<(float)h_bench.s_of_all_mbr/100<<endl;
+        //h_bench.s_of_all_mbr = 0;
+        logt("meeting identify: %d meetings", start, kv_increase);
+        bench->num_active_meetings = h_bench.num_active_meetings;
+        bench->num_taken_buckets = h_bench.num_taken_buckets;
+        //bench->kv_count = h_bench.kv_count;
+        //logt("meeting identify: %d taken %d active %d new meetings found", start, h_bench.num_taken_buckets, h_bench.num_active_meetings, h_bench.meeting_counter);
+
+        if(bench->cur_time == 2200){
+            cout <<"1000~2000 " << h_bench.larger_than_1000s << " 2000~3000 " << h_bench.larger_than_2000s << " 3000~4000 " << h_bench.larger_than_3000s << " >4000 " << h_bench.larger_than_4000s <<endl;
+        }
+    }
+
     //4.5 cuda sort
     if(h_bench.kv_count>bench->config->kv_restriction){
         cout <<"1000~2000 " << h_bench.larger_than_1000s << " 2000~3000 " << h_bench.larger_than_2000s << " 3000~4000 " << h_bench.larger_than_3000s << " >4000 " << h_bench.larger_than_4000s <<endl;

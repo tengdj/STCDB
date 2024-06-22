@@ -281,11 +281,11 @@ void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){             
                 meta_data[obj].end = get_random_location(meta_data[obj].core);
             }
             //meta_data[obj].speed = config->drive_speed;
-            meta_data[obj].speed = config->drive_speed + get_rand_double()*2;           //10~20
+            meta_data[obj].speed = config->drive_speed -2 + get_rand_double()*4;
             mymap->navigate(ret, meta_data[obj], config->cur_duration, count, config->num_objects, obj);
         }else if(meta_data[obj].type == WALK){
             if(!meta_data[obj].time_remaining){
-                meta_data[obj].time_remaining = config->max_walk_time * get_rand_double() + 100;
+                meta_data[obj].time_remaining = config->max_walk_time  * get_rand_double();
             }
             const double step = config->walk_speed/meta_data[obj].end.distance(meta_data[obj].loc, true);
             for(double portion = step;portion<(1+step) && count<config->cur_duration && meta_data[obj].time_remaining > 0;){
@@ -298,7 +298,7 @@ void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){             
             meta_data[obj].loc = ret[(count-1)*config->num_objects+obj];
         }else if(meta_data[obj].type == REST){
             if(!meta_data[obj].time_remaining){
-                meta_data[obj].time_remaining = config->max_rest_time * get_rand_double() + 100;
+                meta_data[obj].time_remaining = (config->max_rest_time - 200) * get_rand_double() + 100;
             }
             //int dur = meta_data[obj].rest_time;
             while(meta_data[obj].time_remaining > 0 && count < config->cur_duration){

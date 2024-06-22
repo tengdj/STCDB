@@ -126,7 +126,7 @@ void tracer::loadData(const char *path, int st) {
     log("loading locations from %d to %d",st, st + 100);
     struct timeval start_time = get_cur_time();
     string filename = path + to_string(st) + "_" + to_string(config->num_objects) + ".tr";
-    ifstream in(path, ios::in | ios::binary);
+    ifstream in(filename, ios::in | ios::binary);
     if(!in.is_open()){
         log("%s cannot be opened",filename.c_str());
         exit(0);
@@ -153,7 +153,7 @@ void tracer::loadData(const char *path, int st, int duration) {
 		log("%s cannot be opened",path);
 		exit(0);
 	}
-	in.read((char *)&true_num_objects, sizeof(true_num_objects));
+	in.read((char *)&true_num_objects, sizeof(true_num_objects));               //also read meta
 	in.read((char *)&true_duration, sizeof(true_duration));
 	in.read((char *)&mbr, sizeof(mbr));
 
@@ -691,13 +691,13 @@ void tracer::process(){
             //loadData(config->trace_path.c_str(),st,config->cur_duration);
             loadData(config->trace_path.c_str(),st);
         }
-        else{
+        else if(!config->load_meetings_pers){
             generator->generate_trace(trace);
         }
 		start = get_cur_time();
-		if(!bench){
-			bench = part->build_schema(trace, config->num_objects);
-			bench->mbr = mbr;
+        if(!bench){
+            bench = part->build_schema(trace, config->num_objects);
+            bench->mbr = mbr;
             bench->end_time_min = config->start_time + config->min_meet_time;           //first min time
             bench->start_time_min = (1ULL<<32) -1;
             bench->start_time_max = 0;
@@ -709,11 +709,15 @@ void tracer::process(){
             }
             pthread_detach(bench->command_thread);
 #ifdef USE_GPU
-			if(config->gpu){
+            if(config->gpu){
 				d_bench = cuda_create_device_bench(bench, gpu);
 			}
 #endif
-		}
+        }
+        if(config->load_meetings_pers){
+            bench->load_meetings(st);
+        }
+
 		for(int t=0;t<config->cur_duration;t++){
 			log("");
 			bench->reset();
@@ -986,6 +990,9 @@ void tracer::process(){
 			bench->pro.max_bucket_num = max(bench->pro.max_bucket_num, bench->num_taken_buckets);
 			bench->pro.num_pairs += bench->num_active_meetings;
 
+            if(config->save_meetings_pers && t == 99){
+                bench->dump_meetings(st);
+            }
 		}
 	}
 	bench->print_profile();

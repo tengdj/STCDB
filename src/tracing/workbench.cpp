@@ -83,7 +83,6 @@ void *workbench::allocate(size_t size){
 }
 
 void workbench::claim_space(){
-
 	size_t size = 0;
 
 	size = grid_capacity*grids_stack_capacity*sizeof(uint);
@@ -167,6 +166,15 @@ void workbench::claim_space(){
     size = config->big_sorted_run_capacity*sizeof(sorted_run);
     bg_run = (sorted_run *)allocate(size);
 
+    if(config->save_meetings_pers || config->load_meetings_pers){
+        size = config->num_objects * 10 *sizeof(meeting_unit);              //100 * size of d_meetings_ps
+        h_meetings_ps = (meeting_unit *) allocate(size);
+        log("\t%.2f MB\t h_meetings_ps",1.0*size/1024/1024);
+
+        size = 100 * sizeof(uint);
+        active_meeting_count_ps = (uint *) allocate(size);
+    }
+
     if(true){
         size = config->MemTable_capacity * sizeof(unsigned char *);
         h_bitmaps = (unsigned char **)allocate(size);
@@ -195,7 +203,7 @@ void workbench::claim_space(){
     }
 }
 
-box workbench::bit_box(box b){
+box workbench::make_bit_box(box b){
     box new_b;
     new_b.low[0] = (b.low[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * ((1ULL << (SID_BIT / 2)) - 1);
     new_b.low[1] = (b.low[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * ((1ULL << (SID_BIT / 2)) - 1);
@@ -482,7 +490,7 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
                 bg_run[i].sst = new SSTable[config->SSTable_count];
             }
             cout << "in bg_run" << i << endl;
-            bit_b = bit_box(b);
+            bit_b = make_bit_box(b);
             //cerr<<"bit_box"<<endl;
             //bit_b.print();
             //cout<<bit_b.low[0]<<","<<bit_b.low[1]<<","<<bit_b.high[0]<<","<<bit_b.high[1]<<endl;
@@ -544,3 +552,34 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
     uni.clear();
     return ret;
 }
+
+void workbench::dump_meetings(uint st) {
+    struct timeval start_time = get_cur_time();
+    string filename = config->trace_path + "meeting" + to_string(st) + "_" + to_string(config->num_objects) + ".tr";
+    ofstream wf(filename, ios::out|ios::binary|ios::trunc);
+    wf.write((char *)active_meeting_count_ps, sizeof(uint) * 100);
+    wf.write((char *)h_meetings_ps, sizeof(meeting_unit) * total_meetings_this100s);
+    wf.close();
+    total_meetings_this100s = 0;
+    logt("dumped to %s",start_time, filename.c_str());
+}
+
+void workbench::load_meetings(uint st) {
+    log("loading meetings from %d to %d",st, st + 100);
+    struct timeval start_time = get_cur_time();
+    string filename = config->trace_path + "meeting" + to_string(st) + "_" + to_string(config->num_objects) + ".tr";
+    ifstream in(filename, ios::in | ios::binary);
+    if(!in.is_open()){
+        log("%s cannot be opened",filename.c_str());
+        exit(0);
+    }
+    in.read((char *)active_meeting_count_ps, sizeof(uint) * 100);
+    total_meetings_this100s = 0;
+    for(uint i = 0; i < 100; i++){
+        total_meetings_this100s += active_meeting_count_ps[i];
+    }
+    in.read((char *)h_meetings_ps, sizeof(meeting_unit) * total_meetings_this100s);
+    in.close();
+    logt("loaded %d objects last for 100 seconds start from %d time from %s",start_time, config->num_objects, st, filename.c_str());
+}
+

@@ -141,10 +141,14 @@ public:
 
 	// the space for the overall meeting information maintaining now
 	meeting_unit * meeting_buckets = NULL;
-    meeting_unit * d_meetings_ps = NULL;
+    meeting_unit * d_meetings_ps = NULL;            //ps : per second
+    meeting_unit * h_meetings_ps = NULL;
+    uint h_meetings_count = 0;
+    uint total_meetings_this100s = 0;
+    uint * active_meeting_count_ps = 0;
 
 	size_t num_taken_buckets = 0;
-	size_t num_active_meetings = 0;
+	uint num_active_meetings = 0;
 
 //	// the space for the valid meeting information now
 //	meeting_unit *meetings = NULL;
@@ -204,7 +208,7 @@ public:
 
     //space for spatial id
     uint64_t * mid_xys = NULL;
-    uint split_num = 7;
+    uint split_num = 10;
     float * x_axis_of_parts = NULL;
     float ** y_axis_of_parts = NULL;
     short * same_pid_count = NULL;
@@ -316,7 +320,7 @@ public:
 		pthread_mutex_unlock(&insert_lk[key%MAX_LOCK_NUM]);
 	}
 
-    box bit_box(box b);
+    box make_bit_box(box b);
 
     bool search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vector<uint> & v_indices);
     bool search_in_disk(uint pid, uint timestamp);
@@ -324,6 +328,9 @@ public:
 
     void load_big_sorted_run(uint b);
     box parse_to_real_mbr(unsigned short first_low, unsigned short first_high, uint64_t value);
+
+    void dump_meetings(uint st);
+    void load_meetings(uint st);
 };
 extern void lookup_rec(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);
 extern void lookup_stack(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);
