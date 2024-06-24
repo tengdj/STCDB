@@ -13,6 +13,7 @@
 #include "../util/query_context.h"
 #include "../geometry/geometry.h"
 #include "../index/QTree.h"
+#include "../index/RTree.h"
 #include "../cuda/cuda_util.cuh"
 
 typedef struct key_value{
@@ -37,16 +38,16 @@ public:
     SSTable * sst = NULL;
 
     uint SSTable_count = 0;
-    //uint SSTable_size = 10*1024*1024;       //10M   useless
     uint64_t *first_widpid = NULL;
     unsigned short * wids = NULL;
     unsigned char * bitmaps = NULL;
-    box * bitmap_mbrs = NULL;
+    //box * bitmap_mbrs = NULL;
     uint * CTF_capacity = NULL;
     uint start_time_min = 0;
     uint start_time_max = 0;
     uint end_time_min = 0;
     uint end_time_max = 0;
+    RTree<short *, double, 2, double> *box_rtree = NULL;
 
     ~sorted_run();
     void print_meta(){

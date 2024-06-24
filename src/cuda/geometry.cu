@@ -722,6 +722,9 @@ void cuda_identify_meetings(workbench *bench) {
             if(!bench->same_pid_count[pid]){
                 atomicAdd(&bench->sid_count, 1);
             }
+//            if(bench->same_pid_count[pid] > ){
+//                bench->d_sids[pid] = 1;             //too large
+//            }
             float mid0 = bench->meeting_buckets[bid].mbr.low[0] / 2 + bench->meeting_buckets[bid].mbr.high[0] / 2;
             float mid1 = bench->meeting_buckets[bid].mbr.low[1] / 2 + bench->meeting_buckets[bid].mbr.high[1] / 2;
             float old_mid0 = uint_to_float(bench->mid_xys[pid] >> 32);
@@ -817,7 +820,7 @@ void make_sid(workbench *bench) {
 __global__
 void write_sid_in_key(workbench *bench) {
     uint kid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (kid >= bench->config->kv_restriction) {
+    if (kid >= bench->kv_count) {
         return;
     }
     uint oid = get_key_oid(bench->d_keys[kid]);
@@ -847,7 +850,7 @@ void get_CTF_capacity(workbench *bench) {
 __global__
 void write_bitmap(workbench *bench){
     uint kid = blockIdx.x*blockDim.x+threadIdx.x;
-    if(kid>=bench->config->kv_restriction){
+    if(kid>=bench->kv_count){
         return;
     }
     uint low0 = (bench->kv_boxs[kid].low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (SID_BIT/2)) - 1);
@@ -922,7 +925,7 @@ void mbr_bitmap(workbench *bench){
 __global__
 void write_key_mbr(workbench *bench){
     uint kid = blockIdx.x*blockDim.x+threadIdx.x;
-    if(kid>=bench->config->kv_restriction){
+    if(kid>=bench->kv_count){
         return;
     }
 //    if(bench->cur_time > 2000){
@@ -1593,7 +1596,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("make_sid: ",start);
 
-        write_sid_in_key<<<bench->config->kv_restriction / 1024 + 1, 1024>>>(d_bench);
+        write_sid_in_key<<<h_bench.kv_count / 1024 + 1, 1024>>>(d_bench);
         check_execution();
         cudaDeviceSynchronize();
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
@@ -1602,7 +1605,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         thrust::device_ptr<__uint128_t> d_vector_keys = thrust::device_pointer_cast(h_bench.d_keys);
         __uint128_t * box128 = reinterpret_cast<__uint128_t *>(h_bench.kv_boxs);
         thrust::device_ptr<__uint128_t> d_vector_boxs = thrust::device_pointer_cast(box128);
-        thrust::sort_by_key(d_vector_keys, d_vector_keys + bench->config->kv_restriction, d_vector_boxs);
+        thrust::sort_by_key(d_vector_keys, d_vector_keys + h_bench.kv_count, d_vector_boxs);
         check_execution();
         cudaDeviceSynchronize();
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
@@ -1617,7 +1620,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         //bitmap
         cout<<"h_bench.bit_count:"<<h_bench.bit_count<<endl;
         cout<<"h_bench.bitmaps_size:"<<h_bench.bitmaps_size<<endl;
-        write_bitmap<<<bench->config->kv_restriction / 1024 + 1, 1024>>>(d_bench);
+        write_bitmap<<<h_bench.kv_count / 1024 + 1, 1024>>>(d_bench);
         check_execution();
         cudaDeviceSynchronize();
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
@@ -1627,7 +1630,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
         logt("mbr_bitmap: ",start);
 
-        write_key_mbr<<<bench->config->kv_restriction / 1024 + 1, 1024>>>(d_bench);
+        write_key_mbr<<<h_bench.kv_count / 1024 + 1, 1024>>>(d_bench);
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
         logt("write_value_mbr: ",start);
 
@@ -1644,13 +1647,24 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 
         //copy to device
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-        CUDA_SAFE_CALL(cudaMemcpy(bench->h_keys[offset+bench->MemTable_count], h_bench.d_keys, bench->config->kv_restriction * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_keys[offset+bench->MemTable_count], h_bench.d_keys, h_bench.kv_count * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_sids[offset+bench->MemTable_count], h_bench.d_sids, bench->config->num_objects * sizeof(unsigned short), cudaMemcpyDeviceToHost));
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_CTF_capacity[offset+bench->MemTable_count], h_bench.d_CTF_capacity, bench->config->SSTable_count*sizeof(uint), cudaMemcpyDeviceToHost));
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps[offset+bench->MemTable_count], h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmap_mbrs[offset+bench->MemTable_count], h_bench.d_bitmap_mbrs, bench->config->SSTable_count*sizeof(box), cudaMemcpyDeviceToHost));
 //        f_box * temp_fbs = new f_box[bench->config->kv_restriction];
 //        CUDA_SAFE_CALL(cudaMemcpy(temp_fbs, h_bench.kv_boxs, bench->config->kv_restriction * sizeof(f_box), cudaMemcpyDeviceToHost));
+
+//        cout << "sid_count" << h_bench.sid_count << endl;
+//        short * temp_same_pid_count = new short[bench->config->num_objects];
+//        CUDA_SAFE_CALL(cudaMemcpy(temp_same_pid_count, h_bench.same_pid_count, bench->config->num_objects * sizeof(unsigned short), cudaMemcpyDeviceToHost));
+//        for(uint i = 0; i < bench->config->num_objects; i++){
+//            if(temp_same_pid_count[i]>0){
+//                cout << temp_same_pid_count[i] << " ";
+//            }
+//        }
+//        cout << endl;
+
 
         logt("cudaMemcpy kv and meta",start);
 
@@ -1718,11 +1732,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         cudaMemset(h_bench.same_pid_count, 0, bench->config->num_objects * sizeof(short));
         bench->MemTable_count++;
         cout << "bench->MemTable_count " << bench->MemTable_count << "MemTable_capacity" << bench->config->MemTable_capacity <<endl;
-        int overflow = h_bench.kv_count - bench->config->kv_restriction;
-        CUDA_SAFE_CALL(cudaMemcpy(h_bench.d_keys, h_bench.d_keys + bench->config->kv_restriction, overflow * sizeof(__uint128_t), cudaMemcpyDeviceToDevice));              //for the overflow part
-        CUDA_SAFE_CALL(cudaMemcpy(h_bench.kv_boxs, h_bench.kv_boxs + bench->config->kv_restriction, overflow * sizeof(f_box), cudaMemcpyDeviceToDevice));
-        //CUDA_SAFE_CALL(cudaMemcpy(h_bench.d_values, h_bench.d_values + bench->config->kv_restriction, overflow * sizeof(uint64_t), cudaMemcpyDeviceToDevice));
-        h_bench.kv_count = overflow;
+        h_bench.kv_count = 0;
         CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));                       //update kv_count, other effect ???
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("init after sort",start);

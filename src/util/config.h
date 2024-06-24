@@ -36,7 +36,7 @@ public:
     bool phased_lookup = true;
     bool unroll = true;
     uint schema_update_delay = 1; //
-    uint min_meet_time = 10;
+    uint min_meet_time = 5;
     uint max_meet_time = 1ULL << DURATION_BIT ;    //4096
     double reach_distance = 2;          //2
     double x_buffer = 0;
@@ -55,9 +55,8 @@ public:
     uint kv_restriction = 134217728;                  //2*1024*1024*1024/16 = 134217728
     uint MemTable_capacity = 2 ;             //5*2 ,and workbench data[100] is not enough
 
-
     uint big_sorted_run_capacity = 100;     //can be made to vector
-    uint SSTable_count = 100;              //default 2G
+    uint SSTable_count = 25;              //default 2G
 
     //bool search_kv = true;
     uint search_single_capacity = 100;
@@ -188,12 +187,12 @@ inline configuration get_parameters(int argc, char **argv){
 class generator_configuration:public configuration{
 public:
     // how many percent of the initial points are evenly distributed
-    double walk_rate = 0.25;
+    double walk_rate = 0.3;
     double walk_speed = 1.0;
-    double drive_rate = 0.0067;
+    double drive_rate = 0;         //0.0033
     double drive_speed = 10.0;
-    uint max_rest_time = 1200;
-    uint max_walk_time = 100;
+    uint max_rest_time = 600;
+    //uint max_walk_time = 100;
 
     string map_path = "../data/streets.map";
     string meta_path = "../data/chicago.mt";

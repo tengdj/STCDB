@@ -208,7 +208,7 @@ public:
 
     //space for spatial id
     uint64_t * mid_xys = NULL;
-    uint split_num = 10;
+    uint split_num = 5;
     float * x_axis_of_parts = NULL;
     float ** y_axis_of_parts = NULL;
     short * same_pid_count = NULL;
@@ -227,7 +227,6 @@ public:
     uint sid_count = 0;
     uint * d_CTF_capacity = NULL;
     uint ** h_CTF_capacity = NULL;
-
 
     pthread_t command_thread;
     pthread_mutex_t mutex_i;

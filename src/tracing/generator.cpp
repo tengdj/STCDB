@@ -85,9 +85,7 @@ trace_generator::trace_generator(generator_configuration *conf, Map *m){
         infile.read((char *)&tweets[i], sizeof(Point));
         infile.read((char *)&tweets_assign[i], sizeof(uint));
     }
-
     infile.read((char *)&core_count, sizeof(core_count));
-    cout<<"core_count : "<<core_count<<endl;
     cores = new gen_core[core_count];
     for(int i=0;i<core_count;i++){
         cores[i].id = i;
@@ -102,7 +100,15 @@ trace_generator::trace_generator(generator_configuration *conf, Map *m){
             cores[i].destination.push_back(pair<int, double>(d,r));
         }
     }
-
+    cout<<"core_count : "<<core_count<<endl;
+    cout<<"tweet_count : "<<tweet_count<<endl;
+//    for(uint i = 0; i < core_count; i++){
+//        cores[i].core.print();
+//    }
+//    cerr <<"cores and tweets points" << endl;
+//    for(uint i = 0; i < tweet_count; i++){
+//        tweets[i].print();
+//    }
     for(int i=0;i<tweet_count;i++){
         cores[tweets_assign[i]].assigned_tweets.push_back(i);
     }
@@ -205,8 +211,8 @@ Point trace_generator::get_random_location(int seed){
             tid = get_rand_number(tweet_count)-1;
         }
     }
-    double xval = tweets[tid].x + (0.5-get_rand_double())*100*degree_per_meter_longitude(tweets[tid].y);
-    double yval = tweets[tid].y + (0.5-get_rand_double())*100*degree_per_meter_latitude;
+    double xval = tweets[tid].x + (0.5-get_rand_double())*150*degree_per_meter_longitude(tweets[tid].y);                //100
+    double yval = tweets[tid].y + (0.5-get_rand_double())*150*degree_per_meter_latitude;
     //maybe not in the map mbr
 //    box map_mbr = map->getMBR();
 //    if(xval < map_mbr.low[0]){
@@ -247,6 +253,21 @@ int trace_generator::get_core(int seed){
     return next_seed;
 }
 
+uint trace_generator::get_ave_walk_time(){
+    double p = get_rand_double();
+    if (p < 0.01) { // 1/100   600
+        return 600;
+    } else if (p < 0.07) { // 6/100  200
+        return 200;
+    } else if (p < 0.17) { // 10/100  100
+        return 100;
+    } else if (p < 0.37) { // 20/100  50
+        return 50;
+    } else { // 63/100  10
+        return 10;
+    }
+}
+
 void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){                 //return --- result
     // use the default map for single thread mode
     if(!mymap){
@@ -264,36 +285,58 @@ void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){             
     while(count<config->cur_duration){
         if(meta_data[obj].type==NOT_YET){
             meta_data[obj].end = get_random_location(meta_data[obj].core);
-            if(tryluck(config->drive_rate)){
+            double p = get_rand_double();
+            if(p < config->drive_rate){
                 meta_data[obj].type = DRIVE;
                 rested = false;
-            }else if(tryluck(config->walk_rate)){
+            }else if(p < config->drive_rate + config->walk_rate){
                 meta_data[obj].type = WALK;
                 rested = false;
             }else if(!rested){
                 meta_data[obj].type = REST;
                 rested = true;
             }
+
+//            if(tryluck(config->drive_rate)){
+//                meta_data[obj].type = DRIVE;
+//                rested = false;
+//            }else if(tryluck(config->walk_rate)){
+//                meta_data[obj].type = WALK;
+//                rested = false;
+//            }else if(!rested){
+//                meta_data[obj].type = REST;
+//                rested = true;
+//            }
         }
         if(meta_data[obj].type == DRIVE){
             if(meta_data[obj].trajectory.empty()){                      //new trip
-                meta_data[obj].core = get_core(meta_data[obj].core);
+                meta_data[obj].core = get_core(meta_data[obj].core);            //change core
                 meta_data[obj].end = get_random_location(meta_data[obj].core);
             }
             //meta_data[obj].speed = config->drive_speed;
-            meta_data[obj].speed = config->drive_speed -2 + get_rand_double()*4;
+            meta_data[obj].speed = config->drive_speed -5 + (uint)(10 * get_rand_double());
             mymap->navigate(ret, meta_data[obj], config->cur_duration, count, config->num_objects, obj);
         }else if(meta_data[obj].type == WALK){
             if(!meta_data[obj].time_remaining){
-                meta_data[obj].time_remaining = config->max_walk_time  * get_rand_double();
+                meta_data[obj].time_remaining = (get_ave_walk_time() - 10) * 2 * get_rand_double() + 5;
             }
             const double step = config->walk_speed/meta_data[obj].end.distance(meta_data[obj].loc, true);
+            uint pause_timestamp = 100 * get_rand_double();
+            uint pause_length = 5 + 5 * get_rand_double();
             for(double portion = step;portion<(1+step) && count<config->cur_duration && meta_data[obj].time_remaining > 0;){
                 ret[count*config->num_objects+obj].x = meta_data[obj].loc.x+portion*(meta_data[obj].end.x - meta_data[obj].loc.x);
                 ret[count*config->num_objects+obj].y = meta_data[obj].loc.y+portion*(meta_data[obj].end.y - meta_data[obj].loc.y);
                 count++;
                 meta_data[obj].time_remaining--;
                 portion += step;
+                if(count == pause_timestamp){
+                    for(uint i = 0; i < pause_length && count<config->cur_duration; i++){
+                        ret[count*config->num_objects+obj].x = ret[(count-1)*config->num_objects+obj].x;
+                        ret[count*config->num_objects+obj].y = ret[(count-1)*config->num_objects+obj].y;
+                        count++;
+                        meta_data[obj].time_remaining--;
+                    }
+                }
             }
             meta_data[obj].loc = ret[(count-1)*config->num_objects+obj];
         }else if(meta_data[obj].type == REST){

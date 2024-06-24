@@ -87,6 +87,7 @@ public:
     // generate a trace with given duration
     void fill_trace(Point * ret, Map *mymap, int obj);
     int get_core(int seed=-1);
+    uint get_ave_walk_time();
 
 };
 

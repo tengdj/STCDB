@@ -125,6 +125,7 @@ uint SSTable::search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_cap
 sorted_run::~sorted_run(){
     delete []sst;
     delete []first_widpid;
+    delete box_rtree;
 }
 
 //uint sorted_run::search_in_sorted_run(uint big_sort_id, uint pid){                              //this pointer refers to a single sorted_run

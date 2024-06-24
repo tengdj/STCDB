@@ -477,12 +477,18 @@ box workbench::parse_to_real_mbr(unsigned short first_low, unsigned short first_
     return ret;
 }
 
+bool PolygonSearchCallback(short * i, box poly_mbr,void* arg){
+    vector<pair<short, box>> * ret = (vector<pair<short, box>> *)arg;
+    ret->push_back(make_pair(*i, poly_mbr));
+    return true;
+}
+
 bool workbench::mbr_search_in_disk(box b, uint timestamp) {
-    assert(mbr.contain(b));
+    //assert(mbr.contain(b));
     cout << "mbr disk search" << endl;
     unordered_set<uint> uni;
     bool ret = false, find = false;
-    box bit_b;
+    box bit_b = make_bit_box(b);
     uint bit_pos = 0;
     for (int i = 0; i < big_sorted_run_count; i++) {
         if ((bg_run[i].start_time_min < timestamp) && (timestamp < bg_run[i].end_time_max)) {
@@ -490,61 +496,56 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
                 bg_run[i].sst = new SSTable[config->SSTable_count];
             }
             cout << "in bg_run" << i << endl;
-            bit_b = make_bit_box(b);
-            //cerr<<"bit_box"<<endl;
-            //bit_b.print();
-            //cout<<bit_b.low[0]<<","<<bit_b.low[1]<<","<<bit_b.high[0]<<","<<bit_b.high[1]<<endl;
-            for (uint j = 0; j < config->SSTable_count; j++) {
-                //cerr<<"bitmap_mbrs"<<j<<endl;
-                bg_run[i].bitmap_mbrs[j].print();
-                if(b.intersect(bg_run[i].bitmap_mbrs[j])) {     //real box intersect
-//                    cerr<<"intersect"<<endl;
-//                    cerr<<"bitmap_mbrs"<<j<<endl;
-//                    bg_run[i].bitmap_mbrs[j].print();
-                    intersect_sst_count++;
-                    find = false;
-                    for (uint p = bit_b.low[0]-1; (p <= bit_b.high[0]+1) && (!find); p++) {
-                        for (uint q = bit_b.low[1]-1; (q <= bit_b.high[1]+1) && (!find); q++) {
-                            bit_pos = xy2d(SID_BIT / 2, p, q);
-                            if (bg_run[i].bitmaps[j * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
-                                //cerr << "SSTable_" << j << "bit_pos" << bit_pos << endl;
-                                find = true;
-                                ret = true;
-                                break;
-                            }
-                        }
-                    }
-                    if(find){
-                        bit_find_count++;
-                        if(!bg_run[i].sst[j].keys){
-                            ifstream read_sst;
-                            string filename = "../store/SSTable_"+to_string(i)+"-"+to_string(j);
-                            //cout<<filename<<endl;
-                            read_sst.open(filename);                   //final place is not high+1, but high
-                            assert(read_sst.is_open());
-                            bg_run[i].sst[j].keys = new __uint128_t[bg_run[i].CTF_capacity[j]];
-                            read_sst.read((char *)bg_run[i].sst[j].keys,sizeof(__uint128_t)*bg_run[i].CTF_capacity[j]);
-                            //cout<<"read right"<<endl;
-                            read_sst.close();
-                        }
-                        uint this_find = 0;
-                        for(uint q = 0; q < bg_run[i].CTF_capacity[j]; q++){
-                            uint pid = get_key_oid(bg_run[i].sst[j].keys[q]);
-                            //box value_box = parse_to_real_mbr(bg_run[i].wids[2 * pid], bg_run[i].wids[2 * pid + 1], bg_run[i].sst[j].kv[q].value);
-                            box key_box;
-                            parse_mbr(bg_run[i].sst[j].keys[q], key_box, bg_run[i].bitmap_mbrs[j]);
-                            if(b.intersect(key_box)){
-                                uni.insert(pid);
-                                this_find++;
-                                mbr_find_count++;
-                                //cout<<"box find!"<<endl;
-                                //key_box.print();
 
-                            }
+            vector<pair<short, box>> intersect_mbrs;
+            bg_run[i].box_rtree->Search(b.low, b.high, PolygonSearchCallback, (void *)&intersect_mbrs);
+            intersect_sst_count = intersect_mbrs.size();
+            for (uint j = 0; j < intersect_mbrs.size(); j++) {
+
+                uint CTF_id = intersect_mbrs[j].first;
+                find = false;
+                for (uint p = bit_b.low[0]-1; (p <= bit_b.high[0]+1) && (!find); p++) {
+                    for (uint q = bit_b.low[1]-1; (q <= bit_b.high[1]+1) && (!find); q++) {
+                        bit_pos = xy2d(SID_BIT / 2, p, q);
+                        if (bg_run[i].bitmaps[CTF_id * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
+                            //cerr << "SSTable_" << CTF_id << "bit_pos" << bit_pos << endl;
+                            find = true;
+                            ret = true;
+                            break;
                         }
-                        //cerr<<this_find<<"finds in sst "<<j<<endl;
                     }
                 }
+                if(find){
+                    bit_find_count++;
+                    if(!bg_run[i].sst[CTF_id].keys){
+                        ifstream read_sst;
+                        string filename = "../store/SSTable_"+to_string(i)+"-"+to_string(CTF_id);
+                        //cout<<filename<<endl;
+                        read_sst.open(filename);                   //final place is not high+1, but high
+                        assert(read_sst.is_open());
+                        bg_run[i].sst[CTF_id].keys = new __uint128_t[bg_run[i].CTF_capacity[CTF_id]];
+                        read_sst.read((char *)bg_run[i].sst[CTF_id].keys,sizeof(__uint128_t)*bg_run[i].CTF_capacity[CTF_id]);
+                        //cout<<"read right"<<endl;
+                        read_sst.close();
+                    }
+                    uint this_find = 0;
+                    for(uint q = 0; q < bg_run[i].CTF_capacity[CTF_id]; q++){
+                        uint pid = get_key_oid(bg_run[i].sst[CTF_id].keys[q]);
+                        box key_box;
+                        parse_mbr(bg_run[i].sst[CTF_id].keys[q], key_box, intersect_mbrs[j].second);
+                        if(b.intersect(key_box)){
+                            uni.insert(pid);
+                            this_find++;
+                            mbr_find_count++;
+                            //cout<<"box find!"<<endl;
+                            //key_box.print();
+
+                        }
+                    }
+                    //cerr<<this_find<<"finds in sst "<<CTF_id<<endl;
+
+                }
+
             }
         }
     }
