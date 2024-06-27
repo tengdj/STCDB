@@ -797,7 +797,8 @@ void set_oid(workbench *bench){                         //0~10000000
 __global__
 void narrow_xy_to_y(workbench *bench){
     uint id = blockIdx.x * blockDim.x + threadIdx.x;
-    if(id >= bench->config->num_objects || id < (bench->config->num_objects - bench->sid_count) ){
+    uint zero_count = bench->config->num_objects - bench->sid_count;
+    if(id >= bench->config->num_objects || id < zero_count){
         return;
     }
     bench->mid_xys[id] = bench->mid_xys[id] & ((1ULL << 32) - 1);     //xy -> y
@@ -853,16 +854,27 @@ void write_bitmap(workbench *bench){
     if(kid>=bench->kv_count){
         return;
     }
-    uint low0 = (bench->kv_boxs[kid].low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (SID_BIT/2)) - 1);
-    uint low1 = (bench->kv_boxs[kid].low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (SID_BIT/2)) - 1);
-    uint high0 = (bench->kv_boxs[kid].high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * ((1ULL << (SID_BIT/2)) - 1);
-    uint high1 = (bench->kv_boxs[kid].high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * ((1ULL << (SID_BIT/2)) - 1);
+//    for(uint i = 0; i < 25; i++){
+//        if(kid == bench->d_CTF_capacity[i]){
+//            printf("%d : %lf %lf %lf %lf\n", kid, bench->kv_boxs[kid].low[0], bench->kv_boxs[kid].low[1], bench->kv_boxs[kid].high[0], bench->kv_boxs[kid].high[1]);
+//        }
+//    }
+
+    uint low0 = (bench->kv_boxs[kid].low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (1ULL << (SID_BIT/2));
+    uint low1 = (bench->kv_boxs[kid].low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (1ULL << (SID_BIT/2));
+    uint high0 = (bench->kv_boxs[kid].high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (1ULL << (SID_BIT/2));
+    uint high1 = (bench->kv_boxs[kid].high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (1ULL << (SID_BIT/2));
+    assert(high1 < 256);
 
     uint bitmap_id = get_key_sid(bench->d_keys[kid]) - 2;
     //uint bitmap_id = kid/(bench->config->kv_restriction / bench->config->SSTable_count);
     uint bit_pos = 0;
     for(uint i=low0;i<=high0;i++){
         for(uint j=low1;j<=high1;j++){
+            if(bitmap_id%5 == 0 && j > 250){
+                printf("bitmap_id %d, %d\n", bitmap_id, j);
+                printf("%d : %lf %lf %lf %lf\n", kid, bench->kv_boxs[kid].low[0], bench->kv_boxs[kid].low[1], bench->kv_boxs[kid].high[0], bench->kv_boxs[kid].high[1]);
+            }
             bit_pos = xy2d(SID_BIT/2,i,j);
             //bench->d_bitmaps[bitmap_id*(bench->bit_count/8)+bit_pos/8] |= (1<<(bit_pos%8));
             //unsigned int *bitmap_ptr = reinterpret_cast<unsigned int *>(&bench->d_bitmaps[bitmap_id * (bench->bit_count / 8) + bit_pos / 32]);
@@ -880,7 +892,7 @@ void mbr_bitmap(workbench *bench){
     uint temp_low[2] = {10000,10000};
     uint temp_high[2] = {0, 0};
     for (uint bit_pos = threadIdx.x; bit_pos < bench->bit_count; bit_pos += blockDim.x) {                   //bit_pos < bench->bit_count
-        if (bench->d_bitmaps[blockIdx.x*(bench->bit_count/8)+bit_pos/8] & (1<<(bit_pos%8)) ) {
+        if ( bench->d_bitmaps[blockIdx.x*(bench->bit_count/8)+bit_pos/8] & (1<<(bit_pos%8)) ) {
             uint temp[2];
             d2xy(SID_BIT/2, bit_pos, temp[0], temp[1]);
             temp_low[0] = min(temp_low[0], temp[0]);
@@ -914,10 +926,10 @@ void mbr_bitmap(workbench *bench){
         }
     }
     if (threadIdx.x == 0) {
-        bench->d_bitmap_mbrs[blockIdx.x].low[0] = (double)local_low[0][0]/((1ULL << (SID_BIT/2)) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
-        bench->d_bitmap_mbrs[blockIdx.x].low[1] = (double)local_low[0][1]/((1ULL << (SID_BIT/2)) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];
-        bench->d_bitmap_mbrs[blockIdx.x].high[0] = (double)local_high[0][0]/((1ULL << (SID_BIT/2)) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
-        bench->d_bitmap_mbrs[blockIdx.x].high[1] = (double)local_high[0][1]/((1ULL << (SID_BIT/2)) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];
+        bench->d_bitmap_mbrs[blockIdx.x].low[0] = (double)local_low[0][0]/(1ULL << (SID_BIT/2))*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
+        bench->d_bitmap_mbrs[blockIdx.x].low[1] = (double)local_low[0][1]/(1ULL << (SID_BIT/2))*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];
+        bench->d_bitmap_mbrs[blockIdx.x].high[0] = (double)local_high[0][0]/(1ULL << (SID_BIT/2))*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
+        bench->d_bitmap_mbrs[blockIdx.x].high[1] = (double)local_high[0][1]/(1ULL << (SID_BIT/2))*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];
         //printf("bench->d_bitmap_mbrs[blockIdx.x].low[0] %lf\n",bench->d_bitmap_mbrs[blockIdx.x].low[0]);
     }
 }

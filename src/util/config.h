@@ -51,8 +51,8 @@ public:
     bool load_data = false;
     uint SSTable_kv_capacity = 1342177;             //1342177  20.5MB
 
-    uint kv_capacity = 134217728 + 1000000;            //134217728 + 1000000
-    uint kv_restriction = 134217728;                  //2*1024*1024*1024/16 = 134217728
+    uint kv_capacity = 13421772 + 1000000;            //134217728 + 1000000
+    uint kv_restriction = 13421772;                  //2*1024*1024*1024/16 = 134217728
     uint MemTable_capacity = 2 ;             //5*2 ,and workbench data[100] is not enough
 
     uint big_sorted_run_capacity = 100;     //can be made to vector

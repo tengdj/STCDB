@@ -852,8 +852,8 @@ void tracer::process(){
                             Point bit_p;
                             uint x=0,y=0;
                             d2xy(SID_BIT/2,i,x,y);
-                            bit_p.x = (double)x/((1ULL << (SID_BIT/2)) - 1)*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
-                            bit_p.y = (double)y/((1ULL << (SID_BIT/2)) - 1)*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
+                            bit_p.x = (double)x/(1ULL << (SID_BIT/2))*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];           //int low0 = (f_low0 - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * (pow(2,WID_BIT/2) - 1);
+                            bit_p.y = (double)y/(1ULL << (SID_BIT/2))*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];               //int low1 = (f_low1 - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * (pow(2,WID_BIT/2) - 1);
                             bit_points[count_p] = bit_p;
                             count_p++;
                         }
@@ -965,7 +965,7 @@ void tracer::process(){
                         struct timeval area_search_time = get_cur_time();
 //                    uint temp = bench->config->SSTable_count;
 //                    bench->config->SSTable_count = bench->merge_sstable_count;
-                        bench->mbr_search_in_disk(search_area, 15);
+                        bench->mbr_search_in_disk(search_area, 5);
 //                    bench->config->SSTable_count = temp;
                         double time_consume = get_time_elapsed(area_search_time);
                         //printf("area_search_time %.2f\n", time_consume);

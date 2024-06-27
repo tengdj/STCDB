@@ -1647,7 +1647,7 @@ bool RTREE_QUAL::Search(Node* a_node, Rect* a_rect, size_t & a_foundCount, bool 
         if(a_resultCallback && &a_resultCallback)
         {
           ++a_foundCount;
-          box temp_box(a_node->m_branch[index].m_rect.m_min[0], a_node->m_branch[index].m_rect.m_min[1], a_node->m_branch[index].m_rect.m_max[0], a_node->m_branch[index].m_rect.m_max[0]);
+          box temp_box(a_node->m_branch[index].m_rect.m_min[0], a_node->m_branch[index].m_rect.m_min[1], a_node->m_branch[index].m_rect.m_max[0], a_node->m_branch[index].m_rect.m_max[1]);
           if(!a_resultCallback(id, temp_box, a_context))
           {
             return false; // Don't continue searching
