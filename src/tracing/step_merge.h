@@ -41,7 +41,7 @@ public:
     uint64_t *first_widpid = NULL;
     unsigned short * wids = NULL;
     unsigned char * bitmaps = NULL;
-    //box * bitmap_mbrs = NULL;
+    box * bitmap_mbrs = NULL;
     uint * CTF_capacity = NULL;
     uint start_time_min = 0;
     uint start_time_max = 0;

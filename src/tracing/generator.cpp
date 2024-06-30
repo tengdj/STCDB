@@ -211,8 +211,8 @@ Point trace_generator::get_random_location(int seed){
             tid = get_rand_number(tweet_count)-1;
         }
     }
-    double xval = tweets[tid].x + (0.5-get_rand_double())*150*degree_per_meter_longitude(tweets[tid].y);                //100
-    double yval = tweets[tid].y + (0.5-get_rand_double())*150*degree_per_meter_latitude;
+    double xval = tweets[tid].x + (0.5-get_rand_double())*100*degree_per_meter_longitude(tweets[tid].y);                //100
+    double yval = tweets[tid].y + (0.5-get_rand_double())*100*degree_per_meter_latitude;
     //maybe not in the map mbr
 //    box map_mbr = map->getMBR();
 //    if(xval < map_mbr.low[0]){
@@ -314,7 +314,8 @@ void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){             
                 meta_data[obj].end = get_random_location(meta_data[obj].core);
             }
             //meta_data[obj].speed = config->drive_speed;
-            meta_data[obj].speed = config->drive_speed -5 + (uint)(10 * get_rand_double());
+            //meta_data[obj].speed = config->drive_speed -5 + (uint)(10 * get_rand_double());
+            meta_data[obj].speed = 1;
             mymap->navigate(ret, meta_data[obj], config->cur_duration, count, config->num_objects, obj);
         }else if(meta_data[obj].type == WALK){
             if(!meta_data[obj].time_remaining){

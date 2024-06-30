@@ -211,7 +211,7 @@ public:
     uint split_num = 5;
     float * x_axis_of_parts = NULL;
     float ** y_axis_of_parts = NULL;
-    short * same_pid_count = NULL;
+    uint * same_pid_count = NULL;
     unsigned short * d_sids = NULL;
     unsigned short ** h_sids = NULL;
     f_box * kv_boxs = NULL;                           //real box, 1:1 kv
@@ -227,6 +227,8 @@ public:
     uint sid_count = 0;
     uint * d_CTF_capacity = NULL;
     uint ** h_CTF_capacity = NULL;
+
+    uint suspicious_pid = 0;
 
     pthread_t command_thread;
     pthread_mutex_t mutex_i;

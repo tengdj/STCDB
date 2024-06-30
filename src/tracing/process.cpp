@@ -604,8 +604,8 @@ void *straight_dump(void *arg){
     copy(bench->h_sids[offset], bench->h_sids[offset] + bench->config->num_objects, bench->bg_run[old_big].wids);
     bench->bg_run[old_big].bitmaps = new unsigned char[bench->bitmaps_size];
     copy(bench->h_bitmaps[offset], bench->h_bitmaps[offset] + bench->bitmaps_size, bench->bg_run[old_big].bitmaps);
-//    bench->bg_run[old_big].bitmap_mbrs = new box[bench->config->SSTable_count];
-//    copy(bench->h_bitmap_mbrs[offset], bench->h_bitmap_mbrs[offset] + bench->config->SSTable_count, bench->bg_run[old_big].bitmap_mbrs);
+    bench->bg_run[old_big].bitmap_mbrs = new box[bench->config->SSTable_count];
+    copy(bench->h_bitmap_mbrs[offset], bench->h_bitmap_mbrs[offset] + bench->config->SSTable_count, bench->bg_run[old_big].bitmap_mbrs);
     bench->bg_run[old_big].CTF_capacity = new uint[bench->config->SSTable_count];
     copy(bench->h_CTF_capacity[offset], bench->h_CTF_capacity[offset] + bench->config->SSTable_count, bench->bg_run[old_big].CTF_capacity);
 
@@ -917,6 +917,8 @@ void tracer::process(){
                     sleep(1);
                 }
 
+                bench->search_in_disk(8918395, 15);
+
                 uint question_count = 10000;
                 bench->wid_filter_count = 0;
                 bench->id_find_count = 0;
@@ -981,7 +983,14 @@ void tracer::process(){
                 p.close();
                 //return;
             }
-
+            if(t % 99 ==0){
+                vector<Point *> points;
+                for(int i=0;i<100;i++){
+                    points.push_back(trace+i*config->num_objects+10001);
+                }
+                print_points(points);
+                points.clear();
+            }
 
 			if(config->analyze_grid||config->profile){
 				bench->analyze_grids();

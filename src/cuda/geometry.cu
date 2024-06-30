@@ -662,11 +662,11 @@ void cuda_identify_meetings(workbench *bench) {
             return;
         }
 
-        float longer_edge = max(bench->meeting_buckets[bid].mbr.high[1] - bench->meeting_buckets[bid].mbr.low[1] , bench->meeting_buckets[bid].mbr.high[0] - bench->meeting_buckets[bid].mbr.low[0]);
-        if(longer_edge > 0.007){
-            bench->meeting_buckets[bid].key = ULL_MAX;
-            return;
-        }
+//        float longer_edge = max(bench->meeting_buckets[bid].mbr.high[1] - bench->meeting_buckets[bid].mbr.low[1] , bench->meeting_buckets[bid].mbr.high[0] - bench->meeting_buckets[bid].mbr.low[0]);
+//        if(longer_edge > 0.007){
+//            bench->meeting_buckets[bid].key = ULL_MAX;
+//            return;
+//        }
 
 //        float area = (bench->meeting_buckets[bid].mbr.high[1] - bench->meeting_buckets[bid].mbr.low[1])*(bench->meeting_buckets[bid].mbr.high[0] - bench->meeting_buckets[bid].mbr.low[0]);
 //        //area
@@ -719,21 +719,36 @@ void cuda_identify_meetings(workbench *bench) {
                                          ((__uint128_t)(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start) << END_BIT) + (__uint128_t)(bench->meeting_buckets[bid].end - bench->end_time_min);
             write_kv_box(&bench->kv_boxs[meeting_idx], &bench->meeting_buckets[bid].mbr);
 
-            if(!bench->same_pid_count[pid]){
+            uint if_zero = atomicAdd(&bench->same_pid_count[pid], 1);                   //but mid_xys shuold also atomic get and write
+            if(!if_zero){
                 atomicAdd(&bench->sid_count, 1);
             }
-//            if(bench->same_pid_count[pid] > ){
-//                bench->d_sids[pid] = 1;             //too large
-//            }
             float mid0 = bench->meeting_buckets[bid].mbr.low[0] / 2 + bench->meeting_buckets[bid].mbr.high[0] / 2;
             float mid1 = bench->meeting_buckets[bid].mbr.low[1] / 2 + bench->meeting_buckets[bid].mbr.high[1] / 2;
-            float old_mid0 = uint_to_float(bench->mid_xys[pid] >> 32);
-            float old_mid1 = uint_to_float(bench->mid_xys[pid] & ((1ULL << 32) - 1) );
-            float new_mid0 = (old_mid0 * bench->same_pid_count[pid] + mid0) / (bench->same_pid_count[pid] + 1);                //centroid
-            float new_mid1 = (old_mid1 * bench->same_pid_count[pid] + mid1) / (bench->same_pid_count[pid] + 1);
-            bench->mid_xys[pid] = ( (uint64_t)float_to_uint(new_mid0) << 32 ) + (uint64_t)float_to_uint(new_mid1);
-            bench->same_pid_count[pid]++;
+            unsigned long long int mid_xy = ( (uint64_t)float_to_uint(mid0) << 32 ) + (uint64_t)float_to_uint(mid1);
+            bench->mid_xys[pid] = mid_xy;
+            //atomicAdd((unsigned long long int*)&bench->mid_xys[pid], mid_xy);
+//            if(bench->mid_xys[pid] == 0){
+//                bench->mid_xys[pid] = mid_xy;
+//            }
+//            else{
+//                bench->mid_xys[pid] = bench->mid_xys[pid]/2 + mid_xy/2;
+//            }
+
+//            uint old_same_pid_count = if_zero;
+////            if(bench->same_pid_count[pid] > ){
+////                bench->d_sids[pid] = 1;             //too large
+////            }
+//            float mid0 = bench->meeting_buckets[bid].mbr.low[0] / 2 + bench->meeting_buckets[bid].mbr.high[0] / 2;
+//            float mid1 = bench->meeting_buckets[bid].mbr.low[1] / 2 + bench->meeting_buckets[bid].mbr.high[1] / 2;
+//            //bench->mid_xys[pid] = ( ( (uint64_t)float_to_uint(mid0) ) << 32 ) + (uint64_t)float_to_uint(mid1);
+//            float old_mid0 = uint_to_float(bench->mid_xys[pid] >> 32);
+//            float old_mid1 = uint_to_float(bench->mid_xys[pid] & ((1ULL << 32) - 1) );
+//            float new_mid0 = (old_mid0 * old_same_pid_count + mid0) / (old_same_pid_count + 1);                //centroid
+//            float new_mid1 = (old_mid1 * old_same_pid_count + mid1) / (old_same_pid_count + 1);
+//            bench->mid_xys[pid] = ( (uint64_t)float_to_uint(new_mid0) << 32 ) + (uint64_t)float_to_uint(new_mid1);
         }
+
     }
     // reset the bucket
     if(meet_cut){
@@ -792,6 +807,11 @@ void set_oid(workbench *bench){                         //0~10000000
         return;
     }
     bench->d_oids[id] = id;
+//    if(bench->same_pid_count[id] >= 2){
+//        uint ave_mid0 = (bench->mid_xys[id] >> 32) / bench->same_pid_count[id];
+//        uint ave_mid1 = (bench->mid_xys[id] & ((1ULL << 32) - 1) ) / bench->same_pid_count[id];
+//        bench->mid_xys[id] = ( (uint64_t)ave_mid0 << 32 ) + (uint64_t)ave_mid1;
+//    }
 }
 
 __global__
@@ -811,8 +831,12 @@ void make_sid(workbench *bench) {
     if(id >= bench->config->num_objects || id < zero_count){
         return;
     }
-    uint part_key_capacity = bench->sid_count / bench->split_num / bench->split_num;
-    uint sid = (id - zero_count) / part_key_capacity + 2;          //0 -> not appear, 1 -> too large
+    //uint part_key_capacity = bench->sid_count / bench->split_num / bench->split_num;              //wrong
+    uint x_part_capacity = bench->sid_count / bench->split_num + 1;                   //x_part_capacity
+    uint part_key_capacity = x_part_capacity / bench->split_num + 1;
+    uint x_index = (id - zero_count) / x_part_capacity;
+    uint y_index = (id - zero_count - x_index * x_part_capacity) / part_key_capacity;
+    uint sid = x_index * bench->split_num + y_index + 2;          //0 -> not appear, 1 -> too large
     uint oid = bench->d_oids[id];
     bench->d_sids[oid] = sid;
     //printf("%d %d\n", sid, oid);
@@ -836,9 +860,13 @@ void get_CTF_capacity(workbench *bench) {
     if(id >= bench->config->num_objects || id < zero_count){
         return;
     }
-    uint part_key_capacity = bench->sid_count / bench->split_num / bench->split_num;
+    //uint part_key_capacity = bench->sid_count / bench->split_num / bench->split_num;              //wrong
+    uint x_part_capacity = bench->sid_count / bench->split_num + 1;                   //x_part_capacity
+    uint part_key_capacity = x_part_capacity / bench->split_num + 1;
     if(id % part_key_capacity == 0){
-        uint CTF_id = (id - zero_count) / part_key_capacity;              // ????
+        uint x_index = (id - zero_count) / x_part_capacity;
+        uint y_index = (id - zero_count - x_index * x_part_capacity) / part_key_capacity;
+        uint CTF_id = x_index * bench->split_num + y_index;
         uint sum = 0;
         for(uint i = 0; i < part_key_capacity; i++){
             sum += bench->same_pid_count[ bench->d_oids[id + i] ];
@@ -871,9 +899,12 @@ void write_bitmap(workbench *bench){
     uint bit_pos = 0;
     for(uint i=low0;i<=high0;i++){
         for(uint j=low1;j<=high1;j++){
-            if(bitmap_id%5 == 0 && j > 250){
+            if(bitmap_id%5 == 0 && j > 200){
                 printf("bitmap_id %d, %d\n", bitmap_id, j);
                 printf("%d : %lf %lf %lf %lf\n", kid, bench->kv_boxs[kid].low[0], bench->kv_boxs[kid].low[1], bench->kv_boxs[kid].high[0], bench->kv_boxs[kid].high[1]);
+                uint oid = get_key_oid(bench->d_keys[kid]);
+                printf("%d with %d\n", oid, get_key_target(bench->d_keys[kid]));
+                printf("end time %d", get_key_end(bench->d_keys[kid]));
             }
             bit_pos = xy2d(SID_BIT/2,i,j);
             //bench->d_bitmaps[bitmap_id*(bench->bit_count/8)+bit_pos/8] |= (1<<(bit_pos%8));
@@ -1295,10 +1326,10 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
     log("\t%.2f MB\tmid_xys",1.0*size/1024/1024);
     cudaMemset(h_bench.mid_xys, 0, bench->config->num_objects*sizeof(uint64_t));
 
-    h_bench.same_pid_count = (short *)gpu->allocate(bench->config->num_objects * sizeof(short));
-    size = bench->config->num_objects*sizeof(short);
+    h_bench.same_pid_count = (uint *)gpu->allocate(bench->config->num_objects * sizeof(uint));
+    size = bench->config->num_objects*sizeof(uint);
     log("\t%.2f MB\tsame_name_count", 1.0 * size / 1024 / 1024);
-    cudaMemset(h_bench.same_pid_count, 0, bench->config->num_objects * sizeof(short));
+    cudaMemset(h_bench.same_pid_count, 0, bench->config->num_objects * sizeof(uint));
 
     //cuda search
     h_bench.search_single_list = (search_info_unit *)gpu->allocate(bench->config->search_single_capacity*sizeof(search_info_unit));
@@ -1591,14 +1622,20 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 
         uint zero_sid_count = bench->config->num_objects - h_bench.sid_count;
         cout <<"zero_sid_count"<< zero_sid_count << endl;
-        uint x_part = h_bench.sid_count / bench->split_num;
-        for(uint i = 0; i < bench->split_num; i++){
-            thrust::sort_by_key(d_vector_xys + zero_sid_count + x_part * i,
-                                d_vector_xys + zero_sid_count + x_part * (i + 1),
-                                d_vector_oids + zero_sid_count + x_part * i);
+        uint x_part_capacity = h_bench.sid_count / bench->split_num + 1;
+        for(uint i = 0; i < bench->split_num - 1; i++){
+            thrust::sort_by_key(d_vector_xys + zero_sid_count + x_part_capacity * i,
+                                d_vector_xys + zero_sid_count + x_part_capacity * (i + 1),
+                                d_vector_oids + zero_sid_count + x_part_capacity * i);
             cudaDeviceSynchronize();
             check_execution();
         }
+        thrust::sort_by_key(d_vector_xys + zero_sid_count + x_part_capacity * (bench->split_num - 1),                    //last part
+                            d_vector_xys + bench->config->num_objects,
+                            d_vector_oids + zero_sid_count + x_part_capacity * (bench->split_num - 1));
+        cudaDeviceSynchronize();
+        check_execution();
+
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("cuda_sort_by_y_time ",start);
 
@@ -1741,7 +1778,8 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         cudaMemset(h_bench.d_oids, 0, bench->config->num_objects*sizeof(uint));
         cudaMemset(h_bench.d_bitmaps, 0, bench->bitmaps_size);
         cudaMemset(h_bench.d_bitmap_mbrs, 0, bench->config->SSTable_count * sizeof(box));
-        cudaMemset(h_bench.same_pid_count, 0, bench->config->num_objects * sizeof(short));
+        cudaMemset(h_bench.same_pid_count, 0, bench->config->num_objects * sizeof(uint));
+        cudaMemset(h_bench.mid_xys, 0, bench->config->num_objects*sizeof(uint64_t));
         bench->MemTable_count++;
         cout << "bench->MemTable_count " << bench->MemTable_count << "MemTable_capacity" << bench->config->MemTable_capacity <<endl;
         h_bench.kv_count = 0;

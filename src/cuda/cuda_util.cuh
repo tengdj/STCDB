@@ -152,8 +152,7 @@ __host__
 inline void print_parse_key(__uint128_t key){
     print_128(key);
     cout<<endl;
-    uint wid = get_key_sid(key);
-    cout<<"wid:"<< wid <<endl;
+    cout<<"sid:"<< get_key_sid(key)<<endl;
     cout << "pid:" << get_key_oid(key) << endl;
     //mbr
     cout<<"target:"<<get_key_target(key)<<endl;
