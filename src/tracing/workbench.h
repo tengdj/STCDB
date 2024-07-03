@@ -208,7 +208,7 @@ public:
 
     //space for spatial id
     uint64_t * mid_xys = NULL;
-    uint split_num = 5;
+
     float * x_axis_of_parts = NULL;
     float ** y_axis_of_parts = NULL;
     uint * same_pid_count = NULL;
@@ -236,13 +236,13 @@ public:
     uint valid_timestamp = 0;
 
     //big sorted run
-    sorted_run *bg_run = NULL;
-    uint big_sorted_run_count = 0;
+    CTB *ctbs = NULL;
+    uint ctb_count = 0;
     uint start_time_min = 0;
     uint start_time_max = 0;
     uint end_time_min = 0;
     uint end_time_max = 0;
-    uint SSTable_kv_capacity = 0;
+    uint CTF_kv_capacity = 0;
     bool dumping = false;
     uint merge_sstable_count = 100;
     uint merge_kv_capacity = 0;

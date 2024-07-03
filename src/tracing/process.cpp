@@ -73,14 +73,14 @@ tracer::~tracer(){
 		delete bench;
 	}
     if(trace){
-        delete trace;
+        delete[] trace;
     }
     if(generator){
         delete generator;
     }
-    if(config){
-        delete config;
-    }
+//    if(config){
+//        delete config;
+//    }
 #ifdef USE_GPU
 	if(gpu){
 		delete gpu;
@@ -586,38 +586,38 @@ void *straight_dump(void *arg){
     cout<<"cur_time: "<<bench->cur_time<<endl;
     uint offset = 0;
     assert(bench->config->MemTable_capacity%2==0);
-    uint old_big = bench->big_sorted_run_count;                 //atomic add
+    uint old_big = bench->ctb_count;                 //atomic add
     cout<<"old big_sorted_run_count: "<<old_big<<endl;
     //bench->big_sorted_run_count++;
     bench->dumping = true;
     if(old_big%2==1){
         offset = bench->config->MemTable_capacity/2;
     }
-    bench->bg_run[old_big].sst = NULL;
-    bench->bg_run[old_big].start_time_min = bench->start_time_min;
-    bench->bg_run[old_big].start_time_max = bench->start_time_max;
-    bench->bg_run[old_big].end_time_min = bench->end_time_min;
-    bench->bg_run[old_big].end_time_max = bench->end_time_max;
+    bench->ctbs[old_big].ctfs = NULL;
+    bench->ctbs[old_big].start_time_min = bench->start_time_min;
+    bench->ctbs[old_big].start_time_max = bench->start_time_max;
+    bench->ctbs[old_big].end_time_min = bench->end_time_min;
+    bench->ctbs[old_big].end_time_max = bench->end_time_max;
     bench->end_time_min = bench->end_time_max;              //new min = old max
-    bench->bg_run[old_big].first_widpid = new uint64_t[bench->config->SSTable_count];
-    bench->bg_run[old_big].wids = new unsigned short[bench->config->num_objects];
-    copy(bench->h_sids[offset], bench->h_sids[offset] + bench->config->num_objects, bench->bg_run[old_big].wids);
-    bench->bg_run[old_big].bitmaps = new unsigned char[bench->bitmaps_size];
-    copy(bench->h_bitmaps[offset], bench->h_bitmaps[offset] + bench->bitmaps_size, bench->bg_run[old_big].bitmaps);
-    bench->bg_run[old_big].bitmap_mbrs = new box[bench->config->SSTable_count];
-    copy(bench->h_bitmap_mbrs[offset], bench->h_bitmap_mbrs[offset] + bench->config->SSTable_count, bench->bg_run[old_big].bitmap_mbrs);
-    bench->bg_run[old_big].CTF_capacity = new uint[bench->config->SSTable_count];
-    copy(bench->h_CTF_capacity[offset], bench->h_CTF_capacity[offset] + bench->config->SSTable_count, bench->bg_run[old_big].CTF_capacity);
+    bench->ctbs[old_big].first_widpid = new uint64_t[bench->config->CTF_count];
+    bench->ctbs[old_big].sids = new unsigned short[bench->config->num_objects];
+    copy(bench->h_sids[offset], bench->h_sids[offset] + bench->config->num_objects, bench->ctbs[old_big].sids);
+    bench->ctbs[old_big].bitmaps = new unsigned char[bench->bitmaps_size];
+    copy(bench->h_bitmaps[offset], bench->h_bitmaps[offset] + bench->bitmaps_size, bench->ctbs[old_big].bitmaps);
+    bench->ctbs[old_big].bitmap_mbrs = new box[bench->config->CTF_count];
+    copy(bench->h_bitmap_mbrs[offset], bench->h_bitmap_mbrs[offset] + bench->config->CTF_count, bench->ctbs[old_big].bitmap_mbrs);
+    bench->ctbs[old_big].CTF_capacity = new uint[bench->config->CTF_count];
+    copy(bench->h_CTF_capacity[offset], bench->h_CTF_capacity[offset] + bench->config->CTF_count, bench->ctbs[old_big].CTF_capacity);
 
-    bench->bg_run[old_big].box_rtree = new RTree<short *, double, 2, double>();
+    bench->ctbs[old_big].box_rtree = new RTree<short *, double, 2, double>();
     cout <<"before insert"<< endl;
-    for(uint i = 0; i < bench->config->SSTable_count; ++i){
-        bench->bg_run[old_big].box_rtree->Insert(bench->h_bitmap_mbrs[offset][i].low, bench->h_bitmap_mbrs[offset][i].high, new short(i));
+    for(uint i = 0; i < bench->config->CTF_count; ++i){
+        bench->ctbs[old_big].box_rtree->Insert(bench->h_bitmap_mbrs[offset][i].low, bench->h_bitmap_mbrs[offset][i].high, new short(i));
     }
 
     cout << "CTF_capacitys:" << endl;
-    for(uint i = 0; i < bench->config->SSTable_count; i++){
-        cout << bench->bg_run[old_big].CTF_capacity[i] << endl;
+    for(uint i = 0; i < bench->config->CTF_count; i++){
+        cout << bench->ctbs[old_big].CTF_capacity[i] << endl;
     }
 //    cerr << "all bitmap_mbrs" << endl;
 //    for(uint i = 0; i < bench->config->SSTable_count; i++){
@@ -625,12 +625,12 @@ void *straight_dump(void *arg){
 //    }
 
     ofstream SSTable_of;
-    __uint128_t * keys = new __uint128_t[bench->SSTable_kv_capacity*5];         //over size
+    __uint128_t * keys = new __uint128_t[bench->config->kv_restriction / bench->config->split_num];         //over size
     uint total_index = 0;
     uint sst_count = 0;
     struct timeval bg_start = get_cur_time();
-    for(sst_count=0; sst_count<bench->config->SSTable_count; sst_count++){
-        bench->bg_run[old_big].first_widpid[sst_count] = bench->h_keys[offset][total_index] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
+    for(sst_count=0; sst_count<bench->config->CTF_count; sst_count++){
+        bench->ctbs[old_big].first_widpid[sst_count] = bench->h_keys[offset][total_index] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
 //        cout<<bench->bg_run[old_big].first_widpid[sst_count]<<endl;
 //        cout<<get_key_wid(bench->h_keys[offset][total_index])<<endl;
 //        cout<<get_key_pid(bench->h_keys[offset][total_index])<<endl<<endl;
@@ -652,7 +652,7 @@ void *straight_dump(void *arg){
     fprintf(stdout,"\topen:\t%.2f\n",bench->pro.bg_open_time);
     //cout<<"sst_count :"<<sst_count<<" less than"<<1024<<endl;
 
-    bench->bg_run[old_big].print_meta();
+    bench->ctbs[old_big].print_meta();
     //logt("merge sort and flush", bg_start);
     //delete[] bit_points;
     delete[] keys;
@@ -662,7 +662,7 @@ void *straight_dump(void *arg){
 
 void* commandThreadFunction(void* arg) {
     workbench *bench = (workbench *)arg;
-    cout<<"bench->config->SSTable_count: "<<bench->config->SSTable_count<<endl;
+    cout << "bench->config->SSTable_count: " << bench->config->CTF_count << endl;
     pthread_mutex_init(&bench->mutex_i,NULL);
     while (true) {
         pthread_mutex_lock(&bench->mutex_i);
@@ -814,7 +814,7 @@ void tracer::process(){
 
             if(bench->crash_consistency){
                 uint offset = 0;
-                if(bench->big_sorted_run_count%2==1){
+                if(bench->ctb_count % 2 == 1){
                     offset = bench->config->MemTable_capacity/2;
                 }
                 for(int i=0;i<bench->MemTable_count; i++){
@@ -829,16 +829,17 @@ void tracer::process(){
                 cout<<"crash_consistency, 2 merge sort and dump"<<endl;
                 cout << "crash dump begin time: " << bench->cur_time << endl;
                 //crash_sst_dump((void *)bench);
+                bench->clear();
             }
             else if(bench->MemTable_count==bench->config->MemTable_capacity/2) {    //0 <= MemTable_count <= MemTable_capacity/2
                 uint offset = 0;
-                if(bench->big_sorted_run_count%2==1){
+                if(bench->ctb_count % 2 == 1){
                     offset = bench->config->MemTable_capacity/2;
                 }
 
                 Point * bit_points = new Point[bench->bit_count];
                 uint count_p;
-                for(uint j = 0;j<bench->config->SSTable_count;j++){
+                for(uint j = 0;j<bench->config->CTF_count; j++){
                     //cerr<<"bitmap"<<j<<endl;
                     cerr<<endl;
                     count_p = 0;
@@ -904,14 +905,14 @@ void tracer::process(){
 
 
                 //init
-                bench->big_sorted_run_count++;
+                bench->ctb_count++;
                 bench->MemTable_count = 0;
                 bench->do_some_search = false;
 
                 //bool findit = searchkv_in_all_place(bench, 2);
             }
 
-            if(!bench->do_some_search && bench->big_sorted_run_count == 1){            // !bench->do_some_search && bench->big_sorted_run_count == 1
+            if(!bench->do_some_search && bench->ctb_count == 1){            // !bench->do_some_search && bench->big_sorted_run_count == 1
                 bench->do_some_search = true;
                 while(bench->dumping){
                     sleep(1);
@@ -952,7 +953,7 @@ void tracer::process(){
                 double mid_x[10] = {-87.678503, -87.81683, -87.80959,-87.81004, -87.68706,-87.68616,-87.67892, -87.63235, -87.61381, -87.58352};
                 double mid_y[10] = {41.856803, 41.97466, 41.90729, 41.76984, 41.97556, 41.89960, 41.74859, 41.87157, 41.78340, 41.70744};
                 double base_edge_length = 0.01;
-                for(int i = 0; i < bench->big_sorted_run_count; i++){
+                for(int i = 0; i < bench->ctb_count; i++){
                     bench->load_big_sorted_run(i);
                 }
                 ofstream p;
@@ -982,14 +983,6 @@ void tracer::process(){
                 }
                 p.close();
                 //return;
-            }
-            if(t % 99 ==0){
-                vector<Point *> points;
-                for(int i=0;i<100;i++){
-                    points.push_back(trace+i*config->num_objects+10001);
-                }
-                print_points(points);
-                points.clear();
             }
 
 			if(config->analyze_grid||config->profile){

@@ -49,14 +49,15 @@ public:
 
     //added
     bool load_data = false;
-    uint SSTable_kv_capacity = 1342177;             //1342177  20.5MB
 
-    uint kv_capacity = 13421772 + 1000000;            //134217728 + 1000000
-    uint kv_restriction = 13421772;                  //2*1024*1024*1024/16 = 134217728
+    uint G_bytes = 1;
+    uint kv_capacity = 134217728 + 1000000;            //134217728 + 1000000
+    uint kv_restriction = 134217728;                  //2*1024*1024*1024/16 = 134217728
     uint MemTable_capacity = 2 ;             //5*2 ,and workbench data[100] is not enough
 
     uint big_sorted_run_capacity = 100;     //can be made to vector
-    uint SSTable_count = 25;              //default 2G
+    uint CTF_count = 25;              //default 2G
+    uint split_num = 5;
 
     //bool search_kv = true;
     uint search_single_capacity = 100;
@@ -69,9 +70,12 @@ public:
     bool load_meetings_pers = false;
 
     void update(){
+        cout << "into update" << endl;
         assert(MemTable_capacity%2==0);
-//        kv_restriction = SSTable_kv_capacity * SSTable_count;
-//        kv_capacity = kv_restriction + 1000000;
+        kv_restriction = G_bytes * 67108864;
+        kv_capacity = kv_restriction + 1000000;
+        split_num = sqrt(CTF_count);
+        assert(split_num*split_num == CTF_count);
     }
 
     void print(){
@@ -98,6 +102,8 @@ public:
         fprintf(stderr,"analyze reach:\t%s\n",analyze_reach?"yes":"no");
         fprintf(stderr,"analyze grid:\t%s\n",analyze_grid?"yes":"no");
 
+        fprintf(stderr,"kv_restriction:\t%d\n",kv_restriction);
+        fprintf(stderr,"split_num:\t%d\n",split_num);
     }
 };
 
@@ -260,7 +266,9 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
             ("trace_path,t", po::value<string>(&config.trace_path), "path to the trace file")
 
             ("memTable_capacity", po::value<uint>(&config.MemTable_capacity), "MemTable_capacity/2 is the dumping threshold")
-            ("sstable_count", po::value<uint>(&config.SSTable_count), "number of SSTable")
+            ("CTF_count", po::value<uint>(&config.CTF_count), "number of CTF")
+
+            ("G_bytes", po::value<uint>(&config.G_bytes), "G_bytes of kv_restriction")
 
             ;
     po::variables_map vm;
@@ -311,6 +319,7 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
     assert(config.walk_rate+config.drive_rate<=1);
     config.update();
     config.print();
+    config.configuration::print();
 
     return config;
 }

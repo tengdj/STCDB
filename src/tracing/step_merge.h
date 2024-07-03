@@ -21,25 +21,25 @@ typedef struct key_value{
     uint64_t value;
 }key_value;                         //sizeof(key_value)==32, beacuse 8+16=24, but 24<2*16=32
 
-class SSTable{
+class CTF{                          //contact tracing file
 public:
     __uint128_t * keys = NULL;
     //key_value *kv = NULL;
     //uint SSTable_kv_capacity = 327680;              //67108864 * 5 / 1024 = 327,680 (Round up)
 
-    ~SSTable();
+    ~CTF();
     uint search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_capacity, uint &search_multi_length, uint *search_multi_pid);
     //uint search_SSTable(uint64_t wp, uint SSTable_kv_capacity, vector<__uint128_t> & v_keys, vector<uint> & v_indices);
 };
 
-class sorted_run {                          //10G
+class CTB {             //contact tracing block
 
 public:
-    SSTable * sst = NULL;
+    CTF * ctfs = NULL;
 
     uint SSTable_count = 0;
     uint64_t *first_widpid = NULL;
-    unsigned short * wids = NULL;
+    unsigned short * sids = NULL;
     unsigned char * bitmaps = NULL;
     box * bitmap_mbrs = NULL;
     uint * CTF_capacity = NULL;
@@ -49,7 +49,7 @@ public:
     uint end_time_max = 0;
     RTree<short *, double, 2, double> *box_rtree = NULL;
 
-    ~sorted_run();
+    ~CTB();
     void print_meta(){
         fprintf(stdout,"start_time:%d~%d,end_time:%d~%d\n",start_time_min,start_time_max,end_time_min,end_time_max);
     }

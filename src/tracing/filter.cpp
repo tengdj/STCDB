@@ -70,12 +70,9 @@ workbench *partitioner::build_schema(Point *points, size_t num_objects){
     }
     if(true){
         bench->bit_count = (1ULL << (SID_BIT / 2)) * (1ULL << (SID_BIT / 2));
-        bench->bitmaps_size = bench->bit_count/8*bench->config->SSTable_count;
+        bench->bitmaps_size = bench->bit_count/8*bench->config->CTF_count;
 
     }
-
-    //bench->SSTable_kv_capacity = bench->config->kv_restriction/bench->config->SSTable_count;
-    bench->SSTable_kv_capacity = config->SSTable_kv_capacity;
 
 	bench->claim_space();
 	logt("claim %.3f MB memory space",start, bench->space_claimed()/1024.0/1024.0);

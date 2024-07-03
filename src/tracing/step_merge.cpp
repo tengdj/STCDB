@@ -7,12 +7,12 @@
 
 #include "step_merge.h"
 
-SSTable::~SSTable(){
+CTF::~CTF(){
     delete []keys;
 }
 
 //range query
-uint SSTable::search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_capacity, uint &search_multi_length, uint *search_multi_pid) {
+uint CTF::search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_capacity, uint &search_multi_length, uint *search_multi_pid) {
     uint count = 0;
     //cout<<"into search_SSTable"<<endl;
     int find = -1;
@@ -122,8 +122,8 @@ uint SSTable::search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_cap
 
 
 
-sorted_run::~sorted_run(){
-    delete []sst;
+CTB::~CTB(){
+    delete []ctfs;
     delete []first_widpid;
     delete box_rtree;
 }
