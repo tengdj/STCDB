@@ -56,7 +56,7 @@ public:
     uint MemTable_capacity = 2 ;             //5*2 ,and workbench data[100] is not enough
 
     uint big_sorted_run_capacity = 100;     //can be made to vector
-    uint CTF_count = 25;              //default 2G
+    uint CTF_count = 100;              //default 2G
     uint split_num = 5;
 
     //bool search_kv = true;
