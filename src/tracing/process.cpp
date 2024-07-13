@@ -912,7 +912,7 @@ void tracer::process(){
                 //bool findit = searchkv_in_all_place(bench, 2);
             }
 
-            if(!bench->do_some_search && bench->ctb_count == 1){            // !bench->do_some_search && bench->big_sorted_run_count == 1
+            if(!bench->do_some_search && bench->ctb_count == 2){            // !bench->do_some_search && bench->big_sorted_run_count == 1
                 bench->do_some_search = true;
                 while(bench->dumping){
                     sleep(1);

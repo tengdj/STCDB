@@ -321,26 +321,27 @@ void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){             
                 meta_data[obj].time_remaining = (get_ave_walk_time() - 10) * 2 * get_rand_double() + 5;
             }
             const double step = config->walk_speed/meta_data[obj].end.distance(meta_data[obj].loc, true);
-            uint pause_timestamp = 10 * get_rand_double();
-            uint pause_length = 5 + 5 * get_rand_double();
+//            uint pause_timestamp = 5+5 * get_rand_double();
+//            uint pause_length = 5 + 5 * get_rand_double();
             for(double portion = step;portion<(1+step) && count<config->cur_duration && meta_data[obj].time_remaining > 0;){
                 ret[count*config->num_objects+obj].x = meta_data[obj].loc.x+portion*(meta_data[obj].end.x - meta_data[obj].loc.x);
                 ret[count*config->num_objects+obj].y = meta_data[obj].loc.y+portion*(meta_data[obj].end.y - meta_data[obj].loc.y);
                 count++;
                 meta_data[obj].time_remaining--;
                 portion += step;
-                if(count == pause_timestamp*10){
-                    for(uint i = 0; i < pause_length && count<config->cur_duration; i++){
-                        ret[count*config->num_objects+obj].x = ret[(count-1)*config->num_objects+obj].x;
-                        ret[count*config->num_objects+obj].y = ret[(count-1)*config->num_objects+obj].y;
-                        count++;
-                        meta_data[obj].time_remaining--;
-                    }
-                }
+//                if(count == pause_timestamp*10){
+//                    for(uint i = 0; i < pause_length && count<config->cur_duration; i++){
+//                        ret[count*config->num_objects+obj].x = ret[(count-1)*config->num_objects+obj].x;
+//                        ret[count*config->num_objects+obj].y = ret[(count-1)*config->num_objects+obj].y;
+//                        count++;
+//                        meta_data[obj].time_remaining--;
+//                    }
+//                }
             }
             meta_data[obj].loc = ret[(count-1)*config->num_objects+obj];
         }else if(meta_data[obj].type == REST){
             if(!meta_data[obj].time_remaining){
+                //meta_data[obj].time_remaining = (config->max_rest_time - 20) * get_rand_double() + 10;
                 meta_data[obj].time_remaining = (config->max_rest_time - 200) * get_rand_double() + 100;
             }
             //int dur = meta_data[obj].rest_time;
