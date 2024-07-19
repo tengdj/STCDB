@@ -323,12 +323,22 @@ void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){             
                 meta_data[obj].time_remaining = (get_ave_walk_time() - 10) * 2 * get_rand_double() + 5;
             }
             const double step = config->walk_speed/meta_data[obj].end.distance(meta_data[obj].loc, true);
+            uint pause_timestamp = 10 * get_rand_double();
+            uint pause_length = 10 * get_rand_double();
             for(double portion = step;portion<(1+step) && count<config->cur_duration && meta_data[obj].time_remaining > 0;){
                 ret[count*config->num_objects+obj].x = meta_data[obj].loc.x+portion*(meta_data[obj].end.x - meta_data[obj].loc.x);
                 ret[count*config->num_objects+obj].y = meta_data[obj].loc.y+portion*(meta_data[obj].end.y - meta_data[obj].loc.y);
                 count++;
                 meta_data[obj].time_remaining--;
                 portion += step;
+                if(count == pause_timestamp * 10 + 1 && get_rand_double() > 0.4){
+                    for(uint i = 0; i < pause_length && count<config->cur_duration; i++){
+                        ret[count*config->num_objects+obj].x = ret[(count-1)*config->num_objects+obj].x;
+                        ret[count*config->num_objects+obj].y = ret[(count-1)*config->num_objects+obj].y;
+                        count++;
+                        meta_data[obj].time_remaining--;
+                    }
+                }
             }
             meta_data[obj].loc = ret[(count-1)*config->num_objects+obj];
             if(!meta_data[obj].time_remaining){

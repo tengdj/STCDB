@@ -490,7 +490,8 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
     bool ret = false, find = false;
     box bit_b = make_bit_box(b);
     uint bit_pos = 0;
-    for (int i = 0; i < ctb_count; i++) {
+    //for (int i = 0; i < ctb_count; i++) {
+    for(int i = 1; i < ctb_count; i++){
         if ((ctbs[i].start_time_min < timestamp) && (timestamp < ctbs[i].end_time_max)) {
             if(!ctbs[i].ctfs){
                 ctbs[i].ctfs = new CTF[config->CTF_count];
@@ -499,9 +500,8 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
 
             vector<pair<short, box>> intersect_mbrs;
             ctbs[i].box_rtree->Search(b.low, b.high, PolygonSearchCallback, (void *)&intersect_mbrs);
-            intersect_sst_count = intersect_mbrs.size();
+            intersect_sst_count += intersect_mbrs.size();
             for (uint j = 0; j < intersect_mbrs.size(); j++) {
-
                 uint CTF_id = intersect_mbrs[j].first;
                 find = false;
                 for (uint p = bit_b.low[0]-1; (p <= bit_b.high[0]+1) && (!find); p++) {

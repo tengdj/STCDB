@@ -31,7 +31,7 @@ public:
     size_t num_meeting_buckets = 100000;
 
     double grid_amplify = 2;
-    uint refine_size = 3;
+    uint refine_size = 4;
     bool dynamic_schema = true;
     bool phased_lookup = true;
     bool unroll = true;
@@ -72,7 +72,7 @@ public:
     void update(){
         cout << "into update" << endl;
         assert(MemTable_capacity%2==0);
-        kv_restriction = G_bytes * 67108864;
+        kv_restriction = G_bytes * 67108864;            //67108864 = 1G
         kv_capacity = kv_restriction + 1000000;
         split_num = sqrt(CTF_count);
         assert(split_num*split_num == CTF_count);
@@ -195,7 +195,7 @@ public:
     // how many percent of the initial points are evenly distributed
     double walk_rate = 0.3;
     double walk_speed = 1.0;
-    double drive_rate = 0.0033;         //0.0033
+    double drive_rate = 0.1;         //0.0033
     double drive_speed = 10.0;
     uint max_rest_time = 600;
     //uint max_walk_time = 100;

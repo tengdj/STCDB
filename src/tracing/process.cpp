@@ -708,12 +708,12 @@ void tracer::process(){
             bench->start_time_min = (1ULL<<32) -1;
             bench->start_time_max = 0;
 
-            //command
-            int ret1;
-            if ((ret1 = pthread_create(&bench->command_thread, NULL, commandThreadFunction, (void *) bench)) != 0) {
-                fprintf(stderr, "pthread_create:%s\n", strerror(ret1));
-            }
-            pthread_detach(bench->command_thread);
+//            //command
+//            int ret1;
+//            if ((ret1 = pthread_create(&bench->command_thread, NULL, commandThreadFunction, (void *) bench)) != 0) {
+//                fprintf(stderr, "pthread_create:%s\n", strerror(ret1));
+//            }
+//            pthread_detach(bench->command_thread);
 #ifdef USE_GPU
             if(config->gpu){
 				d_bench = cuda_create_device_bench(bench, gpu);
@@ -730,7 +730,7 @@ void tracer::process(){
 			bench->points = trace+t*config->num_objects;
 			bench->cur_time = st + t;
             if(bench->cur_time==config->start_time+config->duration-1){         //finish and all dump
-                pthread_cancel(bench->command_thread);
+                //pthread_cancel(bench->command_thread);
                 //bench->crash_consistency = true;
             }
 			// process the coordinate in this time point
