@@ -306,7 +306,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
         if ((ctbs[i].start_time_min < timestamp) && (timestamp < ctbs[i].end_time_max) ) {
             //cout<<"big_sorted_run_num:"<<i<<endl;
             uint64_t wp = pid;
-            if(ctbs[i].sids[pid] == 0){
+            if(ctbs[i].sids[pid] == 0 || ctbs[i].sids[pid] == 1){
                 wid_filter_count++;
                 continue;
             }

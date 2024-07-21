@@ -567,7 +567,7 @@ void Map::navigate(Point *positions, Trace_Meta & meta, int duration, int &count
             meta.loc = positions[(count-1)*num_objects+obj];
             delete meta.trajectory[0];
             meta.trajectory[0] = new Node(meta.loc.x, meta.loc.y);
-            break;
+            return;
         }
         delete meta.trajectory[0];
         meta.trajectory.erase(meta.trajectory.begin());

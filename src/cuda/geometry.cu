@@ -8,9 +8,15 @@
 #include "../tracing/workbench.h"
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
+#include <thrust/device_ptr.h>
 #include <thrust/generate.h>
 #include <thrust/sort.h>
 #include <thrust/copy.h>
+#include <thrust/remove.h>
+#include <thrust/execution_policy.h>
+#include <thrust/sequence.h>
+#include <thrust/tuple.h>
+#include <thrust/zip_function.h>
 
 /*
  *
@@ -103,6 +109,14 @@ inline void mbr_update_by_mbr(box &mbr, box &b){
     if(mbr.high[1] < b.high[1]){
         mbr.high[1] = b.high[1];
     }
+}
+
+__device__
+inline void atomic_mbr_update_by_mbr(uint_box &mbr, box &b){
+    atomicMin(&mbr.low[0], float_to_uint(b.low[0]));
+    atomicMax(&mbr.high[0], float_to_uint(b.high[0]));
+    atomicMin(&mbr.low[1], float_to_uint(b.low[1]));
+    atomicMax(&mbr.high[1], float_to_uint(b.high[1]));
 }
 
 __device__
@@ -675,8 +689,6 @@ void cuda_identify_meetings(workbench *bench) {
 //            return;
 //        }
 
-
-
         uint duration = bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start;
         if(duration >= 990){
             if(duration < 2000){
@@ -700,11 +712,6 @@ void cuda_identify_meetings(workbench *bench) {
         pid = getpid1(bench->meeting_buckets[bid].key);
         target = getpid2(bench->meeting_buckets[bid].key);
 
-//        if(bench->d_sids[pid] == ((1ULL << (SID_BIT)) - 1) || bench->d_sids[target] == ((1ULL << (SID_BIT)) - 1)){
-//            bench->meeting_buckets[bid].key = ULL_MAX;
-//            return;
-//        }
-
         uint meeting_idx = atomicAdd(&bench->kv_count, 2);
         assert(meeting_idx < bench->config->kv_capacity);
 
@@ -723,32 +730,8 @@ void cuda_identify_meetings(workbench *bench) {
             if(!if_zero){
                 atomicAdd(&bench->sid_count, 1);
             }
-            float mid0 = bench->meeting_buckets[bid].mbr.low[0] / 2 + bench->meeting_buckets[bid].mbr.high[0] / 2;
-            float mid1 = bench->meeting_buckets[bid].mbr.low[1] / 2 + bench->meeting_buckets[bid].mbr.high[1] / 2;
-            unsigned long long int mid_xy = ( (uint64_t)float_to_uint(mid0) << 32 ) + (uint64_t)float_to_uint(mid1);
-            bench->mid_xys[pid] = mid_xy;
-            //atomicAdd((unsigned long long int*)&bench->mid_xys[pid], mid_xy);
-//            if(bench->mid_xys[pid] == 0){
-//                bench->mid_xys[pid] = mid_xy;
-//            }
-//            else{
-//                bench->mid_xys[pid] = bench->mid_xys[pid]/2 + mid_xy/2;
-//            }
-
-//            uint old_same_pid_count = if_zero;
-////            if(bench->same_pid_count[pid] > ){
-////                bench->d_sids[pid] = 1;             //too large
-////            }
-//            float mid0 = bench->meeting_buckets[bid].mbr.low[0] / 2 + bench->meeting_buckets[bid].mbr.high[0] / 2;
-//            float mid1 = bench->meeting_buckets[bid].mbr.low[1] / 2 + bench->meeting_buckets[bid].mbr.high[1] / 2;
-//            //bench->mid_xys[pid] = ( ( (uint64_t)float_to_uint(mid0) ) << 32 ) + (uint64_t)float_to_uint(mid1);
-//            float old_mid0 = uint_to_float(bench->mid_xys[pid] >> 32);
-//            float old_mid1 = uint_to_float(bench->mid_xys[pid] & ((1ULL << 32) - 1) );
-//            float new_mid0 = (old_mid0 * old_same_pid_count + mid0) / (old_same_pid_count + 1);                //centroid
-//            float new_mid1 = (old_mid1 * old_same_pid_count + mid1) / (old_same_pid_count + 1);
-//            bench->mid_xys[pid] = ( (uint64_t)float_to_uint(new_mid0) << 32 ) + (uint64_t)float_to_uint(new_mid1);
+            atomic_mbr_update_by_mbr(bench->o_boxs[pid], bench->meeting_buckets[bid].mbr);
         }
-
     }
     // reset the bucket
     if(meet_cut){
@@ -807,18 +790,30 @@ void set_oid(workbench *bench){                         //0~10000000
         return;
     }
     bench->d_oids[id] = id;
-//    if(bench->same_pid_count[id] >= 2){
-//        uint ave_mid0 = (bench->mid_xys[id] >> 32) / bench->same_pid_count[id];
-//        uint ave_mid1 = (bench->mid_xys[id] & ((1ULL << 32) - 1) ) / bench->same_pid_count[id];
-//        bench->mid_xys[id] = ( (uint64_t)ave_mid0 << 32 ) + (uint64_t)ave_mid1;
-//    }
+    if(bench->same_pid_count[id] >= 1){
+        float low0 = uint_to_float(bench->o_boxs[id].low[0]);
+        float high0 = uint_to_float(bench->o_boxs[id].high[0]);
+        float low1 = uint_to_float(bench->o_boxs[id].low[1]);
+        float high1 = uint_to_float(bench->o_boxs[id].high[1]);
+
+        float area = (high1 - low1)*(high0 - low0);
+        if(area > 0.00005){
+            atomicAdd(&bench->oversize_count, 1);
+            bench->d_sids[id] = 1;              //over size
+            return;
+        }
+
+        uint ave_mid0 = bench->o_boxs[id].low[0] / 2 + bench->o_boxs[id].high[0] / 2;
+        uint ave_mid1 = bench->o_boxs[id].high[1] / 2 + bench->o_boxs[id].high[1] / 2;
+        bench->mid_xys[id] = ( (uint64_t)ave_mid0 << 32 ) + (uint64_t)ave_mid1;
+    }
 }
 
 __global__
 void narrow_xy_to_y(workbench *bench){
     uint id = blockIdx.x * blockDim.x + threadIdx.x;
-    uint zero_count = bench->config->num_objects - bench->sid_count;
-    if(id >= bench->config->num_objects || id < zero_count){
+    uint zero_one_count = (bench->config->num_objects - bench->sid_count) + bench->oversize_count;
+    if(id >= bench->config->num_objects || id < zero_one_count){
         return;
     }
     bench->mid_xys[id] = bench->mid_xys[id] & ((1ULL << 32) - 1);     //xy -> y
@@ -827,15 +822,15 @@ void narrow_xy_to_y(workbench *bench){
 __global__
 void make_sid(workbench *bench) {
     uint id = blockIdx.x * blockDim.x + threadIdx.x;
-    uint zero_count = bench->config->num_objects - bench->sid_count;
-    if(id >= bench->config->num_objects || id < zero_count){
+    uint zero_one_count = (bench->config->num_objects - bench->sid_count) + bench->oversize_count;
+    if(id >= bench->config->num_objects || id < zero_one_count){
         return;
     }
     //uint part_key_capacity = bench->sid_count / bench->config->split_num / bench->config->split_num;              //wrong
-    uint x_part_capacity = bench->sid_count / bench->config->split_num + 1;                   //x_part_capacity
+    uint x_part_capacity = (bench->sid_count - bench->oversize_count)  / bench->config->split_num + 1;                   //x_part_capacity
     uint part_key_capacity = x_part_capacity / bench->config->split_num + 1;
-    uint x_index = (id - zero_count) / x_part_capacity;
-    uint y_index = (id - zero_count - x_index * x_part_capacity) / part_key_capacity;
+    uint x_index = (id - zero_one_count) / x_part_capacity;
+    uint y_index = (id - zero_one_count - x_index * x_part_capacity) / part_key_capacity;
     uint sid = x_index * bench->config->split_num + y_index + 2;          //0 -> not appear, 1 -> too large
     uint oid = bench->d_oids[id];
     bench->d_sids[oid] = sid;
@@ -856,8 +851,8 @@ void write_sid_in_key(workbench *bench) {
 __global__
 void get_CTF_capacity(workbench *bench) {
     uint id = blockIdx.x * blockDim.x + threadIdx.x;
-    uint zero_count = bench->config->num_objects - bench->sid_count;
-    if(id >= bench->config->num_objects || id < zero_count){
+    uint zero_one_count = (bench->config->num_objects - bench->sid_count) + bench->oversize_count;
+    if(id >= bench->config->num_objects || id < zero_one_count){
         return;
     }
     uint oid = bench->d_oids[id];
@@ -1107,6 +1102,19 @@ void cuda_init_grids_stack(workbench *bench){
 	}
 	bench->grids_stack[curnode] = curnode;
 }
+__global__
+void cuda_init_o_boxs(workbench *bench){
+    uint id = blockIdx.x*blockDim.x+threadIdx.x;
+    if(id >= bench->config->num_objects){
+        return;
+    }
+    bench->o_boxs[id].low[0] = 100000000;
+    bench->o_boxs[id].low[1] = 100000000;
+    bench->o_boxs[id].high[0] = 0;
+    bench->o_boxs[id].high[1] = 0;
+}
+
+
 
 #define one_dim 16384
 //#define one_dim 8
@@ -1348,6 +1356,10 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
         log("\t%.2f MB\td_oids", 1.0 * size / 1024 / 1024);
         cudaMemset(h_bench.d_oids, 0, bench->config->num_objects*sizeof(uint));
 
+        h_bench.o_boxs = (uint_box*)gpu->allocate(bench->config->num_objects*sizeof(uint_box));
+        size = bench->config->num_objects*sizeof(uint_box);
+        log("\t%.2f MB\to_boxs", 1.0 * size / 1024 / 1024);
+
         h_bench.kv_boxs = (f_box *)gpu->allocate(bench->config->kv_capacity*sizeof(f_box));
         size = bench->config->kv_capacity*sizeof(f_box);
         log("\t%.2f MB\tkv_boxs",1.0*size/1024/1024);
@@ -1382,6 +1394,8 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
 	cuda_init_grids_stack<<<bench->grids_stack_capacity/1024, 1024>>>(d_bench);
 	cuda_init_schema_stack<<<bench->schema_stack_capacity/1024, 1024>>>(d_bench);
 	cuda_clean_buckets<<<bench->config->num_meeting_buckets/1024+1,1024>>>(d_bench);
+
+    cuda_init_o_boxs<<<bench->config->num_objects/1024, 1024>>>(d_bench);
 
 	logt("GPU allocating space %ld MB", start,gpu->size_allocated()/1024/1024);
 
@@ -1583,8 +1597,42 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
             offset = bench->config->MemTable_capacity/2;
         }
 
-
         set_oid<<<bench->config->num_objects / 1024 + 1, 1024>>>(d_bench);                  //thrust::sequence
+        cudaDeviceSynchronize();
+        check_execution();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+
+        thrust::device_ptr<unsigned short> d_ptr_sids = thrust::device_pointer_cast(h_bench.d_sids);
+        thrust::device_ptr<__uint128_t> d_ptr_keys = thrust::device_pointer_cast(h_bench.d_keys);
+        __uint128_t * box128 = reinterpret_cast<__uint128_t *>(h_bench.kv_boxs);
+        thrust::device_ptr<__uint128_t> d_ptr_boxes = thrust::device_pointer_cast(box128);
+        //thrust::device_vector<__uint128_t> d_vector_keys(d_ptr_keys, d_ptr_keys + h_bench.kv_count);
+
+        // 定义一个谓词函数
+        auto predicate = [d_ptr_sids] __device__ (__uint128_t key) {
+            uint oid = get_key_oid(key);
+            return d_ptr_sids[oid] == 1;
+        };
+
+        // 使用 zip_iterator 将两个向量结合在一起
+        auto first = thrust::make_zip_iterator(thrust::make_tuple(d_ptr_keys, d_ptr_boxes));
+        auto last = thrust::make_zip_iterator(thrust::make_tuple(d_ptr_keys + h_bench.kv_count, d_ptr_boxes + h_bench.kv_count));
+
+        // 使用 remove_if 进行操作
+        auto new_end = thrust::remove_if(first, last, [predicate] __device__ (thrust::tuple<__uint128_t, __uint128_t> t) {
+            return predicate(thrust::get<0>(t));
+        });
+        // 计算新长度
+        uint old_kv_count = h_bench.kv_count;
+        h_bench.kv_count = thrust::distance(first, new_end);
+        cout << "oversize_count: " << old_kv_count - h_bench.kv_count << "-" << h_bench.oversize_count << endl;
+        CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));   //update
+
+        // 调整大小
+        //d_vector_keys.resize(h_bench.kv_count);
+        cout << "slim h_bench.kv_count :" << h_bench.kv_count << endl;
+
+
         cudaDeviceSynchronize();
         check_execution();
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
@@ -1605,19 +1653,19 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("narrow_xy_to_y: ",start);
 
-        uint zero_sid_count = bench->config->num_objects - h_bench.sid_count;
-        cout <<"zero_sid_count"<< zero_sid_count << endl;
-        uint x_part_capacity = h_bench.sid_count / bench->config->split_num + 1;
+        uint zero_one_sid_count = (bench->config->num_objects - h_bench.sid_count) + h_bench.oversize_count;
+        cout <<"zero_one_sid_count"<< zero_one_sid_count << endl;
+        uint x_part_capacity = (h_bench.sid_count - h_bench.oversize_count) / bench->config->split_num + 1;
         for(uint i = 0; i < bench->config->split_num - 1; i++){
-            thrust::sort_by_key(d_vector_xys + zero_sid_count + x_part_capacity * i,
-                                d_vector_xys + zero_sid_count + x_part_capacity * (i + 1),
-                                d_vector_oids + zero_sid_count + x_part_capacity * i);
+            thrust::sort_by_key(d_vector_xys + zero_one_sid_count + x_part_capacity * i,
+                                d_vector_xys + zero_one_sid_count + x_part_capacity * (i + 1),
+                                d_vector_oids + zero_one_sid_count + x_part_capacity * i);
             cudaDeviceSynchronize();
             check_execution();
         }
-        thrust::sort_by_key(d_vector_xys + zero_sid_count + x_part_capacity * (bench->config->split_num - 1),                    //last part
+        thrust::sort_by_key(d_vector_xys + zero_one_sid_count + x_part_capacity * (bench->config->split_num - 1),                    //last part
                             d_vector_xys + bench->config->num_objects,
-                            d_vector_oids + zero_sid_count + x_part_capacity * (bench->config->split_num - 1));
+                            d_vector_oids + zero_one_sid_count + x_part_capacity * (bench->config->split_num - 1));
         cudaDeviceSynchronize();
         check_execution();
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
@@ -1638,10 +1686,8 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("write_sid_in_key: ",start);
 
-        thrust::device_ptr<__uint128_t> d_vector_keys = thrust::device_pointer_cast(h_bench.d_keys);
-        __uint128_t * box128 = reinterpret_cast<__uint128_t *>(h_bench.kv_boxs);
-        thrust::device_ptr<__uint128_t> d_vector_boxs = thrust::device_pointer_cast(box128);
-        thrust::sort_by_key(d_vector_keys, d_vector_keys + h_bench.kv_count, d_vector_boxs);
+
+        thrust::sort_by_key(d_ptr_keys, d_ptr_keys + h_bench.kv_count, d_ptr_boxes);
         check_execution();
         cudaDeviceSynchronize();
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
@@ -1764,9 +1810,14 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 //        h_bench.long_oid_count = 0;
 
         //init
+        cuda_init_o_boxs<<<bench->config->num_objects/1024, 1024>>>(d_bench);
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
         h_bench.start_time_min = (1ULL<<32) -1;
         h_bench.start_time_max = 0;
         h_bench.sid_count = 0;
+        h_bench.oversize_count = 0;
         cudaMemset(h_bench.d_sids, 0, bench->config->num_objects*sizeof(unsigned short));
         cudaMemset(h_bench.d_oids, 0, bench->config->num_objects*sizeof(uint));
         cudaMemset(h_bench.d_bitmaps, 0, bench->bitmaps_size);

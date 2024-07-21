@@ -195,7 +195,7 @@ public:
     // how many percent of the initial points are evenly distributed
     double walk_rate = 0.3;
     double walk_speed = 1.0;
-    double drive_rate = 0.1;         //0.0033
+    double drive_rate = 0.01;         //0.0033
     double drive_speed = 10.0;
     uint max_rest_time = 600;
     //uint max_walk_time = 100;

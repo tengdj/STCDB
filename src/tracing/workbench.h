@@ -215,6 +215,8 @@ public:
     unsigned short * d_sids = NULL;
     unsigned short ** h_sids = NULL;
     f_box * kv_boxs = NULL;                           //real box, 1:1 kv
+    uint_box * o_boxs = NULL;                              //merge box, 1:1 object
+    uint oversize_count = 0;
     unsigned char * d_bitmaps = NULL;                 //1024  256*256
     unsigned char ** h_bitmaps = NULL;
     uint bitmap_edge_length = 0;

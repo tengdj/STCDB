@@ -918,12 +918,12 @@ void tracer::process(){
                     sleep(1);
                 }
 
-                bench->search_in_disk(8918395, 15);
+                //bench->search_in_disk(8918395, 15);
 
                 uint question_count = 10000;
                 bench->wid_filter_count = 0;
                 bench->id_find_count = 0;
-                uint pid = 1000000;
+                uint pid = 100000;
 //                string cmd = "sync; sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'";        //sudo!!!
 //                if(system(cmd.c_str())!=0){
 //                    fprintf(stderr, "Error when disable buffer cache\n");

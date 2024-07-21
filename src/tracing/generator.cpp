@@ -280,7 +280,6 @@ void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){             
         meta_data[obj].type = NOT_YET;
     }
     //bool exactly_finish = false;
-    bool rested = false;
     int count = 0;
     while(count<config->cur_duration){
         if(meta_data[obj].type==NOT_YET){
@@ -288,13 +287,10 @@ void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){             
             double p = get_rand_double();
             if(p < config->drive_rate){
                 meta_data[obj].type = DRIVE;
-                rested = false;
             }else if(p < config->drive_rate + config->walk_rate){
                 meta_data[obj].type = WALK;
-                rested = false;
-            }else if(!rested){
+            }else {
                 meta_data[obj].type = REST;
-                rested = true;
             }
 //            if(tryluck(config->drive_rate)){
 //                meta_data[obj].type = DRIVE;
@@ -323,25 +319,26 @@ void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){             
                 meta_data[obj].time_remaining = (get_ave_walk_time() - 10) * 2 * get_rand_double() + 5;
             }
             const double step = config->walk_speed/meta_data[obj].end.distance(meta_data[obj].loc, true);
-            uint pause_timestamp = 10 * get_rand_double();
-            uint pause_length = 10 * get_rand_double();
-            for(double portion = step;portion<(1+step) && count<config->cur_duration && meta_data[obj].time_remaining > 0;){
+//            uint pause_timestamp = 10 * get_rand_double();
+//            uint pause_length = 10 * get_rand_double();
+            double portion;
+            for(portion = step;portion<(1+step) && count<config->cur_duration && meta_data[obj].time_remaining > 0;){
                 ret[count*config->num_objects+obj].x = meta_data[obj].loc.x+portion*(meta_data[obj].end.x - meta_data[obj].loc.x);
                 ret[count*config->num_objects+obj].y = meta_data[obj].loc.y+portion*(meta_data[obj].end.y - meta_data[obj].loc.y);
                 count++;
                 meta_data[obj].time_remaining--;
                 portion += step;
-                if(count == pause_timestamp * 10 + 1 && get_rand_double() > 0.4){
-                    for(uint i = 0; i < pause_length && count<config->cur_duration; i++){
-                        ret[count*config->num_objects+obj].x = ret[(count-1)*config->num_objects+obj].x;
-                        ret[count*config->num_objects+obj].y = ret[(count-1)*config->num_objects+obj].y;
-                        count++;
-                        meta_data[obj].time_remaining--;
-                    }
-                }
+//                if(count == pause_timestamp * 10 + 1 && get_rand_double() > 0.4){
+//                    for(uint i = 0; i < pause_length && count<config->cur_duration; i++){
+//                        ret[count*config->num_objects+obj].x = ret[(count-1)*config->num_objects+obj].x;
+//                        ret[count*config->num_objects+obj].y = ret[(count-1)*config->num_objects+obj].y;
+//                        count++;
+//                        meta_data[obj].time_remaining--;
+//                    }
+//                }
             }
             meta_data[obj].loc = ret[(count-1)*config->num_objects+obj];
-            if(!meta_data[obj].time_remaining){
+            if(!meta_data[obj].time_remaining || portion > 1){
                 meta_data[obj].type = NOT_YET;
             }
         }else if(meta_data[obj].type == REST){
@@ -359,7 +356,8 @@ void trace_generator::fill_trace(Point * ret, Map *mymap, int obj){             
                 meta_data[obj].type = NOT_YET;
             }
         }
-//        if(count<config->cur_duration){
+//        if(count<config->cur_duration){             //must
+//            assert(meta_data[obj].type == NOT_YET);
 //            meta_data[obj].type = NOT_YET;
 //        }
     }

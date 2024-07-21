@@ -263,6 +263,12 @@ public:
     }
 };
 
+class uint_box{
+public:
+    uint low[2] = {100000000,100000000};
+    uint high[2] = {0,0};
+};
+
 class Grid{
 
 public:
