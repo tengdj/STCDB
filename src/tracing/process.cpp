@@ -879,19 +879,19 @@ void tracer::process(){
 
 
 
-//                ofstream p;
-//                string filename = "longer_edges" + to_string(bench->big_sorted_run_count) + ".csv";
-//                cout << filename << endl;
-//                p.open(filename, ios::out|ios::binary|ios::trunc);
-//                p << "percent(%)" << ',' << "edge_length" << endl;
-//                int this_count = 0;
-//                for(int i = 0 ; i < bench->config->kv_restriction; i += 1342177){
-//                    p << i/1342177 << ',' << bench->h_longer_edges[i] << endl;
-////                    if(i%1000000==0){
-////                        cout << i/1000000 << " " << bench->h_longer_edges[i] << endl;
-////                    }
-//                }
-//                p.close();
+                ofstream p;
+                string filename = "longer_edges" + to_string(bench->ctb_count) + ".csv";
+                cout << filename << endl;
+                p.open(filename, ios::out|ios::binary|ios::trunc);
+                p << "percent(%)" << ',' << "edge_length" << endl;
+                int this_count = 0;
+                for(int i = 0 ; i < bench->config->num_objects; i += 20000){
+                    p << i/20000 << ',' << bench->h_longer_edges[i] << endl;
+//                    if(i%1000000==0){
+//                        cout << i/1000000 << " " << bench->h_longer_edges[i] << endl;
+//                    }
+                }
+                p.close();
 
 
 //                if(config->MemTable_capacity==2){

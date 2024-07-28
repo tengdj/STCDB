@@ -705,8 +705,8 @@ void cuda_identify_meetings(workbench *bench) {
             }
         }
 
-//        atomicMin(&bench->start_time_min,bench->meeting_buckets[bid].start);
-//        atomicMax(&bench->start_time_max,bench->meeting_buckets[bid].start);
+        atomicMin(&bench->start_time_min,bench->meeting_buckets[bid].start);
+        atomicMax(&bench->start_time_max,bench->meeting_buckets[bid].start);
 
         uint pid, target;
         pid = getpid1(bench->meeting_buckets[bid].key);
@@ -796,12 +796,15 @@ void set_oid(workbench *bench){                         //0~10000000
         float low1 = uint_to_float(bench->o_boxs[id].low[1]);
         float high1 = uint_to_float(bench->o_boxs[id].high[1]);
 
-        float area = (high1 - low1)*(high0 - low0);
-        if(area > 0.00005){
-            atomicAdd(&bench->oversize_count, 1);
-            bench->d_sids[id] = 1;              //over size
-            return;
-        }
+//        float area = (high1 - low1)*(high0 - low0);
+//        if(area > 0.00005){
+//            atomicAdd(&bench->oversize_count, 1);
+//            bench->d_sids[id] = 1;              //over size
+//            return;
+//        }
+
+        float longer_edge = max(high1 - low1 , high0 - low0);
+        bench->d_longer_edges[id] = longer_edge;
 
         uint ave_mid0 = bench->o_boxs[id].low[0] / 2 + bench->o_boxs[id].high[0] / 2;
         uint ave_mid1 = bench->o_boxs[id].high[1] / 2 + bench->o_boxs[id].high[1] / 2;
@@ -1332,9 +1335,9 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
     size = bench->config->search_single_capacity*sizeof(search_info_unit);
     log("\t%.2f MB\tsearch_single_list",1.0*size/1024/1024);
 
-//    h_bench.d_longer_edges = (float *)gpu->allocate(bench->config->kv_capacity*sizeof(float));
-//    size = bench->config->kv_capacity*sizeof(float);
-//    log("\t%.2f MB\td_longer_edges",1.0*size/1024/1024);
+    h_bench.d_longer_edges = (float *)gpu->allocate(bench->config->num_objects*sizeof(float));
+    size = bench->config->num_objects*sizeof(float);
+    log("\t%.2f MB\td_longer_edges",1.0*size/1024/1024);
 
     if(bench->config->bloom_filter) {
         //bloom filter
@@ -1625,13 +1628,12 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         // 计算新长度
         uint old_kv_count = h_bench.kv_count;
         h_bench.kv_count = thrust::distance(first, new_end);
-        cout << "oversize_count: " << old_kv_count - h_bench.kv_count << "-" << h_bench.oversize_count << endl;
+        cout << "key cut count" << old_kv_count - h_bench.kv_count << " oversize_oid_count:" << h_bench.oversize_count << endl;
         CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));   //update
 
         // 调整大小
         //d_vector_keys.resize(h_bench.kv_count);
         cout << "slim h_bench.kv_count :" << h_bench.kv_count << endl;
-
 
         cudaDeviceSynchronize();
         check_execution();
@@ -1795,15 +1797,16 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         }
 
         //longer edges sort
-//        thrust::device_ptr<float> d_vec_edges = thrust::device_pointer_cast(h_bench.d_longer_edges);
-//        thrust::sort(d_vec_edges, d_vec_edges + bench->config->kv_restriction);
-//        check_execution();
-//        cudaDeviceSynchronize();
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
-//        logt("cuda_sort_time: ",start);
-//        CUDA_SAFE_CALL(cudaMemcpy(bench->h_longer_edges, h_bench.d_longer_edges, bench->config->kv_restriction*sizeof(float), cudaMemcpyDeviceToHost));
-//        cout << "longest edge " <<bench->h_longer_edges[bench->config->kv_restriction-1] << endl;
+        thrust::device_ptr<float> d_vec_edges = thrust::device_pointer_cast(h_bench.d_longer_edges);
+        thrust::sort(d_vec_edges, d_vec_edges + bench->config->num_objects);
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("cuda_sort_time: ",start);
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_longer_edges, h_bench.d_longer_edges, bench->config->num_objects*sizeof(float), cudaMemcpyDeviceToHost));
+        cudaMemset(h_bench.d_longer_edges, 0, bench->config->num_objects*sizeof(float));
+        cout << "longest edge " <<bench->h_longer_edges[bench->config->num_objects-1] << endl;
 //        cout << "long_meeting_count: " << h_bench.long_meeting_count << endl;
 //        cout << "long_oid_count: " << h_bench.long_oid_count << endl;
 //        h_bench.long_meeting_count = 0;
