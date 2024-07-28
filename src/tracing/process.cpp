@@ -608,6 +608,17 @@ void *straight_dump(void *arg){
     copy(bench->h_bitmap_mbrs[offset], bench->h_bitmap_mbrs[offset] + bench->config->CTF_count, bench->ctbs[old_big].bitmap_mbrs);
     bench->ctbs[old_big].CTF_capacity = new uint[bench->config->CTF_count];
     copy(bench->h_CTF_capacity[offset], bench->h_CTF_capacity[offset] + bench->config->CTF_count, bench->ctbs[old_big].CTF_capacity);
+    bench->ctbs[old_big].o_buffer.oversize_kv_count = bench->h_oversize_buffers[offset].oversize_kv_count;
+    bench->ctbs[old_big].o_buffer.keys = new __uint128_t[bench->ctbs[old_big].o_buffer.oversize_kv_count];
+    copy(bench->h_oversize_buffers[offset].keys, bench->h_oversize_buffers[offset].keys + bench->ctbs[old_big].o_buffer.oversize_kv_count, bench->ctbs[old_big].o_buffer.keys);
+    bench->ctbs[old_big].o_buffer.boxes = new f_box[bench->ctbs[old_big].o_buffer.oversize_kv_count];
+    copy(bench->h_oversize_buffers[offset].boxes, bench->h_oversize_buffers[offset].boxes + bench->ctbs[old_big].o_buffer.oversize_kv_count, bench->ctbs[old_big].o_buffer.boxes);
+
+    cout << "test oversize" << endl;
+    for(uint i = 0; i < 100 ; i++){
+        print_parse_key(bench->ctbs[old_big].o_buffer.keys[i]);
+        cout << bench->ctbs[old_big].o_buffer.boxes[i].low[0] << endl;
+    }
 
     bench->ctbs[old_big].box_rtree = new RTree<short *, double, 2, double>();
     cout <<"before insert"<< endl;

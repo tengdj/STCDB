@@ -185,6 +185,9 @@ void workbench::claim_space(){
         size = config->MemTable_capacity * sizeof(uint *);
         h_CTF_capacity = (uint **)allocate(size);
 
+        size = config->MemTable_capacity * sizeof(oversize_buffer *);
+        h_oversize_buffers = (oversize_buffer *)allocate(size);
+
 
         for(int i=0;i<config->MemTable_capacity; i++){
             size = bitmaps_size;
@@ -199,6 +202,13 @@ void workbench::claim_space(){
             size = config->CTF_count * sizeof(uint);
             h_CTF_capacity[i] = (uint *) allocate(size);
             log("\t%.2f MB\t h_CTF_capacity", size / 1024.0 / 1024.0);
+
+            size = config->oversize_buffer_capacity*sizeof(__uint128_t);
+            h_oversize_buffers[i].keys = (__uint128_t *)allocate(size);
+            log("\t%.2f MB\t h_oversize_buffers keys",size/1024.0/1024.0);
+            size = config->oversize_buffer_capacity*sizeof(f_box);
+            h_oversize_buffers[i].boxes = (f_box *)allocate(size);
+            log("\t%.2f MB\t h_oversize_buffers boxes",size/1024.0/1024.0);
         }
     }
 }

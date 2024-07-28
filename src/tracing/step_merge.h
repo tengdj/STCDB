@@ -16,6 +16,12 @@
 #include "../index/RTree.h"
 #include "../cuda/cuda_util.cuh"
 
+typedef struct oversize_buffer{
+    uint oversize_kv_count = 0;
+    __uint128_t * keys = NULL;
+    f_box * boxes = NULL;
+}oversize_buffer;
+
 typedef struct key_value{
     uint64_t key;
     uint64_t value;
@@ -36,17 +42,17 @@ class CTB {             //contact tracing block
 
 public:
     CTF * ctfs = NULL;
-
     uint SSTable_count = 0;
+    uint start_time_min = 0;
+    uint start_time_max = 0;
+    uint end_time_min = 0;
+    uint end_time_max = 0;
     uint64_t *first_widpid = NULL;
     unsigned short * sids = NULL;
     unsigned char * bitmaps = NULL;
     box * bitmap_mbrs = NULL;
     uint * CTF_capacity = NULL;
-    uint start_time_min = 0;
-    uint start_time_max = 0;
-    uint end_time_min = 0;
-    uint end_time_max = 0;
+    oversize_buffer o_buffer;
     RTree<short *, double, 2, double> *box_rtree = NULL;
 
     ~CTB();

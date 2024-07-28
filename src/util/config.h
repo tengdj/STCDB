@@ -69,11 +69,14 @@ public:
     bool save_meetings_pers = false;
     bool load_meetings_pers = false;
 
+    uint oversize_buffer_capacity = 1342177;
+
     void update(){
         cout << "into update" << endl;
         assert(MemTable_capacity%2==0);
         kv_restriction = G_bytes * 67108864;            //67108864 = 1G
         kv_capacity = kv_restriction + 1000000;
+        oversize_buffer_capacity = kv_restriction / 100;
         split_num = sqrt(CTF_count);
         assert(split_num*split_num == CTF_count);
     }
