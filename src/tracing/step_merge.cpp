@@ -7,6 +7,60 @@
 
 #include "step_merge.h"
 
+oversize_buffer::~oversize_buffer() {
+    delete []keys;
+    delete []boxes;
+}
+
+uint oversize_buffer::search_buffer(uint32_t oid) {
+    uint count = 0;
+    //cout<<"into search_SSTable"<<endl;
+    int find = -1;
+    int low = 0;
+    int high = oversize_kv_count - 1;
+    int mid;
+    uint64_t temp_oid;
+    while (low <= high) {
+        mid = (low + high) / 2;
+        temp_oid = get_key_oid(keys[mid]);
+        if (temp_oid == oid){
+            find = mid;
+            break;
+        }
+        else if (temp_oid > oid){
+            high = mid - 1;
+        }
+        else {
+            low = mid + 1;
+        }
+    }
+    if(find==-1){
+        //cout<<"cannot find"<<endl;
+        return 0;
+    }
+    //cout<<"exactly find"<<endl;
+    uint cursor = find;
+    while(temp_oid == oid && cursor >= 1){
+        cursor--;
+        temp_oid = get_key_oid(keys[cursor]);
+    }
+    if(temp_oid == oid && cursor == 0){
+        count++;
+        cout<<oid<<endl;
+    }
+    while(cursor+1<oversize_kv_count){
+        cursor++;
+        temp_oid = get_key_oid(keys[cursor]);
+        if(temp_oid == oid){
+            count++;
+            //cout<<get_key_target(keys[cursor])<<endl;
+        }
+        else break;
+    }
+    //cout<<"find !"<<endl;
+    return count;
+}
+
 CTF::~CTF(){
     delete []keys;
 }

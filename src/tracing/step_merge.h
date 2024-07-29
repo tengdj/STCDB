@@ -16,11 +16,15 @@
 #include "../index/RTree.h"
 #include "../cuda/cuda_util.cuh"
 
-typedef struct oversize_buffer{
+class oversize_buffer {             //contact tracing block
+public:
     uint oversize_kv_count = 0;
     __uint128_t * keys = NULL;
     f_box * boxes = NULL;
-}oversize_buffer;
+
+    ~oversize_buffer();
+    uint search_buffer(uint32_t oid);
+};
 
 typedef struct key_value{
     uint64_t key;

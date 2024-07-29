@@ -316,9 +316,12 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
         if ((ctbs[i].start_time_min < timestamp) && (timestamp < ctbs[i].end_time_max) ) {
             //cout<<"big_sorted_run_num:"<<i<<endl;
             uint64_t wp = pid;
-            if(ctbs[i].sids[pid] == 0 || ctbs[i].sids[pid] == 1){
+            if(ctbs[i].sids[pid] == 0){
                 wid_filter_count++;
                 continue;
+            }
+            else if(ctbs[i].sids[pid] == 1){
+                id_find_count = ctbs[i].o_buffer.search_buffer(pid);
             }
             else{
                 wp += ((uint64_t)ctbs[i].sids[pid] << OID_BIT);
@@ -377,8 +380,8 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                 }
                 continue;
             }
+/*
             //cout<<"high level binary search finish and find"<<endl;
-
             //for the case, there are many SSTables that first_widpid==wp
             //find start and end
             uint pid_start = find;
@@ -453,6 +456,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                 }
             }
             ret = true;
+*/
         }
     }
     //cout<<"finish disk search "<<pid<<endl;
@@ -507,6 +511,17 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
                 ctbs[i].ctfs = new CTF[config->CTF_count];
             }
             cout << "in bg_run" << i << endl;
+
+            uint buffer_find = 0;
+            for(uint q = 0; q < ctbs[i].o_buffer.oversize_kv_count; q++){
+                if(ctbs[i].o_buffer.boxes[q].intersect(b)){
+                    uni.insert(get_key_oid(ctbs[i].o_buffer.keys[i]));
+                    buffer_find++;
+                    mbr_find_count++;
+                    cout<<"box find!"<<endl;
+                    ctbs[i].o_buffer.boxes[q].print();
+                }
+            }
 
             vector<pair<short, box>> intersect_mbrs;
             ctbs[i].box_rtree->Search(b.low, b.high, PolygonSearchCallback, (void *)&intersect_mbrs);

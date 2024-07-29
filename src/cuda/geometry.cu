@@ -1640,6 +1640,11 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         cout << "slim h_bench.kv_count :" << h_bench.kv_count << endl;
         CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));   //update
 
+        thrust::sort_by_key(d_ptr_keys + h_bench.kv_count, d_ptr_keys + old_kv_count, d_ptr_boxes + h_bench.kv_count);
+        cudaDeviceSynchronize();
+        check_execution();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+
         thrust::device_ptr<uint64_t> d_vector_xys = thrust::device_pointer_cast(h_bench.mid_xys);
         thrust::device_ptr<uint> d_vector_oids = thrust::device_pointer_cast(h_bench.d_oids);
         thrust::sort_by_key(d_vector_xys, d_vector_xys + bench->config->num_objects, d_vector_oids);
