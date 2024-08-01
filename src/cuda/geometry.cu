@@ -797,7 +797,7 @@ void set_oid(workbench *bench){                         //0~10000000
         float high1 = uint_to_float(bench->o_boxs[id].high[1]);
 
         float area = (high1 - low1)*(high0 - low0);
-        if(area > 0.00005){
+        if(area > 0.00005){         //0.00005
             atomicAdd(&bench->oversize_oid_count, 1);
             bench->d_sids[id] = 1;              //over size
             return;
@@ -1394,11 +1394,11 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
 	CUDA_SAFE_CALL(cudaMemcpy(h_bench.config, bench->config, sizeof(configuration), cudaMemcpyHostToDevice));
 	CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));
 
-	cuda_init_grids_stack<<<bench->grids_stack_capacity/1024, 1024>>>(d_bench);
-	cuda_init_schema_stack<<<bench->schema_stack_capacity/1024, 1024>>>(d_bench);
+	cuda_init_grids_stack<<<bench->grids_stack_capacity/1024 + 1, 1024>>>(d_bench);
+	cuda_init_schema_stack<<<bench->schema_stack_capacity/1024 + 1, 1024>>>(d_bench);
 	cuda_clean_buckets<<<bench->config->num_meeting_buckets/1024+1,1024>>>(d_bench);
 
-    cuda_init_o_boxs<<<bench->config->num_objects/1024, 1024>>>(d_bench);
+    cuda_init_o_boxs<<<bench->config->num_objects/1024 + 1, 1024>>>(d_bench);
 
 	logt("GPU allocating space %ld MB", start,gpu->size_allocated()/1024/1024);
 
@@ -1747,6 +1747,8 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_oversize_buffers[offset].keys, h_bench.d_keys + h_bench.kv_count, oversize_key_count * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_oversize_buffers[offset].boxes, h_bench.kv_boxs + h_bench.kv_count, oversize_key_count * sizeof(f_box), cudaMemcpyDeviceToHost));
 
+
+
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_keys[offset], h_bench.d_keys, h_bench.kv_count * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_sids[offset], h_bench.d_sids, bench->config->num_objects * sizeof(unsigned short), cudaMemcpyDeviceToHost));
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_CTF_capacity[offset], h_bench.d_CTF_capacity, bench->config->CTF_count * sizeof(uint), cudaMemcpyDeviceToHost));
@@ -1823,7 +1825,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 //        h_bench.long_oid_count = 0;
 
         //init
-        cuda_init_o_boxs<<<bench->config->num_objects/1024, 1024>>>(d_bench);
+        cuda_init_o_boxs<<<bench->config->num_objects/1024 + 1, 1024>>>(d_bench);
         check_execution();
         cudaDeviceSynchronize();
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));

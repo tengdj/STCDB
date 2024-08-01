@@ -310,7 +310,7 @@ bool workbench::search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vect
 //}
 
 bool workbench::search_in_disk(uint pid, uint timestamp){
-    //cout<<"disk search "<<pid<<endl;
+    cout<<"disk search "<<pid<<endl;
     bool ret = false;
     for(int i=0; i < ctb_count; i++) {
         if ((ctbs[i].start_time_min < timestamp) && (timestamp < ctbs[i].end_time_max) ) {
@@ -321,7 +321,8 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                 continue;
             }
             else if(ctbs[i].sids[pid] == 1){
-                id_find_count = ctbs[i].o_buffer.search_buffer(pid);
+                cout << "oid search buffer" << endl;
+                id_find_count += ctbs[i].o_buffer.search_buffer(pid);
             }
             else{
                 wp += ((uint64_t)ctbs[i].sids[pid] << OID_BIT);
@@ -505,7 +506,7 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
     box bit_b = make_bit_box(b);
     uint bit_pos = 0;
     //for (int i = 0; i < ctb_count; i++) {
-    for(int i = 1; i < ctb_count; i++){
+    for(int i = 0; i < ctb_count; i++){
         if ((ctbs[i].start_time_min < timestamp) && (timestamp < ctbs[i].end_time_max)) {
             if(!ctbs[i].ctfs){
                 ctbs[i].ctfs = new CTF[config->CTF_count];
@@ -518,8 +519,8 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
                     uni.insert(get_key_oid(ctbs[i].o_buffer.keys[i]));
                     buffer_find++;
                     mbr_find_count++;
-                    cout<<"box find!"<<endl;
-                    ctbs[i].o_buffer.boxes[q].print();
+                    //cout<<"box find!"<<endl;
+                    //ctbs[i].o_buffer.boxes[q].print();
                 }
             }
 

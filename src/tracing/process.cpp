@@ -615,7 +615,7 @@ void *straight_dump(void *arg){
     copy(bench->h_oversize_buffers[offset].boxes, bench->h_oversize_buffers[offset].boxes + bench->ctbs[old_big].o_buffer.oversize_kv_count, bench->ctbs[old_big].o_buffer.boxes);
 
     cout << "test oversize" << endl;
-    for(uint i = 0; i < 100 ; i++){
+    for(uint i = 0; i < bench->ctbs[old_big].o_buffer.oversize_kv_count ; i++){
         print_parse_key(bench->ctbs[old_big].o_buffer.keys[i]);
         cout << bench->ctbs[old_big].o_buffer.boxes[i].low[0] << endl;
     }
@@ -929,33 +929,35 @@ void tracer::process(){
                     sleep(1);
                 }
 
-                //bench->search_in_disk(8918395, 15);
-
-                uint question_count = 10000;
-                bench->wid_filter_count = 0;
-                bench->id_find_count = 0;
-                uint pid = 100000;
-//                string cmd = "sync; sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'";        //sudo!!!
-//                if(system(cmd.c_str())!=0){
-//                    fprintf(stderr, "Error when disable buffer cache\n");
-//                }
-                ofstream q;
-                q.open(to_string(config->MemTable_capacity/2)+"search_id.csv", ios::out|ios::binary|ios::trunc);
-                q << "question number" << ',' << "time_consume(ms)" << endl;
-                for(int i = 0; i < question_count; i++){
-                    struct timeval disk_search_time = get_cur_time();
-//                    uint temp = bench->config->SSTable_count;
-//                    bench->config->SSTable_count = bench->merge_sstable_count;
-                    bench->search_in_disk(pid, 15);
-//                    bench->config->SSTable_count = temp;
-                    pid++;
-                    double time_consume = get_time_elapsed(disk_search_time);
-                    //printf("disk_search_time %.2f\n", time_consume);
-                    q << i << ',' << time_consume << endl;
+                for(uint i = 0 ; i < bench->ctbs[0].o_buffer.oversize_kv_count; i++){
+                    bench->search_in_disk( get_key_oid(bench->ctbs[bench->ctb_count].o_buffer.keys[i]), 15);
                 }
-                q.close();
-                cout << "question_count:" << question_count << " id_find_count:" << bench->id_find_count <<" kv_restriction:"<< bench->config->kv_restriction << endl;
-                cout << "wid_filter_count:" << bench->wid_filter_count <<"id_not_find_count"<<bench->id_not_find_count<<endl;
+
+//                uint question_count = 10000;
+//                bench->wid_filter_count = 0;
+//                bench->id_find_count = 0;
+//                uint pid = 100000;
+////                string cmd = "sync; sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'";        //sudo!!!
+////                if(system(cmd.c_str())!=0){
+////                    fprintf(stderr, "Error when disable buffer cache\n");
+////                }
+//                ofstream q;
+//                q.open(to_string(config->MemTable_capacity/2)+"search_id.csv", ios::out|ios::binary|ios::trunc);
+//                q << "question number" << ',' << "time_consume(ms)" << endl;
+//                for(int i = 0; i < question_count; i++){
+//                    struct timeval disk_search_time = get_cur_time();
+////                    uint temp = bench->config->SSTable_count;
+////                    bench->config->SSTable_count = bench->merge_sstable_count;
+//                    bench->search_in_disk(pid, 15);
+////                    bench->config->SSTable_count = temp;
+//                    pid++;
+//                    double time_consume = get_time_elapsed(disk_search_time);
+//                    //printf("disk_search_time %.2f\n", time_consume);
+//                    q << i << ',' << time_consume << endl;
+//                }
+//                q.close();
+//                cout << "question_count:" << question_count << " id_find_count:" << bench->id_find_count <<" kv_restriction:"<< bench->config->kv_restriction << endl;
+//                cout << "wid_filter_count:" << bench->wid_filter_count <<"id_not_find_count"<<bench->id_not_find_count<<endl;
 
 //                double mid_x = -87.678503;
 //                double mid_y = 41.856803;
