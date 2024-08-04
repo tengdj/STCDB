@@ -34,6 +34,7 @@ int main(int argc, char **argv){
 	Point *traces = new Point [100*config.num_objects];
     for(uint i = 0; i < config.duration; i+= 100){          //always whole 100
         config.cur_duration = min((config.start_time+config.duration-i),(uint)100);
+        cout << "config.cur_duration : "<< config.cur_duration <<endl;
         gen->generate_trace(traces);
         dumpTo(&config, i, traces);
     }

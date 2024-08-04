@@ -53,7 +53,7 @@ uint oversize_buffer::search_buffer(uint32_t oid) {
         temp_oid = get_key_oid(keys[cursor]);
         if(temp_oid == oid){
             count++;
-            cout<<oid<<"-"<<get_key_target(keys[cursor])<<endl;
+            //cout<<oid<<"-"<<get_key_target(keys[cursor])<<endl;
         }
         else break;
     }

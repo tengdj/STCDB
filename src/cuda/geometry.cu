@@ -17,6 +17,7 @@
 #include <thrust/sequence.h>
 #include <thrust/tuple.h>
 #include <thrust/zip_function.h>
+#include <thrust/partition.h>
 
 /*
  *
@@ -798,13 +799,14 @@ void set_oid(workbench *bench){                         //0~10000000
 
         float area = (high1 - low1)*(high0 - low0);
         if(area > 0.00005){         //0.00005
+            //printf("%d %d %d %d  %d real cut id ,area %f\n",bench->o_boxs[id].low[0], bench->o_boxs[id].high[0], bench->o_boxs[id].low[1], bench->o_boxs[id].high[1], id, area);
             atomicAdd(&bench->oversize_oid_count, 1);
             bench->d_sids[id] = 1;              //over size
             return;
         }
 
-        float longer_edge = max(high1 - low1 , high0 - low0);
-        bench->d_longer_edges[id] = longer_edge;
+//        float longer_edge = max(high1 - low1 , high0 - low0);
+//        bench->d_longer_edges[id] = longer_edge;
 
         uint ave_mid0 = bench->o_boxs[id].low[0] / 2 + bench->o_boxs[id].high[0] / 2;
         uint ave_mid1 = bench->o_boxs[id].high[1] / 2 + bench->o_boxs[id].high[1] / 2;
@@ -1335,9 +1337,9 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
     size = bench->config->search_single_capacity*sizeof(search_info_unit);
     log("\t%.2f MB\tsearch_single_list",1.0*size/1024/1024);
 
-    h_bench.d_longer_edges = (float *)gpu->allocate(bench->config->num_objects*sizeof(float));
-    size = bench->config->num_objects*sizeof(float);
-    log("\t%.2f MB\td_longer_edges",1.0*size/1024/1024);
+//    h_bench.d_longer_edges = (float *)gpu->allocate(bench->config->num_objects*sizeof(float));
+//    size = bench->config->num_objects*sizeof(float);
+//    log("\t%.2f MB\td_longer_edges",1.0*size/1024/1024);
 
     if(bench->config->bloom_filter) {
         //bloom filter
@@ -1615,7 +1617,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         // 定义一个谓词函数
         auto predicate = [d_ptr_sids] __device__ (__uint128_t key) {
             uint oid = get_key_oid(key);
-            return d_ptr_sids[oid] == 1;
+            return d_ptr_sids[oid] != 1;
         };
 
         // 使用 zip_iterator 将两个向量结合在一起
@@ -1623,7 +1625,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         auto last = thrust::make_zip_iterator(thrust::make_tuple(d_ptr_keys + h_bench.kv_count, d_ptr_boxes + h_bench.kv_count));
 
         // 使用 remove_if 进行操作
-        auto new_end = thrust::remove_if(first, last, [predicate] __device__ (thrust::tuple<__uint128_t, __uint128_t> t) {
+        auto new_end = thrust::partition(first, last, [predicate] __device__ (thrust::tuple<__uint128_t, __uint128_t> t) {
             return predicate(thrust::get<0>(t));
         });
         cudaDeviceSynchronize();
@@ -1748,13 +1750,21 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_oversize_buffers[offset].boxes, h_bench.kv_boxs + h_bench.kv_count, oversize_key_count * sizeof(f_box), cudaMemcpyDeviceToHost));
 
 
-
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_keys[offset], h_bench.d_keys, h_bench.kv_count * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_sids[offset], h_bench.d_sids, bench->config->num_objects * sizeof(unsigned short), cudaMemcpyDeviceToHost));
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_CTF_capacity[offset], h_bench.d_CTF_capacity, bench->config->CTF_count * sizeof(uint), cudaMemcpyDeviceToHost));
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps[offset], h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmap_mbrs[offset], h_bench.d_bitmap_mbrs, bench->config->CTF_count * sizeof(box), cudaMemcpyDeviceToHost));
-//        f_box * temp_fbs = new f_box[bench->config->kv_restriction];
+
+//        cout << "host test oversize" << endl;
+//        for(uint i = 0; i < bench->h_oversize_buffers[offset].oversize_kv_count ; i++){
+//            print_parse_key(bench->h_oversize_buffers[offset].keys[i]);
+//            cout << bench->h_oversize_buffers[offset].boxes[i].low[0] << endl;
+//            cout << "sid" << bench->h_sids[offset][get_key_oid(bench->h_oversize_buffers[offset].keys[i]) ] << endl;
+//        }
+
+
+        //        f_box * temp_fbs = new f_box[bench->config->kv_restriction];
 //        CUDA_SAFE_CALL(cudaMemcpy(temp_fbs, h_bench.kv_boxs, bench->config->kv_restriction * sizeof(f_box), cudaMemcpyDeviceToHost));
 
 //        cout << "sid_count" << h_bench.sid_count << endl;
@@ -1808,21 +1818,21 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
             bench->h_bitmap_mbrs[offset][i].print();
         }
 
-        //longer edges sort
-        thrust::device_ptr<float> d_vec_edges = thrust::device_pointer_cast(h_bench.d_longer_edges);
-        thrust::sort(d_vec_edges, d_vec_edges + bench->config->num_objects);
-        check_execution();
-        cudaDeviceSynchronize();
-        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
-        logt("cuda_sort_time: ",start);
-        CUDA_SAFE_CALL(cudaMemcpy(bench->h_longer_edges, h_bench.d_longer_edges, bench->config->num_objects*sizeof(float), cudaMemcpyDeviceToHost));
-        cudaMemset(h_bench.d_longer_edges, 0, bench->config->num_objects*sizeof(float));
-        cout << "longest edge " <<bench->h_longer_edges[bench->config->num_objects-1] << endl;
-//        cout << "long_meeting_count: " << h_bench.long_meeting_count << endl;
-//        cout << "long_oid_count: " << h_bench.long_oid_count << endl;
-//        h_bench.long_meeting_count = 0;
-//        h_bench.long_oid_count = 0;
+//        //longer edges sort
+//        thrust::device_ptr<float> d_vec_edges = thrust::device_pointer_cast(h_bench.d_longer_edges);
+//        thrust::sort(d_vec_edges, d_vec_edges + bench->config->num_objects);
+//        check_execution();
+//        cudaDeviceSynchronize();
+//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+//        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+//        logt("cuda_sort_time: ",start);
+//        CUDA_SAFE_CALL(cudaMemcpy(bench->h_longer_edges, h_bench.d_longer_edges, bench->config->num_objects*sizeof(float), cudaMemcpyDeviceToHost));
+//        cudaMemset(h_bench.d_longer_edges, 0, bench->config->num_objects*sizeof(float));
+//        cout << "longest edge " <<bench->h_longer_edges[bench->config->num_objects-1] << endl;
+////        cout << "long_meeting_count: " << h_bench.long_meeting_count << endl;
+////        cout << "long_oid_count: " << h_bench.long_oid_count << endl;
+////        h_bench.long_meeting_count = 0;
+////        h_bench.long_oid_count = 0;
 
         //init
         cuda_init_o_boxs<<<bench->config->num_objects/1024 + 1, 1024>>>(d_bench);

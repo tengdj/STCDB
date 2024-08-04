@@ -310,7 +310,7 @@ bool workbench::search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vect
 //}
 
 bool workbench::search_in_disk(uint pid, uint timestamp){
-    cout<<"disk search "<<pid<<endl;
+    //cout<<"oid disk search "<<pid<<endl;
     bool ret = false;
     for(int i=0; i < ctb_count; i++) {
         if ((ctbs[i].start_time_min < timestamp) && (timestamp < ctbs[i].end_time_max) ) {
@@ -321,7 +321,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                 continue;
             }
             else if(ctbs[i].sids[pid] == 1){
-                cout << "oid search buffer" << endl;
+                //cout << "oid search buffer" << endl;
                 id_find_count += ctbs[i].o_buffer.search_buffer(pid);
             }
             else{
@@ -500,7 +500,7 @@ bool PolygonSearchCallback(short * i, box poly_mbr,void* arg){
 
 bool workbench::mbr_search_in_disk(box b, uint timestamp) {
     //assert(mbr.contain(b));
-    cout << "mbr disk search" << endl;
+    //cout << "mbr disk search" << endl;
     unordered_set<uint> uni;
     bool ret = false, find = false;
     box bit_b = make_bit_box(b);
@@ -511,7 +511,7 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
             if(!ctbs[i].ctfs){
                 ctbs[i].ctfs = new CTF[config->CTF_count];
             }
-            cout << "in bg_run" << i << endl;
+            //cout << "in bg_run" << i << endl;
 
             uint buffer_find = 0;
             for(uint q = 0; q < ctbs[i].o_buffer.oversize_kv_count; q++){
