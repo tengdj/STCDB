@@ -1012,6 +1012,9 @@ void tracer::process(){
 				bench->update_schema();
 				bench->pro.index_update_time += get_time_elapsed(ct,true);
 			}
+            bench->pro.sum_round_time += get_time_elapsed(start,false);
+            fprintf(stdout,"\tbench->pro.sum_round_time :\t%.2f\n",bench->pro.sum_round_time);
+            //cout << "sum_round_time: "<< bench->pro.sum_round_time << endl;
 			logt("round %d",start,st+t+1);
 			bench->pro.rounds++;
 			bench->pro.max_refine_size = max(bench->pro.max_refine_size, bench->grid_check_counter);

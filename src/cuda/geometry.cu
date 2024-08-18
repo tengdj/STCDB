@@ -1607,6 +1607,8 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         cudaDeviceSynchronize();
         check_execution();
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("set_oid: ",start);
 
         thrust::device_ptr<unsigned short> d_ptr_sids = thrust::device_pointer_cast(h_bench.d_sids);
         thrust::device_ptr<__uint128_t> d_ptr_keys = thrust::device_pointer_cast(h_bench.d_keys);
@@ -1614,25 +1616,27 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         thrust::device_ptr<__uint128_t> d_ptr_boxes = thrust::device_pointer_cast(box128);
         //thrust::device_vector<__uint128_t> d_vector_keys(d_ptr_keys, d_ptr_keys + h_bench.kv_count);
 
-        // 定义一个谓词函数
+        // predicate fuction
         auto predicate = [d_ptr_sids] __device__ (__uint128_t key) {
             uint oid = get_key_oid(key);
             return d_ptr_sids[oid] != 1;
         };
 
-        // 使用 zip_iterator 将两个向量结合在一起
+        // zip_iterator
         auto first = thrust::make_zip_iterator(thrust::make_tuple(d_ptr_keys, d_ptr_boxes));
         auto last = thrust::make_zip_iterator(thrust::make_tuple(d_ptr_keys + h_bench.kv_count, d_ptr_boxes + h_bench.kv_count));
 
-        // 使用 remove_if 进行操作
+        // remove_if is wrong, use partition
         auto new_end = thrust::partition(first, last, [predicate] __device__ (thrust::tuple<__uint128_t, __uint128_t> t) {
             return predicate(thrust::get<0>(t));
         });
         cudaDeviceSynchronize();
         check_execution();
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("remove: ",start);
 
-        // 计算新长度
+        // new length
         uint old_kv_count = h_bench.kv_count;
         h_bench.kv_count = thrust::distance(first, new_end);
         uint oversize_key_count = old_kv_count - h_bench.kv_count;

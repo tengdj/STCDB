@@ -48,6 +48,7 @@ typedef struct profiler{
 
     double search_memtable_time = 0;
     double search_in_disk_time = 0;
+    double sum_round_time = 0;
 }profiler;
 
 typedef struct checking_unit{

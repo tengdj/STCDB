@@ -20,6 +20,7 @@ public:
     uint duration = 1000;
     uint num_objects = 1000;
     string trace_path = "../data/points/";              //"/gisdata/chicago/traces"      // "../data/points/"
+    string disk_path = "/data3/ssd";
     uint cur_duration = 0;
 
     uint file_size = 3600;                             // data in x seconds is put into file
@@ -38,7 +39,7 @@ public:
     uint schema_update_delay = 1; //
     uint min_meet_time = 5;
     uint max_meet_time = 1ULL << DURATION_BIT ;    //4096
-    double reach_distance = 2;          //2
+    double reach_distance = 1.414;          //2
     double x_buffer = 0;
     double y_buffer = 0;
     bool gpu = false;
@@ -74,7 +75,7 @@ public:
     void update(){
         cout << "into update" << endl;
         assert(MemTable_capacity%2==0);
-        kv_restriction = G_bytes * 67108;            //67108864 = 1G
+        kv_restriction = G_bytes * 67108864;            //67108864 = 1G
         kv_capacity = kv_restriction + 1000000;
         oversize_buffer_capacity = kv_restriction / 100;
         split_num = sqrt(CTF_count);
@@ -303,7 +304,7 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
         config.zone_capacity = config.grid_capacity;
     }
     if(!vm.count("num_buckets")){
-        config.num_meeting_buckets = 2*config.num_objects;
+        config.num_meeting_buckets = config.num_objects/2;
     }
     if(vm.count("disable_phased_filter")){
         config.phased_lookup = false;
