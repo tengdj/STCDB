@@ -70,6 +70,7 @@ void workbench::clear(){
 		data_index = 0;
 	}
 	delete insert_lk;
+    ctbs.clear();
 }
 
 
@@ -163,8 +164,8 @@ void workbench::claim_space(){
     h_longer_edges = (float *)allocate(size);
 
 
-    size = config->big_sorted_run_capacity*sizeof(CTB);
-    ctbs = (CTB *)allocate(size);
+//    size = config->big_sorted_run_capacity*sizeof(CTB);
+//    ctbs = (CTB *)allocate(size);
 
     if(config->save_meetings_pers || config->load_meetings_pers){
         size = config->num_objects * 10 *sizeof(meeting_unit);              //100 * size of d_meetings_ps
@@ -238,7 +239,6 @@ void workbench::load_big_sorted_run(uint b){
             read_sst.close();
         }
     }
-
 }
 
 bool workbench::search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vector<uint> & v_indices){          //wid_pid       //for dump
@@ -608,5 +608,58 @@ void workbench::load_meetings(uint st) {
     in.read((char *)h_meetings_ps, sizeof(meeting_unit) * total_meetings_this100s);
     in.close();
     logt("loaded %d objects last for 100 seconds start from %d time from %s",start_time, config->num_objects, st, filename.c_str());
+}
+
+void workbench::dump_meta(const char *path) {
+    struct timeval start_time = get_cur_time();
+    string bench_path = string(path) + "workbench";
+    ofstream wf(bench_path, ios::out|ios::binary|ios::trunc);
+    wf.write((char *)config, sizeof(generator_configuration));        //the config of pipeline is generator_configuration
+    cout << "sizeof(*config)" << sizeof(*config) << endl;
+    cout << "sizeof(configuration)" << sizeof(configuration) << endl;
+    cout << "sizeof(generator_configuration)" << sizeof(generator_configuration) << endl;
+    wf.write((char *)this, sizeof(workbench));
+    for(int i = 0; i < ctb_count; i++){
+        string CTB_path = string(path) + "CTB" + to_string(i);
+        dump_CTB_meta(CTB_path.c_str(), i);
+    }
+    wf.close();
+    logt("bench meta dumped to %s",start_time,path);
+}
+
+void workbench::dump_CTB_meta(const char *path, int i) {
+    struct timeval start_time = get_cur_time();
+    ofstream wf(path, ios::out|ios::binary|ios::trunc);
+    wf.write((char *)this, sizeof(CTB));
+    wf.write((char *)ctbs[i].first_widpid, config->CTF_count * sizeof(uint64_t));
+    wf.write((char *)ctbs[i].sids, config->num_objects * sizeof(unsigned short));
+    wf.write((char *)ctbs[i].bitmaps, bitmaps_size * sizeof(unsigned char));
+    wf.write((char *)ctbs[i].bitmap_mbrs, config->CTF_count * sizeof(box));
+    wf.write((char *)ctbs[i].CTF_capacity, config->CTF_count * sizeof(uint));
+    wf.write((char *)ctbs[i].o_buffer.keys, ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t));
+    wf.write((char *)ctbs[i].o_buffer.boxes, ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box));
+    //RTree
+    wf.close();
+    logt("CTB meta %d dump to %s",start_time, i, path);
+}
+
+void workbench::load_CTB_meta(const char *path, int i) {
+    struct timeval start_time = get_cur_time();
+    ifstream in(path, ios::in | ios::binary);
+    in.read((char *)this, sizeof(CTB));
+    in.read((char *)ctbs[i].first_widpid, config->CTF_count * sizeof(uint64_t));
+    in.read((char *)ctbs[i].sids, config->num_objects * sizeof(unsigned short));
+    in.read((char *)ctbs[i].bitmaps, bitmaps_size * sizeof(unsigned char));
+    in.read((char *)ctbs[i].bitmap_mbrs, config->CTF_count * sizeof(box));
+    in.read((char *)ctbs[i].CTF_capacity, config->CTF_count * sizeof(uint));
+    in.read((char *)ctbs[i].o_buffer.keys, ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t));
+    in.read((char *)ctbs[i].o_buffer.boxes, ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box));
+    in.close();
+    //RTree
+    ctbs[i].box_rtree = new RTree<short *, double, 2, double>();
+    for(uint j = 0; j < config->CTF_count; ++j){
+        ctbs[i].box_rtree->Insert(ctbs[i].bitmap_mbrs[j].low, ctbs[i].bitmap_mbrs[j].high, new short(j));
+    }
+    logt("CTB meta %d dump to %s",start_time, i, path);
 }
 

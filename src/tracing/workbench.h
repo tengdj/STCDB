@@ -240,7 +240,7 @@ public:
     uint valid_timestamp = 0;
 
     //big sorted run
-    CTB *ctbs = NULL;
+    vector<CTB> ctbs;
     uint ctb_count = 0;
     uint start_time_min = 0;
     uint start_time_max = 0;
@@ -336,6 +336,9 @@ public:
 
     void dump_meetings(uint st);
     void load_meetings(uint st);
+    void dump_meta(const char *path);
+    void dump_CTB_meta(const char *path, int i);
+    void load_CTB_meta(const char *path, int i);
 };
 extern void lookup_rec(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);
 extern void lookup_stack(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);

@@ -46,7 +46,7 @@ class CTB {             //contact tracing block
 
 public:
     CTF * ctfs = NULL;
-    uint SSTable_count = 0;
+    uint CTF_count = 0;
     uint start_time_min = 0;
     uint start_time_max = 0;
     uint end_time_min = 0;
@@ -63,6 +63,8 @@ public:
     void print_meta(){
         fprintf(stdout,"start_time:%d~%d,end_time:%d~%d\n",start_time_min,start_time_max,end_time_min,end_time_max);
     }
+
+
     //uint search_in_sorted_run(uint big_sort_id, uint pid);
 };
 

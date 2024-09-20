@@ -186,6 +186,7 @@ void tracer::loadData(const char *path, int st, int duration) {
 void tracer::print(){
 	print_points(trace,config->num_objects,min(config->num_objects,(uint)10000));
 }
+
 void tracer::print_trace(int oid){
 	vector<Point *> points;
 	for(int i=0;i<config->cur_duration;i++){
@@ -593,6 +594,8 @@ void *straight_dump(void *arg){
     if(old_big%2==1){
         offset = bench->config->MemTable_capacity/2;
     }
+    CTB temp_ctb;
+    bench->ctbs.push_back(temp_ctb);
     bench->ctbs[old_big].ctfs = NULL;
     bench->ctbs[old_big].start_time_min = bench->start_time_min;
     bench->ctbs[old_big].start_time_max = bench->start_time_max;
@@ -926,80 +929,80 @@ void tracer::process(){
                 //bool findit = searchkv_in_all_place(bench, 2);
             }
 
-            if(!bench->do_some_search && bench->ctb_count == 1){            // !bench->do_some_search && bench->big_sorted_run_count == 1
-                bench->do_some_search = true;
-                while(bench->dumping){
-                    sleep(1);
-                }
-
-//                for(uint i = 0 ; i < bench->ctbs[1].o_buffer.oversize_kv_count; i++){
-//                    bench->search_in_disk( get_key_oid(bench->ctbs[1].o_buffer.keys[i]), 15);
+//            if(!bench->do_some_search && bench->ctb_count == 1){            // !bench->do_some_search && bench->big_sorted_run_count == 1
+//                bench->do_some_search = true;
+//                while(bench->dumping){
+//                    sleep(1);
 //                }
-
-                uint question_count = 10000;
-                bench->wid_filter_count = 0;
-                bench->id_find_count = 0;
-                uint pid = 100000;
-//                string cmd = "sync; sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'";        //sudo!!!
-//                if(system(cmd.c_str())!=0){
-//                    fprintf(stderr, "Error when disable buffer cache\n");
+//
+////                for(uint i = 0 ; i < bench->ctbs[1].o_buffer.oversize_kv_count; i++){
+////                    bench->search_in_disk( get_key_oid(bench->ctbs[1].o_buffer.keys[i]), 15);
+////                }
+//
+//                uint question_count = 10000;
+//                bench->wid_filter_count = 0;
+//                bench->id_find_count = 0;
+//                uint pid = 100000;
+////                string cmd = "sync; sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'";        //sudo!!!
+////                if(system(cmd.c_str())!=0){
+////                    fprintf(stderr, "Error when disable buffer cache\n");
+////                }
+//                ofstream q;
+//                q.open(to_string(config->MemTable_capacity/2)+"search_id.csv", ios::out|ios::binary|ios::trunc);
+//                q << "question number" << ',' << "time_consume(ms)" << endl;
+//                for(int i = 0; i < question_count; i++){
+//                    struct timeval disk_search_time = get_cur_time();
+////                    uint temp = bench->config->SSTable_count;
+////                    bench->config->SSTable_count = bench->merge_sstable_count;
+//                    bench->search_in_disk(pid, 15);
+////                    bench->config->SSTable_count = temp;
+//                    pid++;
+//                    double time_consume = get_time_elapsed(disk_search_time);
+//                    //printf("disk_search_time %.2f\n", time_consume);
+//                    q << i << ',' << time_consume << endl;
 //                }
-                ofstream q;
-                q.open(to_string(config->MemTable_capacity/2)+"search_id.csv", ios::out|ios::binary|ios::trunc);
-                q << "question number" << ',' << "time_consume(ms)" << endl;
-                for(int i = 0; i < question_count; i++){
-                    struct timeval disk_search_time = get_cur_time();
-//                    uint temp = bench->config->SSTable_count;
-//                    bench->config->SSTable_count = bench->merge_sstable_count;
-                    bench->search_in_disk(pid, 15);
-//                    bench->config->SSTable_count = temp;
-                    pid++;
-                    double time_consume = get_time_elapsed(disk_search_time);
-                    //printf("disk_search_time %.2f\n", time_consume);
-                    q << i << ',' << time_consume << endl;
-                }
-                q.close();
-                cout << "question_count:" << question_count << " id_find_count:" << bench->id_find_count <<" kv_restriction:"<< bench->config->kv_restriction << endl;
-                cout << "wid_filter_count:" << bench->wid_filter_count <<"id_not_find_count"<<bench->id_not_find_count<<endl;
-
-//                double mid_x = -87.678503;
-//                double mid_y = 41.856803;
-//                Point the_mid(mid_x, mid_y);
-//                the_mid.print();
-                double mid_x[10] = {-87.678503, -87.81683, -87.80959,-87.81004, -87.68706,-87.68616,-87.67892, -87.63235, -87.61381, -87.58352};
-                double mid_y[10] = {41.856803, 41.97466, 41.90729, 41.76984, 41.97556, 41.89960, 41.74859, 41.87157, 41.78340, 41.70744};
-                double base_edge_length = 0.01;
-                for(int i = 0; i < bench->ctb_count; i++){
-                    bench->load_big_sorted_run(i);
-                }
-                ofstream p;
-                p.open(to_string(config->MemTable_capacity/2)+"search_mbr.csv", ios::out|ios::binary|ios::trunc);        //config->SSTable_count/50
-                p << "search area" << ',' << "find_count" << ',' << "unique_find" << ',' << "intersect_sst_count" << ',' << "bit_find_count" << ',' << "time(ms)" << endl;
-                for(uint j = 0; j < 10; j++){
-                    for(int i = 0; i < 10 ; i++){
-                        //cout << fixed << setprecision(6) << mid_x - edge_length/2 <<","<<mid_y - edge_length/2 <<","<<mid_x + edge_length/2 <<","<<mid_y + edge_length/2 <<endl;
-                        double edge_length = base_edge_length * (i + 1);
-                        box search_area(mid_x[j] - edge_length/2, mid_y[j] - edge_length/2, mid_x[j] + edge_length/2, mid_y[j] + edge_length/2);
-                        search_area.print();
-                        struct timeval area_search_time = get_cur_time();
-//                    uint temp = bench->config->SSTable_count;
-//                    bench->config->SSTable_count = bench->merge_sstable_count;
-                        bench->mbr_search_in_disk(search_area, 5);
-//                    bench->config->SSTable_count = temp;
-                        double time_consume = get_time_elapsed(area_search_time);
-                        //printf("area_search_time %.2f\n", time_consume);
-                        p << edge_length*edge_length << ',' << bench->mbr_find_count << ',' << bench->mbr_unique_find << ','
-                          << bench->intersect_sst_count <<',' << bench->bit_find_count << ',' << time_consume << endl;
-                        bench->mbr_find_count = 0;
-                        bench->mbr_unique_find = 0;
-                        bench->intersect_sst_count = 0;
-                        bench->bit_find_count = 0;
-                    }
-                    p << endl;
-                }
-                p.close();
-                //return;
-            }
+//                q.close();
+//                cout << "question_count:" << question_count << " id_find_count:" << bench->id_find_count <<" kv_restriction:"<< bench->config->kv_restriction << endl;
+//                cout << "wid_filter_count:" << bench->wid_filter_count <<"id_not_find_count"<<bench->id_not_find_count<<endl;
+//
+////                double mid_x = -87.678503;
+////                double mid_y = 41.856803;
+////                Point the_mid(mid_x, mid_y);
+////                the_mid.print();
+//                double mid_x[10] = {-87.678503, -87.81683, -87.80959,-87.81004, -87.68706,-87.68616,-87.67892, -87.63235, -87.61381, -87.58352};
+//                double mid_y[10] = {41.856803, 41.97466, 41.90729, 41.76984, 41.97556, 41.89960, 41.74859, 41.87157, 41.78340, 41.70744};
+//                double base_edge_length = 0.01;
+//                for(int i = 0; i < bench->ctb_count; i++){
+//                    bench->load_big_sorted_run(i);
+//                }
+//                ofstream p;
+//                p.open(to_string(config->MemTable_capacity/2)+"search_mbr.csv", ios::out|ios::binary|ios::trunc);        //config->SSTable_count/50
+//                p << "search area" << ',' << "find_count" << ',' << "unique_find" << ',' << "intersect_sst_count" << ',' << "bit_find_count" << ',' << "time(ms)" << endl;
+//                for(uint j = 0; j < 10; j++){
+//                    for(int i = 0; i < 10 ; i++){
+//                        //cout << fixed << setprecision(6) << mid_x - edge_length/2 <<","<<mid_y - edge_length/2 <<","<<mid_x + edge_length/2 <<","<<mid_y + edge_length/2 <<endl;
+//                        double edge_length = base_edge_length * (i + 1);
+//                        box search_area(mid_x[j] - edge_length/2, mid_y[j] - edge_length/2, mid_x[j] + edge_length/2, mid_y[j] + edge_length/2);
+//                        search_area.print();
+//                        struct timeval area_search_time = get_cur_time();
+////                    uint temp = bench->config->SSTable_count;
+////                    bench->config->SSTable_count = bench->merge_sstable_count;
+//                        bench->mbr_search_in_disk(search_area, 5);
+////                    bench->config->SSTable_count = temp;
+//                        double time_consume = get_time_elapsed(area_search_time);
+//                        //printf("area_search_time %.2f\n", time_consume);
+//                        p << edge_length*edge_length << ',' << bench->mbr_find_count << ',' << bench->mbr_unique_find << ','
+//                          << bench->intersect_sst_count <<',' << bench->bit_find_count << ',' << time_consume << endl;
+//                        bench->mbr_find_count = 0;
+//                        bench->mbr_unique_find = 0;
+//                        bench->intersect_sst_count = 0;
+//                        bench->bit_find_count = 0;
+//                    }
+//                    p << endl;
+//                }
+//                p.close();
+//                //return;
+//            }
 
 			if(config->analyze_grid||config->profile){
 				bench->analyze_grids();
@@ -1024,6 +1027,10 @@ void tracer::process(){
 
             if(config->save_meetings_pers && t == 99){
                 bench->dump_meetings(st);
+            }
+
+            if(st+t+1 == 99){
+                bench->dump_meta(config->meta_path.c_str());
             }
 		}
 	}

@@ -39,7 +39,7 @@ public:
     uint schema_update_delay = 1; //
     uint min_meet_time = 5;
     uint max_meet_time = 1ULL << DURATION_BIT ;    //4096
-    double reach_distance = 1.414;          //2
+    double reach_distance = 2;          //2
     double x_buffer = 0;
     double y_buffer = 0;
     bool gpu = false;
@@ -56,7 +56,7 @@ public:
     uint kv_restriction = 134217728;                  //2*1024*1024*1024/16 = 134217728
     uint MemTable_capacity = 2 ;             //5*2 ,and workbench data[100] is not enough
 
-    uint big_sorted_run_capacity = 100;     //can be made to vector
+    //uint big_sorted_run_capacity = 100;     //can be made to vector
     uint CTF_count = 100;              //default 2G
     uint split_num = 5;
 
@@ -72,17 +72,19 @@ public:
 
     uint oversize_buffer_capacity = 1342177;
 
+    string meta_path = "../data/meta/";
+
     void update(){
         cout << "into update" << endl;
         assert(MemTable_capacity%2==0);
-        kv_restriction = G_bytes * 67108864;            //67108864 = 1G
+        kv_restriction = G_bytes * 67108 * 3;            //67108864 = 1G
         kv_capacity = kv_restriction + 1000000;
         oversize_buffer_capacity = kv_restriction / 100;
         split_num = sqrt(CTF_count);
         assert(split_num*split_num == CTF_count);
     }
 
-    void print(){
+    void virtual print(){       //virtual
         fprintf(stderr,"configuration:\n");
         fprintf(stderr,"num threads:\t%d\n",num_threads);
         fprintf(stderr,"num objects:\t%d\n",num_objects);
@@ -304,7 +306,7 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
         config.zone_capacity = config.grid_capacity;
     }
     if(!vm.count("num_buckets")){
-        config.num_meeting_buckets = config.num_objects/2;
+        config.num_meeting_buckets = 2*config.num_objects;
     }
     if(vm.count("disable_phased_filter")){
         config.phased_lookup = false;
