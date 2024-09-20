@@ -240,7 +240,7 @@ public:
     uint valid_timestamp = 0;
 
     //big sorted run
-    vector<CTB> ctbs;
+    CTB *ctbs = NULL;
     uint ctb_count = 0;
     uint start_time_min = 0;
     uint start_time_max = 0;

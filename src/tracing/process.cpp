@@ -594,8 +594,8 @@ void *straight_dump(void *arg){
     if(old_big%2==1){
         offset = bench->config->MemTable_capacity/2;
     }
-    CTB temp_ctb;
-    bench->ctbs.push_back(temp_ctb);
+    //CTB temp_ctb;
+//    bench->ctbs.push_back(CTB());
     bench->ctbs[old_big].ctfs = NULL;
     bench->ctbs[old_big].start_time_min = bench->start_time_min;
     bench->ctbs[old_big].start_time_max = bench->start_time_max;
@@ -653,7 +653,7 @@ void *straight_dump(void *arg){
         total_index += bench->h_CTF_capacity[offset][sst_count];
         //assert(total_index<=bench->config->kv_restriction);
         bench->pro.bg_merge_time += get_time_elapsed(bg_start,true);
-        SSTable_of.open("../store/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out|ios::binary|ios::trunc);
+        SSTable_of.open(bench->config->raid_path + to_string(sst_count%8) + "/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out|ios::binary|ios::trunc);
         bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
         SSTable_of.write((char *)keys, sizeof(__uint128_t)*bench->h_CTF_capacity[offset][sst_count]);
         SSTable_of.flush();

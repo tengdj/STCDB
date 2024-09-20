@@ -56,7 +56,7 @@ public:
     uint kv_restriction = 134217728;                  //2*1024*1024*1024/16 = 134217728
     uint MemTable_capacity = 2 ;             //5*2 ,and workbench data[100] is not enough
 
-    //uint big_sorted_run_capacity = 100;     //can be made to vector
+    uint big_sorted_run_capacity = 10000;     //can be made to vector
     uint CTF_count = 100;              //default 2G
     uint split_num = 5;
 
@@ -73,6 +73,7 @@ public:
     uint oversize_buffer_capacity = 1342177;
 
     string meta_path = "../data/meta/";
+    string raid_path = "/data3/ssd";
 
     void update(){
         cout << "into update" << endl;

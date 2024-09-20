@@ -19,9 +19,9 @@ workbench * load_meta(const char *path) {
     in.read((char *)config, sizeof(generator_configuration));               //also read meta
     in.read((char *)bench, sizeof(workbench));      //bench->config = NULL
     bench->config = config;
+    bench->ctbs = new CTB[config->big_sorted_run_capacity];
     for(int i = 0; i < bench->ctb_count; i++){
-        CTB * temp_ctb = new CTB;
-        bench->ctbs.push_back(*temp_ctb);
+        //CTB temp_ctb;
         string CTB_path = string(path) + "CTB" + to_string(i);
         bench->load_CTB_meta(CTB_path.c_str(), i);
     }
@@ -32,7 +32,8 @@ int main(int argc, char **argv){
     string path = "../data/meta/";
     workbench * bench = load_meta(path.c_str());
 
-    if(!bench->do_some_search && bench->ctb_count == 1){            // !bench->do_some_search && bench->big_sorted_run_count == 1
+    cout << "search begin" <<endl;
+    if(true){            // !bench->do_some_search && bench->big_sorted_run_count == 1
         bench->do_some_search = true;
         while(bench->dumping){
             sleep(1);
@@ -106,7 +107,4 @@ int main(int argc, char **argv){
         p.close();
         //return;
     }
-
-
-
 }

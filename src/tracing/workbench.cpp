@@ -70,7 +70,7 @@ void workbench::clear(){
 		data_index = 0;
 	}
 	delete insert_lk;
-    ctbs.clear();
+    //ctbs.clear();
 }
 
 
@@ -164,8 +164,8 @@ void workbench::claim_space(){
     h_longer_edges = (float *)allocate(size);
 
 
-//    size = config->big_sorted_run_capacity*sizeof(CTB);
-//    ctbs = (CTB *)allocate(size);
+    size = config->big_sorted_run_capacity*sizeof(CTB);
+    ctbs = (CTB *)allocate(size);
 
     if(config->save_meetings_pers || config->load_meetings_pers){
         size = config->num_objects * 10 *sizeof(meeting_unit);              //100 * size of d_meetings_ps
@@ -230,7 +230,7 @@ void workbench::load_big_sorted_run(uint b){
     ifstream read_sst;
     for(int i = 0; i < config->CTF_count; i++){
         if(!ctbs[b].ctfs[i].keys){
-            string filename = "../store/SSTable_"+to_string(b)+"-"+to_string(i);
+            string filename = config->raid_path + to_string(i%8) + "/SSTable_"+to_string(b)+"-"+to_string(i);
             //cout<<filename<<endl;
             read_sst.open(filename);
             assert(read_sst.is_open());
@@ -363,7 +363,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                 }
                 if(!ctbs[i].ctfs[high].keys){
                     //cout<<"new SSTables keys"<<high<<endl;
-                    string filename = "../store/SSTable_"+to_string(i)+"-"+to_string(high);
+                    string filename = config->raid_path + to_string(high%8) + "/SSTable_"+to_string(i)+"-"+to_string(high);
                     //cout<<filename<<endl;
                     read_sst.open(filename);                   //final place is not high+1, but high
                     assert(read_sst.is_open());
@@ -545,7 +545,7 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
                     bit_find_count++;
                     if(!ctbs[i].ctfs[CTF_id].keys){
                         ifstream read_sst;
-                        string filename = "../store/SSTable_"+to_string(i)+"-"+to_string(CTF_id);
+                        string filename = config->raid_path + to_string(CTF_id%8) + "/SSTable_"+to_string(i)+"-"+to_string(CTF_id);
                         //cout<<filename<<endl;
                         read_sst.open(filename);                   //final place is not high+1, but high
                         assert(read_sst.is_open());
@@ -596,10 +596,6 @@ void workbench::load_meetings(uint st) {
     struct timeval start_time = get_cur_time();
     string filename = config->trace_path + "meeting" + to_string(st) + "_" + to_string(config->num_objects) + ".tr";
     ifstream in(filename, ios::in | ios::binary);
-    if(!in.is_open()){
-        log("%s cannot be opened",filename.c_str());
-        exit(0);
-    }
     in.read((char *)active_meeting_count_ps, sizeof(uint) * 100);
     total_meetings_this100s = 0;
     for(uint i = 0; i < 100; i++){
@@ -630,7 +626,7 @@ void workbench::dump_meta(const char *path) {
 void workbench::dump_CTB_meta(const char *path, int i) {
     struct timeval start_time = get_cur_time();
     ofstream wf(path, ios::out|ios::binary|ios::trunc);
-    wf.write((char *)this, sizeof(CTB));
+    wf.write((char *)&ctbs[i], sizeof(CTB));
     wf.write((char *)ctbs[i].first_widpid, config->CTF_count * sizeof(uint64_t));
     wf.write((char *)ctbs[i].sids, config->num_objects * sizeof(unsigned short));
     wf.write((char *)ctbs[i].bitmaps, bitmaps_size * sizeof(unsigned char));
@@ -646,7 +642,22 @@ void workbench::dump_CTB_meta(const char *path, int i) {
 void workbench::load_CTB_meta(const char *path, int i) {
     struct timeval start_time = get_cur_time();
     ifstream in(path, ios::in | ios::binary);
-    in.read((char *)this, sizeof(CTB));
+
+    if (!in.is_open()) {
+        std::cerr << "Error opening file: " << path << std::endl;
+    } else {
+        std::streamsize size = in.tellg();
+        std::cout << "File size: " << size << std::endl;
+    }
+
+    in.read((char *)&ctbs[i], sizeof(CTB));
+    ctbs[i].first_widpid = new uint64_t[config->CTF_count];
+    ctbs[i].sids = new unsigned short[config->num_objects];
+    ctbs[i].bitmaps = new unsigned char[bitmaps_size];
+    ctbs[i].bitmap_mbrs = new box[config->CTF_count];
+    ctbs[i].CTF_capacity = new uint[config->CTF_count];
+    ctbs[i].o_buffer.keys = new __uint128_t[ctbs[i].o_buffer.oversize_kv_count];
+    ctbs[i].o_buffer.boxes = new f_box[ctbs[i].o_buffer.oversize_kv_count];
     in.read((char *)ctbs[i].first_widpid, config->CTF_count * sizeof(uint64_t));
     in.read((char *)ctbs[i].sids, config->num_objects * sizeof(unsigned short));
     in.read((char *)ctbs[i].bitmaps, bitmaps_size * sizeof(unsigned char));
@@ -662,4 +673,5 @@ void workbench::load_CTB_meta(const char *path, int i) {
     }
     logt("CTB meta %d dump to %s",start_time, i, path);
 }
+
 

@@ -55,6 +55,7 @@ public:
     unsigned short * sids = NULL;
     unsigned char * bitmaps = NULL;
     box * bitmap_mbrs = NULL;
+
     uint * CTF_capacity = NULL;
     oversize_buffer o_buffer;
     RTree<short *, double, 2, double> *box_rtree = NULL;
