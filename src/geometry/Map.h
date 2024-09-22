@@ -150,6 +150,16 @@ public:
         return streets;
     }
 
+    void check_Streets(){
+        for(int i = 0; i < streets.size(); i++){
+            if(streets[i]->id != i){       //stres[i]->id >= stres.size()
+                cout << "stres id" << streets[i]->id << " " << i << endl;
+                streets[i]->id = i;
+            }
+        }
+    }
+
+
     ~Map();
     box *getMBR();
     Street * nearest(Point *target);

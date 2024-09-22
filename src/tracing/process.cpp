@@ -653,6 +653,7 @@ void *straight_dump(void *arg){
         total_index += bench->h_CTF_capacity[offset][sst_count];
         //assert(total_index<=bench->config->kv_restriction);
         bench->pro.bg_merge_time += get_time_elapsed(bg_start,true);
+        cout << bench->config->raid_path + to_string(sst_count%8) + "/SSTable_"+to_string(old_big)+"-"+to_string(sst_count) << endl;
         SSTable_of.open(bench->config->raid_path + to_string(sst_count%8) + "/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out|ios::binary|ios::trunc);
         bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
         SSTable_of.write((char *)keys, sizeof(__uint128_t)*bench->h_CTF_capacity[offset][sst_count]);
@@ -713,9 +714,13 @@ void tracer::process(){
             loadData(config->trace_path.c_str(),st);
         }
         else if(!config->load_meetings_pers){
-            cout << "config.cur_duration : "<< config->cur_duration <<endl;
-            generator->map->print_region();
-            sleep(2);
+//            cout << "config.cur_duration : "<< config->cur_duration <<endl;
+//            generator->map->print_region();
+//            sleep(2);
+            if(true){
+                cout << st << endl;
+                generator->map->check_Streets();
+            }
             generator->generate_trace(trace);
         }
 		start = get_cur_time();
@@ -1029,8 +1034,8 @@ void tracer::process(){
                 bench->dump_meetings(st);
             }
 
-            if(st+t+1 == 99){
-                bench->dump_meta(config->meta_path.c_str());
+            if(st+t+1 == config->start_time+config->duration - 5){
+                bench->dump_meta(config->CTB_meta_path);
             }
 		}
 	}

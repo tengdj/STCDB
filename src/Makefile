@@ -34,7 +34,7 @@ endif
 %.o:	%.cpp
 	$(CXX) -c $(CPPFLAGS) $(INCLUDES) -o $@ $<
 
-all:	 trace pipeline datagen load_search
+all:	 pipeline datagen load_search
 
 
 # for macro queries

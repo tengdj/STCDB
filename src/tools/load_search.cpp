@@ -13,7 +13,6 @@ workbench * load_meta(const char *path) {
         log("%s cannot be opened",bench_path.c_str());
         exit(0);
     }
-
     generator_configuration * config = new generator_configuration();
     workbench * bench = new workbench(config);
     in.read((char *)config, sizeof(generator_configuration));               //also read meta
@@ -25,6 +24,7 @@ workbench * load_meta(const char *path) {
         string CTB_path = string(path) + "CTB" + to_string(i);
         bench->load_CTB_meta(CTB_path.c_str(), i);
     }
+    logt("bench meta %d load from %s",start_time, bench_path.c_str());
     return bench;
 }
 
@@ -35,9 +35,6 @@ int main(int argc, char **argv){
     cout << "search begin" <<endl;
     if(true){            // !bench->do_some_search && bench->big_sorted_run_count == 1
         bench->do_some_search = true;
-        while(bench->dumping){
-            sleep(1);
-        }
 
 //                for(uint i = 0 ; i < bench->ctbs[1].o_buffer.oversize_kv_count; i++){
 //                    bench->search_in_disk( get_key_oid(bench->ctbs[1].o_buffer.keys[i]), 15);

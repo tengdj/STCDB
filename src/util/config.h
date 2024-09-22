@@ -20,7 +20,6 @@ public:
     uint duration = 1000;
     uint num_objects = 1000;
     string trace_path = "../data/points/";              //"/gisdata/chicago/traces"      // "../data/points/"
-    string disk_path = "/data3/ssd";
     uint cur_duration = 0;
 
     uint file_size = 3600;                             // data in x seconds is put into file
@@ -72,13 +71,13 @@ public:
 
     uint oversize_buffer_capacity = 1342177;
 
-    string meta_path = "../data/meta/";
-    string raid_path = "/data3/ssd";
+    char CTB_meta_path[24] = "../data/meta/";
+    char raid_path[24] = "/data3/ssd";
 
     void update(){
         cout << "into update" << endl;
         assert(MemTable_capacity%2==0);
-        kv_restriction = G_bytes * 67108 * 3;            //67108864 = 1G
+        kv_restriction = G_bytes * 67108864;            //67108864 = 1G
         kv_capacity = kv_restriction + 1000000;
         oversize_buffer_capacity = kv_restriction / 100;
         split_num = sqrt(CTF_count);
