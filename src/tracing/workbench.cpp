@@ -227,6 +227,7 @@ void workbench::load_big_sorted_run(uint b){
     if(!ctbs[b].ctfs){
         ctbs[b].ctfs = new CTF[config->CTF_count];
     }
+    struct timeval start_time = get_cur_time();
     ifstream read_sst;
     for(int i = 0; i < config->CTF_count; i++){
         if(!ctbs[b].ctfs[i].keys){
@@ -239,6 +240,7 @@ void workbench::load_big_sorted_run(uint b){
             read_sst.close();
         }
     }
+    logt("load CTB %d",start_time, b);
 }
 
 bool workbench::search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vector<uint> & v_indices){          //wid_pid       //for dump
@@ -365,8 +367,7 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                     //cout<<"new SSTables keys"<<high<<endl;
                     string filename = config->raid_path + to_string(high%8) + "/SSTable_"+to_string(i)+"-"+to_string(high);
                     //cout<<filename<<endl;
-                    read_sst.open(filename);                   //final place is not high+1, but high
-                    assert(read_sst.is_open());
+
                     ctbs[i].ctfs[high].keys = new __uint128_t [ctbs[i].CTF_capacity[high]];
                     read_sst.read((char *)ctbs[i].ctfs[high].keys, sizeof(__uint128_t) * ctbs[i].CTF_capacity[high]);
                     read_sst.close();
@@ -671,7 +672,7 @@ void workbench::load_CTB_meta(const char *path, int i) {
     for(uint j = 0; j < config->CTF_count; ++j){
         ctbs[i].box_rtree->Insert(ctbs[i].bitmap_mbrs[j].low, ctbs[i].bitmap_mbrs[j].high, new short(j));
     }
-    logt("CTB meta %d dump to %s",start_time, i, path);
+    logt("CTB meta %d load from %s",start_time, i, path);
 }
 
 
