@@ -186,7 +186,7 @@ void workbench::claim_space(){
         size = config->MemTable_capacity * sizeof(uint *);
         h_CTF_capacity = (uint **)allocate(size);
 
-        size = config->MemTable_capacity * sizeof(oversize_buffer *);
+        size = config->MemTable_capacity * sizeof(oversize_buffer);
         h_oversize_buffers = (oversize_buffer *)allocate(size);
 
 

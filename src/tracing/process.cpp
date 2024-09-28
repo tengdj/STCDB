@@ -759,8 +759,8 @@ void tracer::process(){
 //            sleep(2);
             if(true){
                 cout << st << endl;
-                generator->map->check_Streets();
-                generator->map->check_Nodes();
+//                generator->map->check_Streets();
+//                generator->map->check_Nodes();
             }
             generator->generate_trace(trace);
         }
