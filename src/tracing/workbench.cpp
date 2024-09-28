@@ -223,24 +223,66 @@ box workbench::make_bit_box(box b){
     return new_b;
 }
 
+struct load_args {
+    string path;
+    __uint128_t * keys;
+    uint SIZE;
+};
+
+void *parallel_load(void *arg){
+    load_args *pargs = (load_args *)arg;
+    ifstream read_ctf;
+    read_ctf.open(pargs->path.c_str() , ios::out|ios::binary|ios::trunc);
+    cout << pargs->path << endl;
+    assert(read_ctf.is_open());
+    read_ctf.read((char *)pargs->keys, pargs->SIZE);
+    read_ctf.close();
+    return NULL;
+}
+
 void workbench::load_big_sorted_run(uint b){
     if(!ctbs[b].ctfs){
         ctbs[b].ctfs = new CTF[config->CTF_count];
     }
     struct timeval start_time = get_cur_time();
-    ifstream read_sst;
+    load_args *pargs = new load_args[config->CTF_count];
+    pthread_t threads[config->CTF_count];
+
+    // 初始化线程数组
+    for(int i = 0; i < config->CTF_count; i++){
+        threads[i] = 0; // 初始化线程 ID 防止未定义行为
+    }
+
     for(int i = 0; i < config->CTF_count; i++){
         if(!ctbs[b].ctfs[i].keys){
-            string filename = config->raid_path + to_string(i%8) + "/SSTable_"+to_string(b)+"-"+to_string(i);
-            //cout<<filename<<endl;
-            read_sst.open(filename);
-            assert(read_sst.is_open());
             ctbs[b].ctfs[i].keys = new __uint128_t[ctbs[b].CTF_capacity[i]];
-            read_sst.read((char *)ctbs[b].ctfs[i].keys, sizeof(__uint128_t) * ctbs[b].CTF_capacity[i]);
-            read_sst.close();
+            pargs[i].path = config->raid_path + to_string(i % 8) + "/SSTable_" + to_string(b) + "-" + to_string(i);
+            pargs[i].SIZE = sizeof(__uint128_t) * ctbs[b].CTF_capacity[i];
+            pargs[i].keys = ctbs[b].ctfs[i].keys;
+
+            int ret = pthread_create(&threads[i], NULL, parallel_load, (void *)&pargs[i]);
+            if(ret != 0) {
+                std::cerr << "Failed to create thread " << i << " with error code: " << ret << std::endl;
+                threads[i] = 0; // 标记线程创建失败
+                continue;
+            }
         }
     }
-    logt("load CTB %d",start_time, b);
+
+    for(int i = 0; i < config->CTF_count; i++ ){
+        if (threads[i] != 0) { // 检查线程是否成功创建
+            void *status;
+            int ret = pthread_join(threads[i], &status);
+            if (ret != 0) {
+                std::cerr << "Error joining thread " << i << " with error code: " << ret << std::endl;
+            }
+        }
+    }
+    pro.load_keys_time += get_time_elapsed(start_time,false);
+    logt("load CTB keys %d", start_time, b);
+
+    // 删除动态分配的参数内存
+    delete[] pargs;
 }
 
 bool workbench::search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vector<uint> & v_indices){          //wid_pid       //for dump
@@ -465,6 +507,32 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
     return ret;
 }
 
+void workbench::dump_meetings(uint st) {
+    struct timeval start_time = get_cur_time();
+    string filename = config->trace_path + "meeting" + to_string(st) + "_" + to_string(config->num_objects) + ".tr";
+    ofstream wf(filename, ios::out|ios::binary|ios::trunc);
+    wf.write((char *)active_meeting_count_ps, sizeof(uint) * 100);
+    wf.write((char *)h_meetings_ps, sizeof(meeting_unit) * total_meetings_this100s);
+    wf.close();
+    total_meetings_this100s = 0;
+    logt("dumped to %s",start_time, filename.c_str());
+}
+
+void workbench::load_meetings(uint st) {
+    log("loading meetings from %d to %d",st, st + 100);
+    struct timeval start_time = get_cur_time();
+    string filename = config->trace_path + "meeting" + to_string(st) + "_" + to_string(config->num_objects) + ".tr";
+    ifstream in(filename, ios::in | ios::binary);
+    in.read((char *)active_meeting_count_ps, sizeof(uint) * 100);
+    total_meetings_this100s = 0;
+    for(uint i = 0; i < 100; i++){
+        total_meetings_this100s += active_meeting_count_ps[i];
+    }
+    in.read((char *)h_meetings_ps, sizeof(meeting_unit) * total_meetings_this100s);
+    in.close();
+    logt("loaded %d objects last for 100 seconds start from %d time from %s",start_time, config->num_objects, st, filename.c_str());
+}
+
 box workbench::parse_to_real_mbr(unsigned short first_low, unsigned short first_high, uint64_t value) {
 //    uint first_low0, first_low1, first_high0, first_high1;
 //    d2xy(FIRST_HILBERT_BIT/2, first_low, first_low0, first_low1);
@@ -579,32 +647,6 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
     mbr_unique_find = uni.size();
     uni.clear();
     return ret;
-}
-
-void workbench::dump_meetings(uint st) {
-    struct timeval start_time = get_cur_time();
-    string filename = config->trace_path + "meeting" + to_string(st) + "_" + to_string(config->num_objects) + ".tr";
-    ofstream wf(filename, ios::out|ios::binary|ios::trunc);
-    wf.write((char *)active_meeting_count_ps, sizeof(uint) * 100);
-    wf.write((char *)h_meetings_ps, sizeof(meeting_unit) * total_meetings_this100s);
-    wf.close();
-    total_meetings_this100s = 0;
-    logt("dumped to %s",start_time, filename.c_str());
-}
-
-void workbench::load_meetings(uint st) {
-    log("loading meetings from %d to %d",st, st + 100);
-    struct timeval start_time = get_cur_time();
-    string filename = config->trace_path + "meeting" + to_string(st) + "_" + to_string(config->num_objects) + ".tr";
-    ifstream in(filename, ios::in | ios::binary);
-    in.read((char *)active_meeting_count_ps, sizeof(uint) * 100);
-    total_meetings_this100s = 0;
-    for(uint i = 0; i < 100; i++){
-        total_meetings_this100s += active_meeting_count_ps[i];
-    }
-    in.read((char *)h_meetings_ps, sizeof(meeting_unit) * total_meetings_this100s);
-    in.close();
-    logt("loaded %d objects last for 100 seconds start from %d time from %s",start_time, config->num_objects, st, filename.c_str());
 }
 
 void workbench::dump_meta(const char *path) {

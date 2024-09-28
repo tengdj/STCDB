@@ -604,9 +604,8 @@ void cuda_identify_meetings(workbench *bench) {
     if (bench->meeting_buckets[bid].key == ULL_MAX) {
         return;
     }
-    // is still active
     bool meet_cut = false;
-    if (bench->meeting_buckets[bid].end == bench->cur_time) {
+    if (bench->meeting_buckets[bid].end == bench->cur_time) {               // is still active
         if(bench->meeting_buckets[bid].end - bench->meeting_buckets[bid].start >= bench->config->max_meet_time){
             meet_cut = true;
             atomicAdd(&bench->meeting_cut_count, 1);
@@ -1586,13 +1585,13 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         //logt("meeting identify: %d taken %d active %d new meetings found", start, h_bench.num_taken_buckets, h_bench.num_active_meetings, h_bench.meeting_counter);
 
         if(bench->cur_time == 2200){
-            cout <<"1000~2000 " << h_bench.larger_than_1000s << " 2000~3000 " << h_bench.larger_than_2000s << " 3000~4000 " << h_bench.larger_than_3000s << " >4000 " << h_bench.larger_than_4000s <<endl;
+            cout <<"1000~2000 " << h_bench.larger_than_1000s << " 2000~3000 " << h_bench.larger_than_2000s << " 3000~4000 " << h_bench.larger_than_3000s << " 4000~4096 " << h_bench.larger_than_4000s <<endl;
         }
     }
 
     //4.5 cuda sort
     if(h_bench.kv_count>bench->config->kv_restriction){
-        cout <<"1000~2000 " << h_bench.larger_than_1000s << " 2000~3000 " << h_bench.larger_than_2000s << " 3000~4000 " << h_bench.larger_than_3000s << " >4000 " << h_bench.larger_than_4000s <<endl;
+        cout <<"1000~2000 " << h_bench.larger_than_1000s << " 2000~3000 " << h_bench.larger_than_2000s << " 3000~4000 " << h_bench.larger_than_3000s << " 4000~4096 " << h_bench.larger_than_4000s <<endl;
         bench->meeting_cut_count = h_bench.meeting_cut_count;
         bench->start_time_min = min(bench->start_time_min, h_bench.start_time_min);
         bench->start_time_max = max(bench->start_time_max, h_bench.start_time_max);

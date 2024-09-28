@@ -587,7 +587,7 @@ struct dump_args {
     uint SIZE;
 };
 
-void *parallel_load(void *arg){
+void *parallel_dump(void *arg){
     dump_args *pargs = (dump_args *)arg;
     ofstream SSTable_of;
     SSTable_of.open(pargs->path.c_str() , ios::out|ios::binary|ios::trunc);
@@ -671,20 +671,23 @@ void *straight_dump(void *arg){
         pargs[sst_count].path = bench->config->raid_path + to_string(sst_count%8) + "/SSTable_"+to_string(old_big)+"-"+to_string(sst_count);
         pargs[sst_count].SIZE = sizeof(__uint128_t)*bench->h_CTF_capacity[offset][sst_count];
         pargs[sst_count].keys = bench->h_keys[offset] + total_index;
-        pthread_create(&threads[sst_count], NULL, parallel_load, (void *)&pargs[sst_count]);
+        pthread_create(&threads[sst_count], NULL, parallel_dump, (void *)&pargs[sst_count]);
         total_index += bench->h_CTF_capacity[offset][sst_count];
     }
     //but, the last sst may not be full
-    cout << "total_index" << total_index << " 2G:" <<bench->config->kv_restriction;
     for(int i = 0; i < bench->config->CTF_count; i++ ){
         void *status;
         pthread_join(threads[i], &status);
     }
+    cout << "total_index" << total_index << " 2G:" <<bench->config->kv_restriction << endl;
+    cerr << "total_index" << total_index << " 2G:" <<bench->config->kv_restriction << endl;
+    bench->pro.bg_merge_time += get_time_elapsed(bg_start,false);
     logt("dumped keys for CTB %d",bg_start, old_big);
     delete[] pargs;
 
 //
 //
+
 //    for(sst_count=0; sst_count<bench->config->CTF_count; sst_count++){
 //        bench->ctbs[old_big].first_widpid[sst_count] = bench->h_keys[offset][total_index] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
 ////        cout<<bench->bg_run[old_big].first_widpid[sst_count]<<endl;
@@ -705,8 +708,8 @@ void *straight_dump(void *arg){
 //    //but, the last sst may not be full
 
     fprintf(stdout,"\tmerge sort:\t%.2f\n",bench->pro.bg_merge_time);
-    fprintf(stdout,"\tflush:\t%.2f\n",bench->pro.bg_flush_time);
-    fprintf(stdout,"\topen:\t%.2f\n",bench->pro.bg_open_time);
+//    fprintf(stdout,"\tflush:\t%.2f\n",bench->pro.bg_flush_time);
+//    fprintf(stdout,"\topen:\t%.2f\n",bench->pro.bg_open_time);
     //cout<<"sst_count :"<<sst_count<<" less than"<<1024<<endl;
 
     bench->ctbs[old_big].print_meta();
