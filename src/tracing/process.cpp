@@ -591,7 +591,7 @@ void *parallel_dump(void *arg){
     dump_args *pargs = (dump_args *)arg;
     ofstream SSTable_of;
     SSTable_of.open(pargs->path.c_str() , ios::out|ios::binary|ios::trunc);
-    cout << pargs->path << endl;
+    //cout << pargs->path << endl;
     assert(SSTable_of.is_open());
     SSTable_of.write((char *)pargs->keys, pargs->SIZE);
     SSTable_of.flush();

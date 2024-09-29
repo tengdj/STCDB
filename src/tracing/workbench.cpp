@@ -232,8 +232,8 @@ struct load_args {
 void *parallel_load(void *arg){
     load_args *pargs = (load_args *)arg;
     ifstream read_ctf;
-    read_ctf.open(pargs->path.c_str() , ios::out|ios::binary|ios::trunc);
-    cout << pargs->path << endl;
+    read_ctf.open(pargs->path.c_str() , ios::in|ios::binary);           //never trunc when multi thread, use app
+    //cout << pargs->path << endl;
     assert(read_ctf.is_open());
     read_ctf.read((char *)pargs->keys, pargs->SIZE);
     read_ctf.close();
@@ -244,33 +244,33 @@ void workbench::load_big_sorted_run(uint b){
     if(!ctbs[b].ctfs){
         ctbs[b].ctfs = new CTF[config->CTF_count];
     }
+    for(int i = 0; i < config->CTF_count; i++) {
+        //if(!ctbs[b].ctfs[i].keys){
+        ctbs[b].ctfs[i].keys = new __uint128_t[ctbs[b].CTF_capacity[i]];
+    }
+
     struct timeval start_time = get_cur_time();
     load_args *pargs = new load_args[config->CTF_count];
     pthread_t threads[config->CTF_count];
-
-    // 初始化线程数组
     for(int i = 0; i < config->CTF_count; i++){
-        threads[i] = 0; // 初始化线程 ID 防止未定义行为
+        threads[i] = 0;
     }
-
     for(int i = 0; i < config->CTF_count; i++){
-        if(!ctbs[b].ctfs[i].keys){
+        //if(!ctbs[b].ctfs[i].keys){
             ctbs[b].ctfs[i].keys = new __uint128_t[ctbs[b].CTF_capacity[i]];
             pargs[i].path = config->raid_path + to_string(i % 8) + "/SSTable_" + to_string(b) + "-" + to_string(i);
             pargs[i].SIZE = sizeof(__uint128_t) * ctbs[b].CTF_capacity[i];
             pargs[i].keys = ctbs[b].ctfs[i].keys;
-
             int ret = pthread_create(&threads[i], NULL, parallel_load, (void *)&pargs[i]);
             if(ret != 0) {
                 std::cerr << "Failed to create thread " << i << " with error code: " << ret << std::endl;
-                threads[i] = 0; // 标记线程创建失败
+                threads[i] = 0;
                 continue;
             }
-        }
+        //}
     }
-
     for(int i = 0; i < config->CTF_count; i++ ){
-        if (threads[i] != 0) { // 检查线程是否成功创建
+        if (threads[i] != 0) {
             void *status;
             int ret = pthread_join(threads[i], &status);
             if (ret != 0) {
@@ -280,8 +280,6 @@ void workbench::load_big_sorted_run(uint b){
     }
     pro.load_keys_time += get_time_elapsed(start_time,false);
     logt("load CTB keys %d", start_time, b);
-
-    // 删除动态分配的参数内存
     delete[] pargs;
 }
 
@@ -409,8 +407,8 @@ bool workbench::search_in_disk(uint pid, uint timestamp){
                     //cout<<"new SSTables keys"<<high<<endl;
                     string filename = config->raid_path + to_string(high%8) + "/SSTable_"+to_string(i)+"-"+to_string(high);
                     //cout<<filename<<endl;
-
                     ctbs[i].ctfs[high].keys = new __uint128_t [ctbs[i].CTF_capacity[high]];
+                    read_sst.open(filename, ios::in|ios::binary);
                     read_sst.read((char *)ctbs[i].ctfs[high].keys, sizeof(__uint128_t) * ctbs[i].CTF_capacity[high]);
                     read_sst.close();
                 }
@@ -616,7 +614,7 @@ bool workbench::mbr_search_in_disk(box b, uint timestamp) {
                         ifstream read_sst;
                         string filename = config->raid_path + to_string(CTF_id%8) + "/SSTable_"+to_string(i)+"-"+to_string(CTF_id);
                         //cout<<filename<<endl;
-                        read_sst.open(filename);                   //final place is not high+1, but high
+                        read_sst.open(filename, ios::in|ios::binary);                   //final place is not high+1, but high
                         assert(read_sst.is_open());
                         ctbs[i].ctfs[CTF_id].keys = new __uint128_t[ctbs[i].CTF_capacity[CTF_id]];
                         read_sst.read((char *)ctbs[i].ctfs[CTF_id].keys, sizeof(__uint128_t) * ctbs[i].CTF_capacity[CTF_id]);
