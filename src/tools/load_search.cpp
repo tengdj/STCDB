@@ -19,7 +19,7 @@ workbench * load_meta(const char *path) {
     in.read((char *)bench, sizeof(workbench));      //bench->config = NULL
     bench->config = config;
     bench->ctbs = new CTB[config->big_sorted_run_capacity];
-    for(int i = 0; i < bench->ctb_count; i++){
+    for(int i = 0; i < 425; i++){
         //CTB temp_ctb;
         string CTB_path = string(path) + "CTB" + to_string(i);
         bench->load_CTB_meta(CTB_path.c_str(), i);
@@ -43,7 +43,7 @@ int main(int argc, char **argv){
 //                if(system(cmd.c_str())!=0){
 //                    fprintf(stderr, "Error when disable buffer cache\n");
 //                }
-        for(int i = 0; i < bench->ctb_count; i++){
+        for(int i = 0; i < 425; i++){
             bench->load_big_sorted_run(i);
         }
         fprintf(stderr,"\ttotal load keys:\t%.2f\n",bench->pro.load_keys_time);

@@ -1077,6 +1077,15 @@ void tracer::process(){
             if(config->save_meetings_pers && t == 99){
                 bench->dump_meetings(st);
             }
+            if(t==99){
+                for(int i = 0; i < 10000; i++){
+                    if(generator->meta_data[i].type == DRIVE){
+                        cerr <<" the trace of " << i << endl;
+                        print_trace(i);
+                        break;
+                    }
+                }
+            }
 
             if(st+t+1 == config->start_time+config->duration - 5){
                 bench->dump_meta(config->CTB_meta_path);

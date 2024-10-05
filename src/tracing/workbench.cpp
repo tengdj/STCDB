@@ -686,11 +686,7 @@ void workbench::load_CTB_meta(const char *path, int i) {
 
     if (!in.is_open()) {
         std::cerr << "Error opening file: " << path << std::endl;
-    } else {
-        std::streamsize size = in.tellg();
-        std::cout << "File size: " << size << std::endl;
     }
-
     in.read((char *)&ctbs[i], sizeof(CTB));
     ctbs[i].first_widpid = new uint64_t[config->CTF_count];
     ctbs[i].sids = new unsigned short[config->num_objects];

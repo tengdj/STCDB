@@ -486,97 +486,101 @@ void Map::navigate(Point *positions, Trace_Meta & meta, int duration, int &count
 //    assert(dest);
 //    assert(speed>0);
     if(meta.trajectory.empty()){
-        // get the closest points streets to the source and destination points
+// get the closest points streets to the source and destination points
         vector<Street *> ret;
         Street *o = nearest(&meta.loc);
         Street *d = nearest(&meta.end);
 
-        //conduct a breadth first query to get a list of streets
-        for(Street *s:streets) {
+// conduct a breadth first query to get a list of streets
+        for(Street *s: streets) {
             s->father_from_origin = NULL;
         }
         Street *s = o->breadthFirst(d);
-        assert(s && s==d);
-        do{
+        assert(s && s == d);
+        do {
             ret.push_back(s);
             s = s->father_from_origin;
-        }while(s!=NULL);
-        reverse(ret.begin(),ret.end());
+        } while(s != NULL);
 
-        // convert the street sequence to node sequences
+// no need to reverse the ret anymore since we are inserting in reverse order
+
+// convert the street sequence to node sequences
         Node *originnode = new Node(meta.loc.x, meta.loc.y);
         Node *destnode = new Node(meta.end.x, meta.end.y);
-        meta.trajectory.push_back(originnode);
+
+// first push the destination node
+        meta.trajectory.push_back(destnode);
+
         Node *cur;
-        if(ret.size()==1){
-            cur = ret[0]->start;
-        }else{
-            cur = ret[0]->close(ret[1]);
+        if(ret.size() == 1) {
+            cur = ret[0]->end;  // start from the end node
+        } else {
+            cur = ret.back()->close(*(ret.end() - 2));  // last street's close node to the second last street
             // swap to other end
-            if(ret[0]->start==cur){
-                cur = ret[0]->end;
-            }else{
-                cur = ret[0]->start;
+            if(ret.back()->start == cur) {
+                cur = ret.back()->end;
+            } else {
+                cur = ret.back()->start;
             }
         }
 
-        for(int i=0;i<ret.size();i++){
-            Node * temp = new Node(cur->x,cur->y);
+// iterate the streets in reverse order and insert nodes
+        for(int i = ret.size() - 1; i >= 0; i--) {
+            Node *temp = new Node(cur->x, cur->y);
             meta.trajectory.push_back(temp);
-            if(ret[i]->start==cur){
+            if(ret[i]->start == cur) {
                 cur = ret[i]->end;
-            }else{
+            } else {
                 cur = ret[i]->start;
             }
         }
-        Node * temp = new Node(cur->x,cur->y);
-        meta.trajectory.push_back(temp);
-        meta.trajectory.push_back(destnode);
-        ret.clear();
+
+// finally push the origin node
+        meta.trajectory.push_back(originnode);
     }
 
 
-    // quantify the street sequence to generate a list of
-    // points with fixed gap
     double dist_from_origin = 0;
     int point_index = 0;
     bool finish = true;
-    while(meta.trajectory.size()>1){
-        Node *cur_start = meta.trajectory[0];
-        Node *cur_end = meta.trajectory[1];
+
+    while (meta.trajectory.size() > 1) {
+        Node *cur_start = meta.trajectory.back();      // Use back() for the current end point
+        Node *cur_end = meta.trajectory[meta.trajectory.size() - 2];  // Get the second-to-last element
         double length = cur_start->distance(*cur_end, true);
-        double cur_dis = (point_index+1)*meta.speed-dist_from_origin;
-        while(cur_dis<length) {
-            //have other position can be reported in this street
-            double cur_portion = cur_dis/length;
-            assert(count<duration);
-            //now get the longitude and latitude and timestamp for current event and add to return list
-            positions[count*num_objects+obj].x = cur_start->x+(cur_end->x-cur_start->x)*cur_portion;
-            positions[count*num_objects+obj].y = cur_start->y+(cur_end->y-cur_start->y)*cur_portion;
+        double cur_dis = (point_index + 1) * meta.speed - dist_from_origin;
+
+        while (cur_dis < length) {
+            double cur_portion = cur_dis / length;
+            assert(count < duration);
+
+            positions[count * num_objects + obj].x = cur_start->x + (cur_end->x - cur_start->x) * cur_portion;
+            positions[count * num_objects + obj].y = cur_start->y + (cur_end->y - cur_start->y) * cur_portion;
             count++;
-            // move to next point
             cur_dis += meta.speed;
             point_index++;
-            //if(count==duration&&meta.trajectory.size()>2){
-            if(count==duration){
+
+            if (count == duration) {
                 finish = false;
                 break;
             }
         }
-        if(!finish){
-            meta.loc = positions[(count-1)*num_objects+obj];
-            delete meta.trajectory[0];
-            meta.trajectory[0] = new Node(meta.loc.x, meta.loc.y);
+
+        if (!finish) {
+            meta.loc = positions[(count - 1) * num_objects + obj];
+            delete meta.trajectory.back();  // Free the last node memory
+            meta.trajectory.back() = new Node(meta.loc.x, meta.loc.y);  // Update the last node with the new location
             return;
         }
-        delete meta.trajectory[0];
-        meta.trajectory.erase(meta.trajectory.begin());
-        //move to next street
-        dist_from_origin += length;
+
+        delete meta.trajectory.back();  // Delete the last element
+        meta.trajectory.pop_back();     // Pop the last element
+        dist_from_origin += length;     // Move to the next segment
     }
-    if(finish){
-        assert(meta.trajectory.size()==1);
-        delete meta.trajectory[0];
+
+    if (finish) {
+        assert(meta.trajectory.size() == 1);
+        delete meta.trajectory.back();
         meta.trajectory.clear();
         meta.loc = meta.end;
     }
