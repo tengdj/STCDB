@@ -680,6 +680,10 @@ void workbench::dump_CTB_meta(const char *path, int i) {
     logt("CTB meta %d dump to %s",start_time, i, path);
 }
 
+double bytes_to_MB(size_t bytes) {
+    return bytes / (1024.0 * 1024.0);
+}
+
 void workbench::load_CTB_meta(const char *path, int i) {
     struct timeval start_time = get_cur_time();
     ifstream in(path, ios::in | ios::binary);
@@ -704,7 +708,32 @@ void workbench::load_CTB_meta(const char *path, int i) {
     in.read((char *)ctbs[i].o_buffer.boxes, ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box));
     in.close();
     //RTree
-    ctbs[i].box_rtree = new RTree<short *, double, 2, double>();
+    ctbs[i].box_rtree = new RTree<short *, double, 2, double>();        //size nearly equals to bitmap_mbrs
+    std::cerr << "Size of ctbs[i].first_widpid: "
+              << bytes_to_MB(config->CTF_count * sizeof(uint64_t)) << " MB" << std::endl;
+
+    std::cerr << "Size of ctbs[i].sids: "
+              << bytes_to_MB(config->num_objects * sizeof(unsigned short)) << " MB" << std::endl;
+
+    std::cerr << "Size of ctbs[i].bitmaps: "
+              << bytes_to_MB(bitmaps_size * sizeof(unsigned char)) << " MB" << std::endl;
+
+    std::cerr << "Size of ctbs[i].bitmap_mbrs: "
+              << bytes_to_MB(config->CTF_count * sizeof(box)) << " MB" << std::endl;
+
+    std::cerr << "Size of ctbs[i].CTF_capacity: "
+              << bytes_to_MB(config->CTF_count * sizeof(uint)) << " MB" << std::endl;
+
+    std::cerr << "Size of ctbs[i].o_buffer.keys: "
+              << bytes_to_MB(ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t)) << " MB" << std::endl;
+
+    std::cerr << "Size of ctbs[i].o_buffer.boxes: "
+              << bytes_to_MB(ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box)) << " MB" << std::endl;
+
+    uint byte_of_CTB_meta = config->CTF_count * sizeof(uint64_t) + config->num_objects * sizeof(unsigned short) + bitmaps_size * sizeof(unsigned char)
+                            + config->CTF_count * sizeof(box) * 2 + config->CTF_count * sizeof(uint) + ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t)
+                            + ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box);
+    cerr << "byte_of_CTB_meta: " << byte_of_CTB_meta << endl;
     for(uint j = 0; j < config->CTF_count; ++j){
         ctbs[i].box_rtree->Insert(ctbs[i].bitmap_mbrs[j].low, ctbs[i].bitmap_mbrs[j].high, new short(j));
     }

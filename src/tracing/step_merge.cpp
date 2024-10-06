@@ -177,10 +177,20 @@ uint CTF::search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_capacit
 
 
 CTB::~CTB(){
-    delete []ctfs;
-    delete []first_widpid;
-//    if(box_rtree)
-//        delete box_rtree;
+    if(ctfs)
+        delete []ctfs;
+    if(first_widpid)
+        delete []first_widpid;
+    if(sids)
+        delete []sids;
+    if(bitmaps)
+        delete []bitmaps;
+    if(bitmap_mbrs)
+        delete []bitmap_mbrs;
+    if(CTF_capacity)
+        delete []CTF_capacity;
+    if(box_rtree)
+        delete box_rtree;
 }
 
 //uint sorted_run::search_in_sorted_run(uint big_sort_id, uint pid){                              //this pointer refers to a single sorted_run

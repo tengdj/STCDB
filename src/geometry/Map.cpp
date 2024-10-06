@@ -582,6 +582,7 @@ void Map::navigate(Point *positions, Trace_Meta & meta, int duration, int &count
         assert(meta.trajectory.size() == 1);
         delete meta.trajectory.back();
         meta.trajectory.clear();
+        meta.trajectory.shrink_to_fit();
         meta.loc = meta.end;
     }
 
