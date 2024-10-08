@@ -29,7 +29,8 @@ tracer::tracer(configuration *conf, box &b, Point *t, trace_generator *gen){
 			config->gpu = false;
 		}else{
 			assert(config->specific_gpu<gpus.size());
-			gpu = gpus[config->specific_gpu];
+			//gpu = gpus[config->specific_gpu];
+            gpu = gpus[gpus.size()-1];
 			gpu->print();
 			for(int i=0;i<gpus.size();i++){
 				if(i!=config->specific_gpu){
@@ -53,7 +54,8 @@ tracer::tracer(configuration *conf){
 			config->gpu = false;
 		}else{
 			assert(config->specific_gpu<gpus.size());
-			gpu = gpus[config->specific_gpu];
+			//gpu = gpus[config->specific_gpu];
+            gpu = gpus[gpus.size()-1];
 			gpu->print();
 			for(int i=0;i<gpus.size();i++){
 				if(i!=config->specific_gpu){
@@ -635,23 +637,22 @@ void *straight_dump(void *arg){
     bench->ctbs[old_big].o_buffer.boxes = new f_box[bench->ctbs[old_big].o_buffer.oversize_kv_count];
     copy(bench->h_oversize_buffers[offset].boxes, bench->h_oversize_buffers[offset].boxes + bench->ctbs[old_big].o_buffer.oversize_kv_count, bench->ctbs[old_big].o_buffer.boxes);
 
-    cout << "test oversize" << endl;
-    for(uint i = 0; i < min((uint)100, bench->ctbs[old_big].o_buffer.oversize_kv_count); i++){
-        print_parse_key(bench->ctbs[old_big].o_buffer.keys[i]);
-            cout << bench->ctbs[old_big].o_buffer.boxes[i].low[0] << endl;
-        cout << "sid" << bench->ctbs[old_big].sids[get_key_oid(bench->ctbs[old_big].o_buffer.keys[i]) ] << endl;
-    }
+//    cout << "test oversize" << endl;
+//    for(uint i = 0; i < min((uint)100, bench->ctbs[old_big].o_buffer.oversize_kv_count); i++){
+//        print_parse_key(bench->ctbs[old_big].o_buffer.keys[i]);
+//            cout << bench->ctbs[old_big].o_buffer.boxes[i].low[0] << endl;
+//        cout << "sid" << bench->ctbs[old_big].sids[get_key_oid(bench->ctbs[old_big].o_buffer.keys[i]) ] << endl;
+//    }
 
     bench->ctbs[old_big].box_rtree = new RTree<short *, double, 2, double>();
-    cout <<"before insert"<< endl;
     for(uint i = 0; i < bench->config->CTF_count; ++i){
         bench->ctbs[old_big].box_rtree->Insert(bench->h_bitmap_mbrs[offset][i].low, bench->h_bitmap_mbrs[offset][i].high, new short(i));
     }
 
-    cout << "CTF_capacitys:" << endl;
-    for(uint i = 0; i < bench->config->CTF_count; i++){
-        cout << bench->ctbs[old_big].CTF_capacity[i] << endl;
-    }
+//    cout << "CTF_capacitys:" << endl;
+//    for(uint i = 0; i < bench->config->CTF_count; i++){
+//        cout << bench->ctbs[old_big].CTF_capacity[i] << endl;
+//    }
 //    cerr << "all bitmap_mbrs" << endl;
 //    for(uint i = 0; i < bench->config->SSTable_count; i++){
 //        bench->bg_run[old_big].bitmap_mbrs[i].print();
@@ -873,7 +874,7 @@ void tracer::process(){
 //                logt("search memtable",newstart);
 
                 //search disk
-                bench->search_in_disk(bench->search_single_pid, bench->valid_timestamp);
+                bench->id_search_in_disk(bench->search_single_pid, bench->valid_timestamp);
                 bench->pro.search_in_disk_time += get_time_elapsed(newstart,false);
                 logt("search in disk",newstart);
                 pthread_mutex_unlock(&bench->mutex_i);
@@ -986,7 +987,7 @@ void tracer::process(){
 //                }
 //
 ////                for(uint i = 0 ; i < bench->ctbs[1].o_buffer.oversize_kv_count; i++){
-////                    bench->search_in_disk( get_key_oid(bench->ctbs[1].o_buffer.keys[i]), 15);
+////                    bench->id_search_in_disk( get_key_oid(bench->ctbs[1].o_buffer.keys[i]), 15);
 ////                }
 //
 //                uint question_count = 10000;
@@ -1079,7 +1080,7 @@ void tracer::process(){
                 bench->dump_meetings(st);
             }
 
-            if(st+t+1 == config->start_time+config->duration - 5  || st+t+1 % 100000 == 0){
+            if(st+t+1 == config->start_time+config->duration - 5  || (st+t+1) % 100000 == 0){
                 bench->dump_meta(config->CTB_meta_path);
             }
 		}

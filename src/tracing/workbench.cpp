@@ -6,7 +6,6 @@
  */
 
 #include "workbench.h"
-#include <unordered_set>
 
 
 workbench::workbench(workbench *bench):workbench(bench->config){
@@ -351,157 +350,137 @@ bool workbench::search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vect
 //    }
 //}
 
-bool workbench::search_in_disk(uint pid, uint timestamp){
-    //cout<<"oid disk search "<<pid<<endl;
+void workbench::load_CTF_keys(uint CTB_id, uint CTF_id){
+    ifstream read_sst;
+    string filename = config->raid_path + to_string(CTF_id%8) + "/SSTable_"+to_string(CTB_id)+"-"+to_string(CTF_id);
+    read_sst.open(filename, ios::in|ios::binary);
+    assert(read_sst.is_open());
+    ctbs[CTB_id].ctfs[CTF_id].keys = new __uint128_t[ctbs[CTB_id].CTF_capacity[CTF_id]];
+    read_sst.read((char *)ctbs[CTB_id].ctfs[CTF_id].keys, sizeof(__uint128_t) * ctbs[CTB_id].CTF_capacity[CTF_id]);
+    read_sst.close();
+}
+
+bool workbench::search_time_in_disk(uint pid, uint start_time, uint end_time){          //not finish
     bool ret = false;
     for(int i=0; i < ctb_count; i++) {
-        if ((ctbs[i].start_time_min < timestamp) && (timestamp < ctbs[i].end_time_max) ) {
-            //cout<<"big_sorted_run_num:"<<i<<endl;
-            uint64_t wp = pid;
-            if(ctbs[i].sids[pid] == 0){
-                wid_filter_count++;
-                continue;
-            }
-            else if(ctbs[i].sids[pid] == 1){
-                //cout << "oid search buffer" << endl;
-                id_find_count += ctbs[i].o_buffer.search_buffer(pid);
-            }
-            else{
-                wp += ((uint64_t)ctbs[i].sids[pid] << OID_BIT);
-                //cout<<"wp: "<<wp<<endl;
+        if ((ctbs[i].start_time_min < end_time) && (start_time < ctbs[i].end_time_max)) {      //intersect
+            ret = true;
+            if((start_time < ctbs[i].end_time_min) && (ctbs[i].end_time_max < end_time)){       //all accepted
+                uint count = 0;
+                for(int j = 0; j < ctbs[i].CTF_count; j++){
+                    count += ctbs[i].CTF_capacity[j];
+                }
             }
             if(!ctbs[i].ctfs){
-                //cout<<"new SSTables"<<endl;
-                ctbs[i].ctfs = new CTF[config->CTF_count];                   //maybe useful later, should not delete after this func , if(!NULL)
+                ctbs[i].ctfs = new CTF[config->CTF_count];
             }
-            ifstream read_sst;
 
-            //high level binary search
-            int find = -1;
-            int low = 0;
-            int high = config->CTF_count - 1;
-            int mid;
-            while (low <= high) {
-                mid = (low + high) / 2;
-                //cout << bg_run[i].first_widpid[mid] << endl;
-                if (ctbs[i].first_widpid[mid] == wp){
-                    find = mid;
-                    break;
+            for(int j = 0; j < ctbs[i].CTF_count; j++){
+                if(!ctbs[i].ctfs[j].keys){
+                    load_CTF_keys(i, j);
                 }
-                else if (ctbs[i].first_widpid[mid] > wp){
-                    high = mid - 1;
-                }
-                else {
-                    low = mid + 1;
+                for(uint q = 0; q < ctbs[i].CTF_capacity[j]; q++){
+                    uint key_end_time = ctbs[i].end_time_min + get_key_end(ctbs[i].ctfs[j].keys[q]);
+                    uint key_start_time = key_end_time - get_key_duration(ctbs[i].ctfs[j].keys[q]);
+                    if( (key_start_time < end_time) && (start_time < key_end_time)){
+
+
+
+                    }
                 }
             }
-            if(find==-1){
+        }
+    }
+    return ret;
+}
+
+bool workbench::id_search_in_CTB(uint pid, uint CTB_id){
+    uint i = CTB_id;
+    uint64_t wp = pid;
+    if(ctbs[i].sids[pid] == 0){
+        wid_filter_count++;
+        return false;
+    }
+    else if(ctbs[i].sids[pid] == 1){
+        //cout << "oid search buffer" << endl;
+        id_find_count += ctbs[i].o_buffer.search_buffer(pid);
+    }
+    else{
+        wp += ((uint64_t)ctbs[i].sids[pid] << OID_BIT);
+        //cout<<"wp: "<<wp<<endl;
+    }
+    if(!ctbs[i].ctfs){
+        //cout<<"new SSTables"<<endl;
+        ctbs[i].ctfs = new CTF[config->CTF_count];                   //maybe useful later, should not delete after this func , if(!NULL)
+    }
+    ifstream read_sst;
+
+    //high level binary search
+    int find = -1;
+    int low = 0;
+    int high = config->CTF_count - 1;
+    int mid;
+    while (low <= high) {
+        mid = (low + high) / 2;
+        //cout << bg_run[i].first_widpid[mid] << endl;
+        if (ctbs[i].first_widpid[mid] == wp){
+            find = mid;
+            break;
+        }
+        else if (ctbs[i].first_widpid[mid] > wp){
+            high = mid - 1;
+        }
+        else {
+            low = mid + 1;
+        }
+    }
+    if(find==-1){
 //                cout<<"not find in first_widpid"<<endl;
 //                cout << low << "-" << bg_run[i].first_widpid[low] << endl;
 //                cout << mid << "-" << bg_run[i].first_widpid[mid] << endl;
 //                cout << high << "-" << bg_run[i].first_widpid[high] << endl;
-                if(high<0){
-                    high = 0;
-                }
-                if(!ctbs[i].ctfs[high].keys){
-                    //cout<<"new SSTables keys"<<high<<endl;
-                    string filename = config->raid_path + to_string(high%8) + "/SSTable_"+to_string(i)+"-"+to_string(high);
-                    //cout<<filename<<endl;
-                    ctbs[i].ctfs[high].keys = new __uint128_t [ctbs[i].CTF_capacity[high]];
-                    read_sst.open(filename, ios::in|ios::binary);
-                    read_sst.read((char *)ctbs[i].ctfs[high].keys, sizeof(__uint128_t) * ctbs[i].CTF_capacity[high]);
-                    read_sst.close();
-                }
-                uint target_count = ctbs[i].ctfs[high].search_SSTable(wp, search_multi, ctbs[i].CTF_capacity[high], search_multi_length, search_multi_pid);
-                id_find_count += target_count;
-                if(target_count){
-                    ret = true;
-                }
-                else{
-                    id_not_find_count++;
-                }
-                continue;
-            }
-/*
-            //cout<<"high level binary search finish and find"<<endl;
-            //for the case, there are many SSTables that first_widpid==wp
-            //find start and end
-            uint pid_start = find;
-            while(pid_start>=1){
-                pid_start--;
-                if(ctbs[i].first_widpid[pid_start] != wp){
-                    break;
-                }
-            }
-            if(!ctbs[i].ctfs[pid_start].keys){
-                read_sst.open("../store/SSTable_"+to_string(i)+"-"+to_string(pid_start));
-                assert(read_sst.is_open());
-                ctbs[i].ctfs[pid_start].keys = new __uint128_t[ctbs[i].CTF_capacity[pid_start]];
-                read_sst.read((char *)ctbs[i].ctfs[pid_start].keys, sizeof(__uint128_t) * ctbs[i].CTF_capacity[pid_start]);
-                read_sst.close();
-            }
-            ctbs[i].ctfs[pid_start].search_SSTable(wp, search_multi, ctbs[i].CTF_capacity[pid_start], search_multi_length, search_multi_pid);
-            uint cursor = pid_start+1;
-            uint temp_pid;
-            while(true) {
-                read_sst.open("../store/SSTable_" + to_string(i) + "-" + to_string(cursor));
-                assert(read_sst.is_open());
-                if(!ctbs[i].ctfs[cursor].keys){
-                    ctbs[i].ctfs[cursor].keys = new __uint128_t[ctbs[i].CTF_capacity[cursor]];
-                }
-                read_sst.read((char *) ctbs[i].ctfs[cursor].keys, sizeof(__uint128_t) * ctbs[i].CTF_capacity[cursor]);
-                read_sst.close();
-                if (cursor + 1 < config->CTF_count) {
-                    if (ctbs[i].first_widpid[cursor + 1] != wp) {               //must shut down in this cursor
-                        cout<<"case 1"<<endl;
-                        uint index = 0;
-                        while (index <= ctbs[i].CTF_capacity[cursor] - 1) {
-                            temp_pid = get_key_oid(ctbs[i].ctfs[cursor].keys[index]) ;
-                            if (temp_pid == pid) {
-                                id_find_count++;
-                                //cout << bg_run[i].sst[cursor].keys[index] << endl;
-                                if(search_multi){
-                                    search_multi_pid[search_multi_length] = get_key_oid(
-                                            ctbs[i].ctfs[cursor].keys[index]) ;
-                                    search_multi_length++;
-                                }
-                            } else break;
-                            index++;
-                        }
-                        break;
-                    }
-                    if (ctbs[i].first_widpid[cursor + 1] == wp) {               //mustn't shut down in this cursor
-                        for (uint j = 0; j < ctbs[i].CTF_capacity[cursor]; j++) {
-                            //cout << bg_run[i].sst[cursor].keys[j] << endl;
-                            if(search_multi){
-                                search_multi_pid[search_multi_length] = get_key_oid(ctbs[i].ctfs[cursor].keys[j]) ;
-                                search_multi_length++;
-                            }
-                        }
-                    }
-                    cursor++;
-                } else {                                           // cursor is the last one, same too bg_run->first_widpid[cursor+1]!=pid
-                    uint index = 0;
-                    while (index <= ctbs[i].CTF_capacity[cursor] - 1) {
-                        temp_pid = get_key_oid(ctbs[i].ctfs[cursor].keys[index]);
-                        cout<<"temp_pid: "<<temp_pid<<endl;
-                        if (temp_pid == pid) {
-                            //cout << bg_run[i].sst[cursor].keys[index] << endl;
-                            if(search_multi){
-                                search_multi_pid[search_multi_length] = get_key_oid(ctbs[i].ctfs[cursor].keys[index]);
-                                search_multi_length++;
-                            }
-                        } else break;
-                        index++;
-                    }
-                    break;
-                }
-            }
-            ret = true;
-*/
+        if(high<0){
+            high = 0;
+        }
+        if(!ctbs[i].ctfs[high].keys){
+            load_CTF_keys(i, high);
+        }
+        uint target_count = ctbs[i].ctfs[high].search_SSTable(wp, search_multi, ctbs[i].CTF_capacity[high], search_multi_length, search_multi_pid);
+        id_find_count += target_count;
+        if(target_count){
+            return true;
+        }
+        else{
+            id_not_find_count++;
+            return false;
         }
     }
-    //cout<<"finish disk search "<<pid<<endl;
+    //else  true
+    if(!ctbs[i].ctfs[find].keys){
+        load_CTF_keys(i, find);
+    }
+    for(int cursor = 0; cursor < ctbs[i].CTF_capacity[find]; cursor++){
+        uint64_t temp_wp = ctbs[i].ctfs[high].keys[cursor] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
+        if(temp_wp == wp){
+            id_find_count++;
+            if(search_multi){
+                search_multi_pid[search_multi_length] = get_key_oid(ctbs[i].ctfs[high].keys[cursor]);
+                search_multi_length++;
+            }
+        }
+        else break;
+    }
+    return true;
+}
+
+bool workbench::id_search_in_disk(uint pid, uint timestamp){
+    //cout<<"oid disk search "<<pid<<endl;
+    bool ret = false;
+    for(int i=0; i < ctb_count; i++) {
+        if ((ctbs[i].start_time_min < timestamp) && (timestamp < ctbs[i].end_time_max) ) {
+            ret |= id_search_in_CTB(pid, i);
+        }
+    }
     return ret;
 }
 
@@ -531,115 +510,85 @@ void workbench::load_meetings(uint st) {
     logt("loaded %d objects last for 100 seconds start from %d time from %s",start_time, config->num_objects, st, filename.c_str());
 }
 
-box workbench::parse_to_real_mbr(unsigned short first_low, unsigned short first_high, uint64_t value) {
-//    uint first_low0, first_low1, first_high0, first_high1;
-//    d2xy(FIRST_HILBERT_BIT/2, first_low, first_low0, first_low1);
-//    d2xy(FIRST_HILBERT_BIT/2, first_high, first_high0, first_high1);
-//    double float_first_low0 = (double)first_low0/(pow(2,WID_BIT/2) - 1)*(mbr.high[0] - mbr.low[0]) + mbr.low[0];
-//    double float_first_low1 = (double)first_low1/(pow(2,WID_BIT/2) - 1)*(mbr.high[1] - mbr.low[1]) + mbr.low[1];
-//    double float_first_high0 = (double)first_high0/(pow(2,WID_BIT/2) - 1)*(mbr.high[0] - mbr.low[0]) + mbr.low[0];
-//    double float_first_high1 = (double)first_high1/(pow(2,WID_BIT/2) - 1)*(mbr.high[1] - mbr.low[1]) + mbr.low[1];
-//    box first(float_first_low0, float_first_low1, float_first_high0, float_first_high1);
-//    cerr<<"first\n";
-//    first.print();
-//
-//    uint second_low, second_high;
-//    second_low = get_value_mbr_low(value);
-//    second_high = get_value_mbr_high(value);
-//    uint second_low0, second_low1, second_high0, second_high1;
-//    d2xy(FIRST_HILBERT_BIT/2, second_low, second_low0, second_low1);
-//    d2xy(FIRST_HILBERT_BIT/2, second_high, second_high0, second_high1);
-//    box ret;
-//    ret.low[0] = (double)second_low0/15*(float_first_high0 - float_first_low0) + float_first_low0;
-//    ret.low[1] = (double)second_low1/15*(float_first_high1 - float_first_low1) + float_first_low1;
-//    ret.high[0] = (double)second_high0/15*(float_first_high0 - float_first_low0) + float_first_low0;
-//    ret.high[1] = (double)second_high1/15*(float_first_high1 - float_first_low1) + float_first_low1;
-//    ret.print();
-    box ret;
-    return ret;
-}
-
 bool PolygonSearchCallback(short * i, box poly_mbr,void* arg){
     vector<pair<short, box>> * ret = (vector<pair<short, box>> *)arg;
     ret->push_back(make_pair(*i, poly_mbr));
     return true;
 }
 
+bool workbench::mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni){
+    uint i = CTB_id;
+    bool ret = false, find = false;
+    box bit_b = make_bit_box(b);
+    uint bit_pos = 0;
+    if(!ctbs[i].ctfs){
+        ctbs[i].ctfs = new CTF[config->CTF_count];
+    }
+    //cout << "in bg_run" << i << endl;
+
+    uint buffer_find = 0;
+    for(uint q = 0; q < ctbs[i].o_buffer.oversize_kv_count; q++){
+        if(ctbs[i].o_buffer.boxes[q].intersect(b)){
+            uni.insert(get_key_oid(ctbs[i].o_buffer.keys[i]));
+            buffer_find++;
+            mbr_find_count++;
+            //cout<<"box find!"<<endl;
+            //ctbs[i].o_buffer.boxes[q].print();
+        }
+    }
+
+    vector<pair<short, box>> intersect_mbrs;
+    ctbs[i].box_rtree->Search(b.low, b.high, PolygonSearchCallback, (void *)&intersect_mbrs);
+    intersect_sst_count += intersect_mbrs.size();
+    for (uint j = 0; j < intersect_mbrs.size(); j++) {
+        uint CTF_id = intersect_mbrs[j].first;
+        find = false;
+        for (uint p = bit_b.low[0]-1; (p <= bit_b.high[0]+1) && (!find); p++) {
+            for (uint q = bit_b.low[1]-1; (q <= bit_b.high[1]+1) && (!find); q++) {
+                bit_pos = xy2d(SID_BIT / 2, p, q);
+                if (ctbs[i].bitmaps[CTF_id * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
+                    //cerr << "SSTable_" << CTF_id << "bit_pos" << bit_pos << endl;
+                    find = true;
+                    ret = true;
+                    break;
+                }
+            }
+        }
+        if(find){
+            bit_find_count++;
+            if(!ctbs[i].ctfs[CTF_id].keys){
+                load_CTF_keys(i, CTF_id);
+            }
+            uint this_find = 0;
+            for(uint q = 0; q < ctbs[i].CTF_capacity[CTF_id]; q++){
+                uint pid = get_key_oid(ctbs[i].ctfs[CTF_id].keys[q]);
+                box key_box;
+                parse_mbr(ctbs[i].ctfs[CTF_id].keys[q], key_box, intersect_mbrs[j].second);
+                if(b.intersect(key_box)){
+                    uni.insert(pid);
+                    this_find++;
+                    mbr_find_count++;
+                    //cout<<"box find!"<<endl;
+                    //key_box.print();
+
+                }
+            }
+            //cerr<<this_find<<"finds in sst "<<CTF_id<<endl;
+
+        }
+    }
+    return ret;
+}
+
 bool workbench::mbr_search_in_disk(box b, uint timestamp) {
     //assert(mbr.contain(b));
     //cout << "mbr disk search" << endl;
     unordered_set<uint> uni;
-    bool ret = false, find = false;
-    box bit_b = make_bit_box(b);
-    uint bit_pos = 0;
+    bool ret = false;
     //for (int i = 0; i < ctb_count; i++) {
     for(int i = 0; i < ctb_count; i++){
         if ((ctbs[i].start_time_min < timestamp) && (timestamp < ctbs[i].end_time_max)) {
-            if(!ctbs[i].ctfs){
-                ctbs[i].ctfs = new CTF[config->CTF_count];
-            }
-            //cout << "in bg_run" << i << endl;
-
-            uint buffer_find = 0;
-            for(uint q = 0; q < ctbs[i].o_buffer.oversize_kv_count; q++){
-                if(ctbs[i].o_buffer.boxes[q].intersect(b)){
-                    uni.insert(get_key_oid(ctbs[i].o_buffer.keys[i]));
-                    buffer_find++;
-                    mbr_find_count++;
-                    //cout<<"box find!"<<endl;
-                    //ctbs[i].o_buffer.boxes[q].print();
-                }
-            }
-
-            vector<pair<short, box>> intersect_mbrs;
-            ctbs[i].box_rtree->Search(b.low, b.high, PolygonSearchCallback, (void *)&intersect_mbrs);
-            intersect_sst_count += intersect_mbrs.size();
-            for (uint j = 0; j < intersect_mbrs.size(); j++) {
-                uint CTF_id = intersect_mbrs[j].first;
-                find = false;
-                for (uint p = bit_b.low[0]-1; (p <= bit_b.high[0]+1) && (!find); p++) {
-                    for (uint q = bit_b.low[1]-1; (q <= bit_b.high[1]+1) && (!find); q++) {
-                        bit_pos = xy2d(SID_BIT / 2, p, q);
-                        if (ctbs[i].bitmaps[CTF_id * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
-                            //cerr << "SSTable_" << CTF_id << "bit_pos" << bit_pos << endl;
-                            find = true;
-                            ret = true;
-                            break;
-                        }
-                    }
-                }
-                if(find){
-                    bit_find_count++;
-                    if(!ctbs[i].ctfs[CTF_id].keys){
-                        ifstream read_sst;
-                        string filename = config->raid_path + to_string(CTF_id%8) + "/SSTable_"+to_string(i)+"-"+to_string(CTF_id);
-                        //cout<<filename<<endl;
-                        read_sst.open(filename, ios::in|ios::binary);                   //final place is not high+1, but high
-                        assert(read_sst.is_open());
-                        ctbs[i].ctfs[CTF_id].keys = new __uint128_t[ctbs[i].CTF_capacity[CTF_id]];
-                        read_sst.read((char *)ctbs[i].ctfs[CTF_id].keys, sizeof(__uint128_t) * ctbs[i].CTF_capacity[CTF_id]);
-                        //cout<<"read right"<<endl;
-                        read_sst.close();
-                    }
-                    uint this_find = 0;
-                    for(uint q = 0; q < ctbs[i].CTF_capacity[CTF_id]; q++){
-                        uint pid = get_key_oid(ctbs[i].ctfs[CTF_id].keys[q]);
-                        box key_box;
-                        parse_mbr(ctbs[i].ctfs[CTF_id].keys[q], key_box, intersect_mbrs[j].second);
-                        if(b.intersect(key_box)){
-                            uni.insert(pid);
-                            this_find++;
-                            mbr_find_count++;
-                            //cout<<"box find!"<<endl;
-                            //key_box.print();
-
-                        }
-                    }
-                    //cerr<<this_find<<"finds in sst "<<CTF_id<<endl;
-
-                }
-
-            }
+            ret |= mbr_search_in_CTB(b, i, uni);
         }
     }
     mbr_unique_find = uni.size();

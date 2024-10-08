@@ -1813,12 +1813,12 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 //            delete[] temp_f_box;
 //        }
 
-        cerr << "kv box, real box, and then the bitmap_mbr"<<endl;
-        bench->h_bitmap_mbrs[offset][0].print();
-        cerr<<"bitmap_mbrs:"<<endl;
-        for(int i = 0; i < bench->config->CTF_count; i++){
-            bench->h_bitmap_mbrs[offset][i].print();
-        }
+//        cerr << "kv box, real box, and then the bitmap_mbr"<<endl;
+//        bench->h_bitmap_mbrs[offset][0].print();
+//        cerr<<"bitmap_mbrs:"<<endl;
+//        for(int i = 0; i < bench->config->CTF_count; i++){
+//            bench->h_bitmap_mbrs[offset][i].print();
+//        }
 
 //        //longer edges sort
 //        thrust::device_ptr<float> d_vec_edges = thrust::device_pointer_cast(h_bench.d_longer_edges);

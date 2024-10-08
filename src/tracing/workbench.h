@@ -14,6 +14,7 @@
 #include "../index/QTree.h"
 #include "step_merge.h"
 #include "../cuda/cuda_util.cuh"
+#include <unordered_set>
 
 typedef struct profiler{
 	double copy_time = 0;
@@ -196,6 +197,7 @@ public:
     uint mbr_find_count = 0;
     uint mbr_unique_find = 0;
     uint intersect_sst_count = 0;
+    uint time_find_count = 0;
     uint meeting_cut_count = 0;
     uint larger_than_1000s = 0;
     uint larger_than_2000s = 0;
@@ -328,11 +330,15 @@ public:
     box make_bit_box(box b);
 
     bool search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vector<uint> & v_indices);
-    bool search_in_disk(uint pid, uint timestamp);
+    bool id_search_in_disk(uint pid, uint timestamp);
     bool mbr_search_in_disk(box b, uint timestamp);
+    bool search_time_in_disk(uint pid, uint start_time, uint end_time);
+    bool id_search_in_CTB(uint pid, uint CTB_id);
+    bool mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni);
 
+    void load_CTF_keys(uint CTB_id, uint CTF_id);
     void load_big_sorted_run(uint b);
-    box parse_to_real_mbr(unsigned short first_low, unsigned short first_high, uint64_t value);
+    //box parse_to_real_mbr(unsigned short first_low, unsigned short first_high, uint64_t value);
 
     void dump_meetings(uint st);
     void load_meetings(uint st);
