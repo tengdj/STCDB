@@ -66,8 +66,8 @@ void workbench::clear(){
 			data[i] = NULL;
 			data_size[i] = 0;
 		}
-		data_index = 0;
 	}
+    data_index = 0;
 	delete insert_lk;
     //ctbs.clear();
 }

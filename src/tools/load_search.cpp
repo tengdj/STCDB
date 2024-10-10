@@ -39,8 +39,8 @@ void query_search_id(workbench *bench){
     for(int i = 0; i < question_count; i++){
         struct timeval disk_search_time = get_cur_time();
         bench->id_search_in_disk(pid, 15);
-        for(int j = 0; j < bench->ctb_count; i++){
-            bench->id_search_in_CTB(pid, i);
+        for(int j = 0; j < bench->ctb_count; j++){
+            bench->id_search_in_CTB(pid, j);
         }
         pid++;
         double time_consume = get_time_elapsed(disk_search_time);
@@ -104,10 +104,11 @@ int main(int argc, char **argv){
 //                if(system(cmd.c_str())!=0){
 //                    fprintf(stderr, "Error when disable buffer cache\n");
 //                }
-        for(int i = 0; i < bench->ctb_count; i++){
-            bench->load_big_sorted_run(i);
-        }
-        fprintf(stderr,"\ttotal load keys:\t%.2f\n", bench->pro.load_keys_time);
+
+//        for(int i = 0; i < bench->ctb_count; i++){
+//            bench->load_big_sorted_run(i);
+//        }
+//        fprintf(stderr,"\ttotal load keys:\t%.2f\n", bench->pro.load_keys_time);
 
         query_search_id(bench);
         //query_search_box(bench);
