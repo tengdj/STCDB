@@ -606,8 +606,10 @@ void workbench::dump_meta(const char *path) {
     cout << "sizeof(generator_configuration)" << sizeof(generator_configuration) << endl;
     wf.write((char *)this, sizeof(workbench));
     for(int i = 0; i < ctb_count; i++){
-        string CTB_path = string(path) + "CTB" + to_string(i);
-        dump_CTB_meta(CTB_path.c_str(), i);
+        if(ctbs[i].sids){
+            string CTB_path = string(path) + "CTB" + to_string(i);
+            dump_CTB_meta(CTB_path.c_str(), i);
+        }
     }
     wf.close();
     logt("bench meta dumped to %s",start_time,path);
@@ -627,6 +629,9 @@ void workbench::dump_CTB_meta(const char *path, int i) {
     //RTree
     wf.close();
     logt("CTB meta %d dump to %s",start_time, i, path);
+
+    delete[] ctbs[i].sids;
+    ctbs[i].sids = NULL;
 }
 
 double bytes_to_MB(size_t bytes) {

@@ -717,6 +717,10 @@ void *straight_dump(void *arg){
     //logt("merge sort and flush", bg_start);
     //delete[] bit_points;
     bench->dumping = false;
+
+    string CTB_path = string(bench->config->CTB_meta_path) + "CTB" + to_string(old_big);
+    bench->dump_CTB_meta(CTB_path.c_str(), old_big);
+
     return NULL;
 }
 

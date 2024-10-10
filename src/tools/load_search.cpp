@@ -110,7 +110,7 @@ int main(int argc, char **argv){
 //        }
 //        fprintf(stderr,"\ttotal load keys:\t%.2f\n", bench->pro.load_keys_time);
 
-        query_search_id(bench);
+        //query_search_id(bench);
         //query_search_box(bench);
 
     }
