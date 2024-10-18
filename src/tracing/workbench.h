@@ -330,14 +330,15 @@ public:
     box make_bit_box(box b);
 
     bool search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vector<uint> & v_indices);
-    bool id_search_in_disk(uint pid, uint timestamp);
-    bool mbr_search_in_disk(box b, uint timestamp);
-    bool search_time_in_disk(uint pid, uint start_time, uint end_time);
-    bool id_search_in_CTB(uint pid, uint CTB_id);
-    bool mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni);
+    bool id_search_in_disk(uint pid, time_query * tq);
+    bool mbr_search_in_disk(box b, time_query * tq);
+    uint search_time_in_disk(time_query * tq);
+    bool id_search_in_CTB(uint pid, uint CTB_id, time_query * tq);
+    bool mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq);
 
     void load_CTF_keys(uint CTB_id, uint CTF_id);
     void load_big_sorted_run(uint b);
+    void clear_all_keys();
     //box parse_to_real_mbr(unsigned short first_low, unsigned short first_high, uint64_t value);
 
     void dump_meetings(uint st);

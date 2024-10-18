@@ -878,7 +878,7 @@ void tracer::process(){
 //                logt("search memtable",newstart);
 
                 //search disk
-                bench->id_search_in_disk(bench->search_single_pid, bench->valid_timestamp);
+                //bench->id_search_in_disk(bench->search_single_pid, bench->valid_timestamp);
                 bench->pro.search_in_disk_time += get_time_elapsed(newstart,false);
                 logt("search in disk",newstart);
                 pthread_mutex_unlock(&bench->mutex_i);

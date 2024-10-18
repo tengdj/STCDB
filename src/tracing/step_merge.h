@@ -16,6 +16,18 @@
 #include "../index/RTree.h"
 #include "../cuda/cuda_util.cuh"
 
+class time_query{
+public:
+    uint t_start = 0;
+    uint t_end = 0;
+    bool abandon = true;
+    bool check_key_time(__uint128_t key){           // tq->t_start -= ctb.start_min   tq->t_end -= ctb.start_min
+        uint key_end = get_key_end(key);
+        uint key_start = key_end - get_key_duration(key);
+        return abandon || (key_start < t_end) && (t_start < key_end);
+    }
+};
+
 class oversize_buffer {             //contact tracing block
 public:
     uint oversize_kv_count = 0;
@@ -23,18 +35,12 @@ public:
     f_box * boxes = NULL;
 
     ~oversize_buffer();
-    uint search_buffer(uint32_t oid);
+    uint search_buffer(uint32_t oid, time_query * tq);
 };
-
-typedef struct key_value{
-    uint64_t key;
-    uint64_t value;
-}key_value;                         //sizeof(key_value)==32, beacuse 8+16=24, but 24<2*16=32
 
 class CTF{                          //contact tracing file
 public:
     __uint128_t * keys = NULL;
-    //key_value *kv = NULL;
     //uint SSTable_kv_capacity = 327680;              //67108864 * 5 / 1024 = 327,680 (Round up)
 
     ~CTF();
@@ -64,9 +70,7 @@ public:
     void print_meta(){
         fprintf(stdout,"start_time:%d~%d,end_time:%d~%d\n",start_time_min,start_time_max,end_time_min,end_time_max);
     }
-
-
-    //uint search_in_sorted_run(uint big_sort_id, uint pid);
 };
+
 
 #endif

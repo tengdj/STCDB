@@ -282,6 +282,19 @@ void workbench::load_big_sorted_run(uint b){
     delete[] pargs;
 }
 
+void workbench::clear_all_keys(){
+    for(int i = 0; i < ctb_count; i++){
+        for(int j = 0; j < config->CTF_count; j++){
+            if(ctbs[i].ctfs){
+                if(ctbs[i].ctfs[j].keys){
+                    delete []ctbs[i].ctfs[j].keys;
+                    ctbs[i].ctfs[j].keys = nullptr;
+                }
+            }
+        }
+    }
+}
+
 bool workbench::search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vector<uint> & v_indices){          //wid_pid       //for dump
     cout<<"memtable search "<<pid<<endl;
     uint offset = 0;
@@ -340,16 +353,6 @@ bool workbench::search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vect
     return ret;
 }
 
-//bool workbench::search_timestamp(uint timestamp){
-//    bool ret = false;
-//    int count;
-//    for(int i=0;i<big_sorted_run_count;i++) {
-//        if ( (bg_run[i].start_time_min < timestamp)&&(timestamp < bg_run[i].end_time_max) ) {
-//            int end_time
-//        }
-//    }
-//}
-
 void workbench::load_CTF_keys(uint CTB_id, uint CTF_id){
     ifstream read_sst;
     string filename = config->raid_path + to_string(CTF_id%8) + "/SSTable_"+to_string(CTB_id)+"-"+to_string(CTF_id);
@@ -360,50 +363,52 @@ void workbench::load_CTF_keys(uint CTB_id, uint CTF_id){
     read_sst.close();
 }
 
-bool workbench::search_time_in_disk(uint pid, uint start_time, uint end_time){          //not finish
-    bool ret = false;
+uint workbench::search_time_in_disk(time_query * tq){          //not finish
+    uint count = 0;
     for(int i=0; i < ctb_count; i++) {
-        if ((ctbs[i].start_time_min < end_time) && (start_time < ctbs[i].end_time_max)) {      //intersect
-            ret = true;
-            if((start_time < ctbs[i].end_time_min) && (ctbs[i].end_time_max < end_time)){       //all accepted
-                uint count = 0;
-                for(int j = 0; j < ctbs[i].CTF_count; j++){
+        if (tq->abandon || (ctbs[i].start_time_min < tq->t_end) && (tq->t_start < ctbs[i].end_time_max)) {      //intersect
+            if((tq->t_start < ctbs[i].end_time_min) && (ctbs[i].end_time_max < tq->t_end)){       //all accepted
+                for(int j = 0; j < config->CTF_count; j++){
                     count += ctbs[i].CTF_capacity[j];
                 }
             }
+            time_query tq_temp;
+            tq_temp.t_start = tq->t_start - ctbs[i].start_time_min;
+            tq_temp.t_end = tq->t_start - ctbs[i].start_time_min;
+            tq_temp.abandon = tq->abandon;
             if(!ctbs[i].ctfs){
                 ctbs[i].ctfs = new CTF[config->CTF_count];
             }
-
-            for(int j = 0; j < ctbs[i].CTF_count; j++){
+            for(int j = 0; j < config->CTF_count; j++){
                 if(!ctbs[i].ctfs[j].keys){
                     load_CTF_keys(i, j);
                 }
                 for(uint q = 0; q < ctbs[i].CTF_capacity[j]; q++){
-                    uint key_end_time = ctbs[i].end_time_min + get_key_end(ctbs[i].ctfs[j].keys[q]);
-                    uint key_start_time = key_end_time - get_key_duration(ctbs[i].ctfs[j].keys[q]);
-                    if( (key_start_time < end_time) && (start_time < key_end_time)){
-
-
-
+                    if( tq_temp.check_key_time(ctbs[i].ctfs[j].keys[q]) ){
+                        cout << "single find" << endl;
+                        count++;
                     }
                 }
             }
         }
     }
-    return ret;
+    return count;
 }
 
-bool workbench::id_search_in_CTB(uint pid, uint CTB_id){
+bool workbench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
     uint i = CTB_id;
     uint64_t wp = pid;
+    time_query tq_temp;
+    tq_temp.t_start = tq->t_start - ctbs[i].start_time_min;
+    tq_temp.t_end = tq->t_start - ctbs[i].start_time_min;
+    tq_temp.abandon = tq->abandon;
     if(ctbs[i].sids[pid] == 0){
         wid_filter_count++;
         return false;
     }
     else if(ctbs[i].sids[pid] == 1){
         //cout << "oid search buffer" << endl;
-        id_find_count += ctbs[i].o_buffer.search_buffer(pid);
+        id_find_count += ctbs[i].o_buffer.search_buffer(pid, &tq_temp);
     }
     else{
         wp += ((uint64_t)ctbs[i].sids[pid] << OID_BIT);
@@ -473,12 +478,12 @@ bool workbench::id_search_in_CTB(uint pid, uint CTB_id){
     return true;
 }
 
-bool workbench::id_search_in_disk(uint pid, uint timestamp){
+bool workbench::id_search_in_disk(uint pid, time_query * tq){
     //cout<<"oid disk search "<<pid<<endl;
     bool ret = false;
     for(int i=0; i < ctb_count; i++) {
-        if ((ctbs[i].start_time_min < timestamp) && (timestamp < ctbs[i].end_time_max) ) {
-            ret |= id_search_in_CTB(pid, i);
+        if (tq->abandon || (ctbs[i].start_time_min < tq->t_end) && (tq->t_start < ctbs[i].end_time_max)) {
+            ret |= id_search_in_CTB(pid, i, tq);
         }
     }
     return ret;
@@ -516,7 +521,7 @@ bool PolygonSearchCallback(short * i, box poly_mbr,void* arg){
     return true;
 }
 
-bool workbench::mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni){
+bool workbench::mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq){
     uint i = CTB_id;
     bool ret = false, find = false;
     box bit_b = make_bit_box(b);
@@ -560,38 +565,44 @@ bool workbench::mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni){
                 load_CTF_keys(i, CTF_id);
             }
             uint this_find = 0;
+            time_query tq_temp;
+            tq_temp.t_start = tq->t_start - ctbs[i].start_time_min;
+            tq_temp.t_end = tq->t_start - ctbs[i].start_time_min;
+            tq_temp.abandon = tq->abandon;
+//#pragma omp parallel for num_threads(config->num_threads)
             for(uint q = 0; q < ctbs[i].CTF_capacity[CTF_id]; q++){
-                uint pid = get_key_oid(ctbs[i].ctfs[CTF_id].keys[q]);
-                box key_box;
-                parse_mbr(ctbs[i].ctfs[CTF_id].keys[q], key_box, intersect_mbrs[j].second);
-                if(b.intersect(key_box)){
-                    uni.insert(pid);
-                    this_find++;
-                    mbr_find_count++;
-                    //cout<<"box find!"<<endl;
-                    //key_box.print();
-
+                __uint128_t temp_key = ctbs[i].ctfs[CTF_id].keys[q];
+                if(tq->abandon || tq_temp.check_key_time(temp_key)){
+                    uint pid = get_key_oid(temp_key);
+                    box key_box;
+                    parse_mbr(temp_key, key_box, intersect_mbrs[j].second);
+                    if(b.intersect(key_box)){
+                        uni.insert(pid);
+                        this_find++;
+                        mbr_find_count++;
+                        //cout<<"box find!"<<endl;
+                        //key_box.print();
+                    }
                 }
             }
             //cerr<<this_find<<"finds in sst "<<CTF_id<<endl;
-
         }
     }
     return ret;
 }
 
-bool workbench::mbr_search_in_disk(box b, uint timestamp) {
+bool workbench::mbr_search_in_disk(box b, time_query * tq){
     //assert(mbr.contain(b));
     //cout << "mbr disk search" << endl;
     unordered_set<uint> uni;
     bool ret = false;
     //for (int i = 0; i < ctb_count; i++) {
     for(int i = 0; i < ctb_count; i++){
-        if ((ctbs[i].start_time_min < timestamp) && (timestamp < ctbs[i].end_time_max)) {
-            ret |= mbr_search_in_CTB(b, i, uni);
+        if (tq->abandon || (ctbs[i].start_time_min < tq->t_end) && (tq->t_start < ctbs[i].end_time_max)) {
+            ret |= mbr_search_in_CTB(b, i, uni, tq);
         }
     }
-    mbr_unique_find = uni.size();
+    mbr_unique_find += uni.size();
     uni.clear();
     return ret;
 }

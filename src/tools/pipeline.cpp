@@ -5,7 +5,6 @@
 using namespace std;
 
 int main(int argc, char **argv){
-
     generator_configuration config = get_generator_parameters(argc, argv);
     //config.load_data = false;
     Map *m = new Map(config.map_path);

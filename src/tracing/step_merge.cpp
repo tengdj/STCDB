@@ -12,7 +12,7 @@ oversize_buffer::~oversize_buffer() {
     delete []boxes;
 }
 
-uint oversize_buffer::search_buffer(uint32_t oid) {
+uint oversize_buffer::search_buffer(uint32_t oid, time_query * tq) {
     uint count = 0;
     //cout<<"into search_SSTable"<<endl;
     int find = -1;
@@ -45,14 +45,16 @@ uint oversize_buffer::search_buffer(uint32_t oid) {
         temp_oid = get_key_oid(keys[cursor]);
     }
     if(temp_oid == oid && cursor == 0){
-        count++;
+        if(tq->abandon || tq->check_key_time(keys[cursor]))
+            count++;
         //cout<<oid<<endl;
     }
     while(cursor+1<oversize_kv_count){
         cursor++;
         temp_oid = get_key_oid(keys[cursor]);
         if(temp_oid == oid){
-            count++;
+            if(tq->abandon || tq->check_key_time(keys[cursor]))
+                count++;
             //cout<<oid<<"-"<<get_key_target(keys[cursor])<<endl;
         }
         else break;
