@@ -44,15 +44,14 @@ void experiment_search_oid(workbench *bench){
     q << "question number" << ',' << "time_consume(ms)" << ',' << "find_id_count" << ',' << "wid_filter_count" << endl;
     struct timeval disk_search_time = get_cur_time();
     double time_consume = 0;
-    for(int i = 0; i < 100; i++){
+    for(int i = 0; i < 10000; i++){
         bench->wid_filter_count = 0;
         bench->id_find_count = 0;
         bench->clear_all_keys();
         clear_cache();
         uint pid = get_rand_number(bench->config->num_objects);
         get_time_elapsed(disk_search_time, true);
-#pragma omp parallel for num_threads(bench->config->num_threads)
-        for(int j = 0; j < bench->ctb_count; j++){
+        for(int j = 0; j < 1015; j++){
             bench->id_search_in_CTB(pid, j, &tq);
         }
         time_consume = get_time_elapsed(disk_search_time, true);
@@ -175,7 +174,7 @@ int main(int argc, char **argv){
     string path = "../data/meta/";
     workbench * bench = load_meta(path.c_str());
 
-    cout << "search begin" <<endl;
+    cout << "search begin" << endl;
 
 
 
@@ -186,8 +185,8 @@ int main(int argc, char **argv){
 
     clear_cache();
     bench->clear_all_keys();
-    //experiment_search_oid(bench);
-    experiment_search_box(bench);
+    experiment_search_oid(bench);
+    //experiment_search_box(bench);
     //experiment_search_time(bench);
     //query_search_id(bench);
     //query_search_box(bench);
