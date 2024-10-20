@@ -16,18 +16,6 @@
 #include "../index/RTree.h"
 #include "../cuda/cuda_util.cuh"
 
-class time_query{
-public:
-    uint t_start = 0;
-    uint t_end = 0;
-    bool abandon = true;
-    bool check_key_time(__uint128_t key){           // tq->t_start -= ctb.start_min   tq->t_end -= ctb.start_min
-        uint key_end = get_key_end(key);
-        uint key_start = key_end - get_key_duration(key);
-        return abandon || (key_start < t_end) && (t_start < key_end);
-    }
-};
-
 class oversize_buffer {             //contact tracing block
 public:
     uint oversize_kv_count = 0;

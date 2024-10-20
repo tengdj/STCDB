@@ -8,6 +8,8 @@
 #ifndef QUERY_CONTEXT_H_
 #define QUERY_CONTEXT_H_
 #include "config.h"
+#include "../geometry/geometry.h"
+#include "../cuda/cuda_util.cuh"
 #include <pthread.h>
 
 #define MAX_LOCK_NUM 10000
@@ -89,6 +91,38 @@ public:
 	}
 };
 
+
+class time_query{
+public:
+    uint t_start = 0;
+    uint t_end = 0;
+    bool abandon = true;
+    bool check_key_time(__uint128_t key){           // tq->t_start -= ctb.start_min   tq->t_end -= ctb.start_min
+        uint key_end = get_key_end(key);
+        uint key_start = key_end - get_key_duration(key);
+        return abandon || (key_start < t_end) && (t_start < key_end);
+    }
+};
+
+class box_query{
+public:
+    box search_b;
+    bool abandon = true;
+    bool check_box_intersect(box key_box){
+        return abandon || search_b.intersect(key_box);
+    }
+};
+
+class object_query{
+
+};
+
+struct box_search_info{
+    uint ctb_id;
+    uint ctf_id;
+    box * bmap_mbr;
+    time_query tq;
+};
 
 
 #endif /* QUERY_CONTEXT_H_ */

@@ -350,4 +350,11 @@ public:
 extern void lookup_rec(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);
 extern void lookup_stack(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);
 
+class new_bench : public workbench{
+public:
+    vector<box_search_info> box_search_queue;
+    atomic<long long> search_count;
+};
+
+
 #endif /* SRC_TRACING_WORKBENCH_H_ */

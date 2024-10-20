@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <fstream>
 #include <set>
+#include <atomic>
 
 using namespace std;
 typedef unsigned int uint;

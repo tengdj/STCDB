@@ -569,22 +569,12 @@ bool workbench::mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, 
             tq_temp.t_start = tq->t_start - ctbs[i].start_time_min;
             tq_temp.t_end = tq->t_start - ctbs[i].start_time_min;
             tq_temp.abandon = tq->abandon;
-//#pragma omp parallel for num_threads(config->num_threads)
-            for(uint q = 0; q < ctbs[i].CTF_capacity[CTF_id]; q++){
-                __uint128_t temp_key = ctbs[i].ctfs[CTF_id].keys[q];
-                if(tq->abandon || tq_temp.check_key_time(temp_key)){
-                    uint pid = get_key_oid(temp_key);
-                    box key_box;
-                    parse_mbr(temp_key, key_box, intersect_mbrs[j].second);
-                    if(b.intersect(key_box)){
-                        uni.insert(pid);
-                        this_find++;
-                        mbr_find_count++;
-                        //cout<<"box find!"<<endl;
-                        //key_box.print();
-                    }
-                }
-            }
+            box_search_info bs_uint;
+            bs_uint.ctb_id = i;
+            bs_uint.ctf_id = CTF_id;
+            bs_uint.bmap_mbr = &ctbs[i].bitmap_mbrs[CTF_id];
+            bs_uint.tq = tq_temp;
+            box_search_queue.push_back(bs_uint);
             //cerr<<this_find<<"finds in sst "<<CTF_id<<endl;
         }
     }
