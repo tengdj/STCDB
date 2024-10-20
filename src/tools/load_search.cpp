@@ -51,7 +51,7 @@ void experiment_search_oid(workbench *bench){
         clear_cache();
         uint pid = get_rand_number(bench->config->num_objects);
         get_time_elapsed(disk_search_time, true);
-        for(int j = 0; j < 1015; j++){
+        for(uint j = 0; j < min((uint)1015, bench->ctb_count); j++){
             bench->id_search_in_CTB(pid, j, &tq);
         }
         time_consume = get_time_elapsed(disk_search_time, true);
@@ -62,7 +62,7 @@ void experiment_search_oid(workbench *bench){
 
 void *box_search_unit(void *arg){
     query_context *ctx = (query_context *)arg;
-    workbench *bench = (workbench *)ctx->target[0];
+    new_bench *bench = (new_bench *)ctx->target[0];
     box * b = (box *)ctx->target[1];
     uint mbr_find_count = 0;
     while(true){
@@ -73,6 +73,9 @@ void *box_search_unit(void *arg){
         }
         for(int obj = start; obj < end; obj++){
             box_search_info info = bench->box_search_queue[obj];
+            if(!bench->ctbs[info.ctb_id].ctfs[info.ctf_id].keys){
+                bench->load_CTF_keys(info.ctb_id, info.ctf_id);
+            }
             for(uint q = 0; q < bench->ctbs[info.ctb_id].CTF_capacity[info.ctf_id]; q++){
                 __uint128_t temp_key = bench->ctbs[info.ctb_id].ctfs[info.ctf_id].keys[q];
                 if(info.tq.abandon || info.tq.check_key_time(temp_key)){
@@ -86,20 +89,24 @@ void *box_search_unit(void *arg){
                     }
                 }
             }
+            delete[] bench->ctbs[info.ctb_id].ctfs[info.ctf_id].keys;
+            bench->ctbs[info.ctb_id].ctfs[info.ctf_id].keys = nullptr;
         }
     }
-    bench->mbr_find_count.fetch_add(mbr_find_count, std::memory_order_relaxed);
+    bench->search_count.fetch_add(mbr_find_count, std::memory_order_relaxed);
     return NULL;
 }
 
-void experiment_search_box(workbench *bench){
+void experiment_search_box(new_bench *bench){
     bench->box_search_queue.reserve(bench->ctb_count * bench->config->CTF_count / 20);
     time_query tq;
     tq.abandon = true;
     ofstream q;
     q.open("ex_search_box.csv", ios::out|ios::binary|ios::trunc);
-    q << "search area" << ',' << "find_count" << ',' << "unique_find" << ',' << "search_time" << ',' << "bitmap_find_count" << ',' << "prepare_time(ms)" << endl;
+    q << "search area" << ',' << "find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ',' << "prepare_time(ms)" << endl;
     for(int i = 0; i < 10; i++){
+        bench->clear_all_keys();
+        clear_cache();
         struct timeval prepare_start = get_cur_time();
         bench->mbr_find_count = 0;
         bench->intersect_sst_count = 0;
@@ -110,10 +117,8 @@ void experiment_search_box(workbench *bench){
         mid.y = 41.6 + 0.4*get_rand_double();
         box search_area(mid.x - edge_length/2, mid.y - edge_length/2, mid.x + edge_length/2, mid.y + edge_length/2);
         search_area.print();
-        bench->clear_all_keys();
-        clear_cache();
-        for(int j = 0; j < bench->ctb_count; j++){
-            bench->mbr_search_in_disk(search_area, &tq);
+        for(uint j = 0; j < min((uint)1015, bench->ctb_count); j++){
+            bench->mbr_search_in_disk(search_area, &tq, j);
         }
         double prepare_consume = get_time_elapsed(prepare_start, true);
         struct timeval multi_thread_start = get_cur_time();
@@ -133,7 +138,7 @@ void experiment_search_box(workbench *bench){
             pthread_join(threads[i], &status);
         }
         double multi_thread_consume = get_time_elapsed(multi_thread_start, true);
-        q << edge_length*edge_length << ',' << bench->mbr_find_count << ',' << multi_thread_consume << ','
+        q << edge_length*edge_length << ',' << bench->search_count << ',' << multi_thread_consume << ','
           << bench->intersect_sst_count <<',' << bench->bit_find_count << ',' << prepare_consume << endl;
         bench->box_search_queue.clear();
     }
@@ -221,7 +226,9 @@ int main(int argc, char **argv){
     clear_cache();
     string path = "../data/meta/";
     workbench * bench = load_meta(path.c_str());
-    cout << bench->ctb_count << endl;
+    new_bench * nb = new new_bench(bench->config);
+    memcpy(nb, bench, sizeof(workbench));
+    cout << nb->ctb_count << endl;
     cout << "search begin" << endl;
 
 
@@ -234,7 +241,7 @@ int main(int argc, char **argv){
     clear_cache();
     bench->clear_all_keys();
     //experiment_search_oid(bench);
-    experiment_search_box(bench);
+    experiment_search_box(nb);
     //experiment_search_time(bench);
     //query_search_id(bench);
     //query_search_box(bench);

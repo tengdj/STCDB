@@ -331,10 +331,10 @@ public:
 
     bool search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vector<uint> & v_indices);
     bool id_search_in_disk(uint pid, time_query * tq);
-    bool mbr_search_in_disk(box b, time_query * tq);
+    //bool mbr_search_in_disk(box b, time_query * tq);
     uint search_time_in_disk(time_query * tq);
     bool id_search_in_CTB(uint pid, uint CTB_id, time_query * tq);
-    bool mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq);
+    //bool mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq);
 
     void load_CTF_keys(uint CTB_id, uint CTF_id);
     void load_big_sorted_run(uint b);
@@ -354,6 +354,10 @@ class new_bench : public workbench{
 public:
     vector<box_search_info> box_search_queue;
     atomic<long long> search_count;
+
+    new_bench(configuration * config) : workbench(config){}
+    bool mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq);
+    bool mbr_search_in_disk(box b, time_query * tq, uint CTB_id);
 };
 
 
