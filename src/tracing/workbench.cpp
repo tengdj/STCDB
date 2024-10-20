@@ -385,7 +385,6 @@ uint workbench::search_time_in_disk(time_query * tq){          //not finish
                 }
                 for(uint q = 0; q < ctbs[i].CTF_capacity[j]; q++){
                     if( tq_temp.check_key_time(ctbs[i].ctfs[j].keys[q]) ){
-                        cout << "single find" << endl;
                         count++;
                     }
                 }
@@ -395,7 +394,7 @@ uint workbench::search_time_in_disk(time_query * tq){          //not finish
     return count;
 }
 
-bool workbench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
+bool new_bench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
     uint i = CTB_id;
     uint64_t wp = pid;
     time_query tq_temp;
@@ -408,7 +407,8 @@ bool workbench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
     }
     else if(ctbs[i].sids[pid] == 1){
         //cout << "oid search buffer" << endl;
-        id_find_count += ctbs[i].o_buffer.search_buffer(pid, &tq_temp);
+        uint buffer_find = ctbs[i].o_buffer.search_buffer(pid, &tq_temp);
+        search_count.fetch_add(buffer_find, std::memory_order_relaxed);
     }
     else{
         wp += ((uint64_t)ctbs[i].sids[pid] << OID_BIT);
@@ -451,7 +451,9 @@ bool workbench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
             load_CTF_keys(i, high);
         }
         uint target_count = ctbs[i].ctfs[high].search_SSTable(wp, search_multi, ctbs[i].CTF_capacity[high], search_multi_length, search_multi_pid);
-        id_find_count += target_count;
+        search_count.fetch_add(target_count, std::memory_order_relaxed);
+        delete[] ctbs[i].ctfs[high].keys;
+        ctbs[i].ctfs[high].keys = nullptr;
         if(target_count){
             return true;
         }
@@ -467,18 +469,21 @@ bool workbench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
     for(int cursor = 0; cursor < ctbs[i].CTF_capacity[find]; cursor++){
         uint64_t temp_wp = ctbs[i].ctfs[high].keys[cursor] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
         if(temp_wp == wp){
-            id_find_count++;
+            uint old_search_count = search_count.fetch_add(1, std::memory_order_relaxed);;
             if(search_multi){
-                search_multi_pid[search_multi_length] = get_key_oid(ctbs[i].ctfs[high].keys[cursor]);
+                search_multi_pid[old_search_count] = get_key_oid(ctbs[i].ctfs[high].keys[cursor]);
                 search_multi_length++;
             }
         }
         else break;
     }
+
+    delete[] ctbs[i].ctfs[find].keys;
+    ctbs[i].ctfs[find].keys = nullptr;
     return true;
 }
 
-bool workbench::id_search_in_disk(uint pid, time_query * tq){
+bool new_bench::id_search_in_disk(uint pid, time_query * tq){
     //cout<<"oid disk search "<<pid<<endl;
     bool ret = false;
     for(int i=0; i < ctb_count; i++) {
