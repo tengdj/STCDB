@@ -57,7 +57,7 @@ public:
 
     uint big_sorted_run_capacity = 10000;     //can be made to vector
     uint CTF_count = 100;              //default 2G
-    uint split_num = 5;
+    uint split_num = 10;
 
     //bool search_kv = true;
     uint search_single_capacity = 100;

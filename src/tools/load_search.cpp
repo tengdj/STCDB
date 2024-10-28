@@ -39,11 +39,186 @@ workbench * load_meta(const char *path) {
 void * id_saerch_unit(void * arg){
     query_context *ctx = (query_context *)arg;
     new_bench *bench = (new_bench *)ctx->target[0];
-    uint * pid = (uint *)ctx->target[1];
-    uint * j = (uint *)ctx->target[2];
-    time_query * tq = (time_query *)ctx->target[3];
-    bench->id_search_in_CTB(*pid, *j, tq);
+//    uint * pid = (uint *)ctx->target[1];
+//    uint * j = (uint *)ctx->target[2];
+//    time_query * tq = (time_query *)ctx->target[3];
+    bench->id_search_in_CTB(*(uint *)ctx->target[1], *(uint *)ctx->target[2], (time_query *)ctx->target[3]);
     return NULL;
+}
+
+//void single_experiment_twice(new_bench * bench){
+//    bench->search_multi_pid = new uint[1000000];
+//    bench->clear_all_keys();
+//    clear_cache();
+//    time_query tq;
+//    tq.abandon = true;
+//    ofstream q;
+//    q.open("ex_search_id.csv", ios::out|ios::binary|ios::trunc);
+//    q << "question number" << ',' << "time_consume(ms)" << ',' << "find_id_count" << ',' << "wid_filter_count" << endl;
+//    for(int i = 0; i < 1; i++){
+//        struct timeval prepare_start = get_cur_time();
+//        bench->search_count = 0;
+//        bench->wid_filter_count = 0;
+//        uint pid = 10000;
+//        bench->search_multi = true;
+//        uint the_min = min((uint)1215, bench->ctb_count);
+//        pthread_t threads[the_min];
+//        query_context * tctx = new query_context[the_min];
+//        for(uint j = 0; j < the_min; j++){
+//            tctx[j].target[0] = (void *)bench;
+//            tctx[j].target[1] = (void *)&pid;
+//            tctx[j].target[2] = (void *)new int(j);
+//            tctx[j].target[3] = (void *)&tq;
+//            pthread_create(&threads[j], NULL, id_saerch_unit, (void *)&tctx[j]);
+//            //bench->id_search_in_CTB(pid, j, &tq);
+//        }
+//        delete[] tctx;
+//        tctx = nullptr;
+//        double prepare_consume = get_time_elapsed(prepare_start, true);
+//        bench->search_multi = false;
+//        q << pid << ',' << prepare_consume << ',' << bench->search_count << ',' << bench->wid_filter_count << endl;
+//    }
+//    uint search_length = bench->search_count;
+//    for(int i = 0; i < search_length; i++){
+////        bench->clear_all_keys();
+////        clear_cache();
+//        struct timeval prepare_start = get_cur_time();
+//        bench->search_count = 0;
+//        bench->wid_filter_count = 0;
+//        uint pid = bench->search_multi_pid[i];
+//        bench->search_multi = false;
+//        uint the_min = min((uint)1215, bench->ctb_count);
+//        pthread_t threads[the_min];
+//        query_context * tctx = new query_context[the_min];
+//        for(uint j = 0; j < the_min; j++){
+//            tctx[j].target[0] = (void *)bench;
+//            tctx[j].target[1] = (void *)&pid;
+//            tctx[j].target[2] = (void *)new int(j);
+//            tctx[j].target[3] = (void *)&tq;
+//            pthread_create(&threads[j], NULL, id_saerch_unit, (void *)&tctx[j]);
+//            //bench->id_search_in_CTB(pid, j, &tq);
+//        }
+//        for(int j = 0; j < the_min; j++ ){
+//            void *status;
+//            pthread_join(threads[j], &status);
+//        }
+//        delete[] tctx;
+//        tctx = nullptr;
+//        double prepare_consume = get_time_elapsed(prepare_start, true);
+//        bench->search_multi = false;
+//        q << pid << ',' << prepare_consume << ',' << bench->search_count << ',' << bench->wid_filter_count << endl;
+//    }
+//    q.close();
+//    delete[] bench->search_multi_pid;
+//};
+
+void experiment_twice(new_bench *bench){
+    bench->search_multi_pid = new uint[1000000];
+    bench->clear_all_keys();
+    clear_cache();
+    time_query tq;
+    tq.abandon = true;
+    ofstream q;
+    q.open("ex_search_id.csv", ios::out|ios::binary|ios::trunc);
+    q << "question number" << ',' << "time_consume(ms)" << ',' << "find_id_count" << ',' << "wid_filter_count" << endl;
+    for(int i = 0; i < 1; i++){
+        struct timeval prepare_start = get_cur_time();
+        bench->search_count = 0;
+        bench->wid_filter_count = 0;
+        uint pid = 10000;
+        bench->search_multi = true;
+        uint the_min = min((uint)1215, bench->ctb_count);
+        pthread_t threads[the_min];
+        query_context * tctx = new query_context[the_min];
+        for(uint j = 0; j < the_min; j++){
+            tctx[j].target[0] = (void *)bench;
+            tctx[j].target[1] = (void *)&pid;
+            tctx[j].target[2] = (void *)new int(j);
+            tctx[j].target[3] = (void *)&tq;
+            pthread_create(&threads[j], NULL, id_saerch_unit, (void *)&tctx[j]);
+            //bench->id_search_in_CTB(pid, j, &tq);
+        }
+        for(int j = 0; j < the_min; j++ ){
+            void *status;
+            pthread_join(threads[j], &status);
+        }
+        delete[] tctx;
+        tctx = nullptr;
+        double prepare_consume = get_time_elapsed(prepare_start, true);
+        bench->search_multi = false;
+        q << pid << ',' << prepare_consume << ',' << bench->search_count << ',' << bench->wid_filter_count << endl;
+    }
+    uint search_length = bench->search_count;
+    for(int i = 0; i < search_length; i++){
+//        bench->clear_all_keys();
+//        clear_cache();
+        struct timeval prepare_start = get_cur_time();
+        bench->search_count = 0;
+        bench->wid_filter_count = 0;
+        uint pid = bench->search_multi_pid[i];
+        bench->search_multi = false;
+        uint the_min = min((uint)1215, bench->ctb_count);
+        pthread_t threads[the_min];
+        query_context * tctx = new query_context[the_min];
+        for(uint j = 0; j < the_min; j++){
+            tctx[j].target[0] = (void *)bench;
+            tctx[j].target[1] = (void *)&pid;
+            tctx[j].target[2] = (void *)new int(j);
+            tctx[j].target[3] = (void *)&tq;
+            pthread_create(&threads[j], NULL, id_saerch_unit, (void *)&tctx[j]);
+            //bench->id_search_in_CTB(pid, j, &tq);
+        }
+        for(int j = 0; j < the_min; j++ ){
+            void *status;
+            pthread_join(threads[j], &status);
+        }
+        delete[] tctx;
+        tctx = nullptr;
+        double prepare_consume = get_time_elapsed(prepare_start, true);
+        bench->search_multi = false;
+        q << pid << ',' << prepare_consume << ',' << bench->search_count << ',' << bench->wid_filter_count << endl;
+    }
+    q.close();
+    delete[] bench->search_multi_pid;
+}
+
+void exp4_search_oid_single(new_bench *bench){
+    time_query tq;
+    tq.abandon = true;
+    ofstream q;
+    q.open("ex_search_id.csv", ios::out|ios::binary|ios::trunc);
+    q << "question number" << ',' << "time_consume(ms)" << ',' << "find_id_count" << ',' << "wid_filter_count" << endl;
+    for(int i = 0; i < 10; i++){
+        bench->clear_all_keys();
+        clear_cache();
+        struct timeval prepare_start = get_cur_time();
+        bench->search_count = 0;
+        bench->wid_filter_count = 0;
+        uint pid = get_rand_number(bench->config->num_objects);
+        bench->search_multi = false;
+        uint the_min = min((uint)1215, bench->ctb_count);
+        //pthread_t threads[the_min];
+        query_context * tctx = new query_context[the_min];
+        for(uint j = 0; j < the_min; j++){
+            tctx[j].target[0] = (void *)bench;
+            tctx[j].target[1] = (void *)&pid;
+            tctx[j].target[2] = (void *)new int(j);
+            tctx[j].target[3] = (void *)&tq;
+            id_saerch_unit((void *)&tctx[j]);
+            //pthread_create(&threads[j], NULL, id_saerch_unit, (void *)&tctx[j]);
+            //bench->id_search_in_CTB(pid, j, &tq);
+        }
+//        for(int j = 0; j < the_min; j++ ){
+//            void *status;
+//            pthread_join(threads[j], &status);
+//        }
+        delete[] tctx;
+        tctx = nullptr;
+        double prepare_consume = get_time_elapsed(prepare_start, true);
+        bench->search_multi = false;
+        q << pid << ',' << prepare_consume << ',' << bench->search_count << ',' << bench->wid_filter_count << endl;
+    }
+    q.close();
 }
 
 void experiment_search_oid(new_bench *bench){
@@ -52,34 +227,34 @@ void experiment_search_oid(new_bench *bench){
     ofstream q;
     q.open("ex_search_id.csv", ios::out|ios::binary|ios::trunc);
     q << "question number" << ',' << "time_consume(ms)" << ',' << "find_id_count" << ',' << "wid_filter_count" << endl;
-    for(int i = 0; i < 10000; i++){
+    for(int i = 0; i < 10; i++){
         bench->clear_all_keys();
         clear_cache();
         struct timeval prepare_start = get_cur_time();
         bench->search_count = 0;
         bench->wid_filter_count = 0;
-        bench->id_find_count = 0;
         uint pid = get_rand_number(bench->config->num_objects);
         bench->search_multi = false;
-        uint the_min = min((uint)1015, bench->ctb_count);
+        uint the_min = min((uint)1215, bench->ctb_count);
         pthread_t threads[the_min];
-        query_context tctx;
-        tctx.target[0] = (void *)bench;
-        tctx.target[1] = (void *)&pid;
-        tctx.target[3] = (void *)&tq;
+        query_context * tctx = new query_context[the_min];
         for(uint j = 0; j < the_min; j++){
-            tctx.target[2] = (void *)&j;
-            bench->id_search_in_CTB(pid, j, &tq);
+            tctx[j].target[0] = (void *)bench;
+            tctx[j].target[1] = (void *)&pid;
+            tctx[j].target[2] = (void *)new int(j);
+            tctx[j].target[3] = (void *)&tq;
+            pthread_create(&threads[j], NULL, id_saerch_unit, (void *)&tctx[j]);
+            //bench->id_search_in_CTB(pid, j, &tq);
         }
-        for(int i = 0; i < the_min; i++ ){
+        for(int j = 0; j < the_min; j++ ){
             void *status;
-            pthread_join(threads[i], &status);
+            pthread_join(threads[j], &status);
         }
+        delete[] tctx;
+        tctx = nullptr;
         double prepare_consume = get_time_elapsed(prepare_start, true);
-
         bench->search_multi = false;
-        prepare_consume = get_time_elapsed(prepare_start, true);
-        q << pid << ',' << prepare_consume << ',' << bench->id_find_count << ',' << bench->wid_filter_count << endl;
+        q << pid << ',' << prepare_consume << ',' << bench->search_count << ',' << bench->wid_filter_count << endl;
     }
     q.close();
 }
@@ -142,7 +317,7 @@ void exp4_search_box_single(new_bench *bench){
         mid.y = 41.6 + 0.2;
         box search_area(mid.x - edge_length/2, mid.y - edge_length/2, mid.x + edge_length/2, mid.y + edge_length/2);
         search_area.print();
-        for(uint j = 0; j < min((uint)1015, bench->ctb_count); j++){
+        for(uint j = 0; j < min((uint)1215, bench->ctb_count); j++){
             bench->mbr_search_in_disk(search_area, &tq, j);
         }
         double prepare_consume = get_time_elapsed(prepare_start, true);
@@ -154,12 +329,12 @@ void exp4_search_box_single(new_bench *bench){
         tctx.num_units = bench->box_search_queue.size();
         tctx.report_gap = 1;
         tctx.num_batchs = 1;
-        for(int i = 0; i < 1; i++){
-            pthread_create(&threads[i], NULL, box_search_unit, (void *)&tctx);
+        for(int j = 0; j < 1; j++){
+            pthread_create(&threads[j], NULL, box_search_unit, (void *)&tctx);
         }
-        for(int i = 0; i < 1; i++ ){
+        for(int j = 0; j < 1; j++ ){
             void *status;
-            pthread_join(threads[i], &status);
+            pthread_join(threads[j], &status);
         }
         double multi_thread_consume = get_time_elapsed(multi_thread_start, true);
         q << edge_length*edge_length << ',' << bench->search_count << ',' << multi_thread_consume << ','
@@ -191,7 +366,7 @@ void experiment_search_box(new_bench *bench){
         mid.y = 41.6 + 0.4*get_rand_double();
         box search_area(mid.x - edge_length/2, mid.y - edge_length/2, mid.x + edge_length/2, mid.y + edge_length/2);
         search_area.print();
-        for(uint j = 0; j < min((uint)1015, bench->ctb_count); j++){
+        for(uint j = 0; j < min((uint)1215, bench->ctb_count); j++){
             bench->mbr_search_in_disk(search_area, &tq, j);
         }
         double prepare_consume = get_time_elapsed(prepare_start, true);
@@ -202,13 +377,13 @@ void experiment_search_box(new_bench *bench){
         tctx.target[1] = (void *)&search_area;
         tctx.num_units = bench->box_search_queue.size();
         tctx.report_gap = 1;
-        tctx.num_batchs = 1;
-        for(int i = 0; i < bench->config->num_threads; i++){
-            pthread_create(&threads[i], NULL, box_search_unit, (void *)&tctx);
+        tctx.num_batchs = 10000;
+        for(int j = 0; j < bench->config->num_threads; j++){
+            pthread_create(&threads[j], NULL, box_search_unit, (void *)&tctx);
         }
-        for(int i = 0; i < bench->config->num_threads; i++ ){
+        for(int j = 0; j < bench->config->num_threads; j++ ){
             void *status;
-            pthread_join(threads[i], &status);
+            pthread_join(threads[j], &status);
         }
         double multi_thread_consume = get_time_elapsed(multi_thread_start, true);
         q << edge_length*edge_length << ',' << bench->search_count << ',' << multi_thread_consume << ','
@@ -313,8 +488,10 @@ int main(int argc, char **argv){
 
     clear_cache();
     bench->clear_all_keys();
+    experiment_twice(nb);
+    //exp4_search_oid_single(nb);
+    //experiment_search_oid(nb);
     //exp4_search_box_single(nb);
-    experiment_search_oid(nb);
     //experiment_search_box(nb);
     //experiment_search_time(bench);
     //query_search_id(bench);

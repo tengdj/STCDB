@@ -23,7 +23,7 @@ public:
     f_box * boxes = NULL;
 
     ~oversize_buffer();
-    uint search_buffer(uint32_t oid, time_query * tq);
+    uint search_buffer(uint32_t oid, time_query * tq, bool search_multi, atomic<long long> &search_count, uint *search_multi_pid);
 };
 
 class CTF{                          //contact tracing file
@@ -32,7 +32,7 @@ public:
     //uint SSTable_kv_capacity = 327680;              //67108864 * 5 / 1024 = 327,680 (Round up)
 
     ~CTF();
-    uint search_SSTable(uint64_t wp, bool search_multi, uint SSTable_kv_capacity, uint &search_multi_length, uint *search_multi_pid);
+    uint search_SSTable(uint64_t wp, time_query * tq, bool search_multi, uint SSTable_kv_capacity, atomic<long long> &search_count, uint *search_multi_pid);
     //uint search_SSTable(uint64_t wp, uint SSTable_kv_capacity, vector<__uint128_t> & v_keys, vector<uint> & v_indices);
 };
 

@@ -34,7 +34,7 @@ endif
 %.o:	%.cpp
 	$(CXX) -c $(CPPFLAGS) $(INCLUDES) -o $@ $<
 
-all:	 pipeline datagen load_search
+all:	 pipeline datagen load_search compaction
 
 
 # for macro queries
@@ -48,6 +48,9 @@ trace:	tools/trace.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
 	$(CXX) -o ../build/$@ $^ $(LIBS)
 
 load_search:		tools/load_search.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
+	$(CXX) -o ../build/$@ $^ $(LIBS)
+
+compaction:		tools/compaction.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
 	$(CXX) -o ../build/$@ $^ $(LIBS)
 
 #searchsst:	tools/searchsst.o $(GEOMETRY_OBJS) $(TRACING_OBJS)

@@ -290,7 +290,7 @@ uint search_keys_by_pid(__uint128_t* keys, uint64_t wp, uint capacity, vector<__
 //        offset = bench->config->MemTable_capacity/2;
 //    }
 //    bench->bg_run[old_big].sst = NULL;
-//
+//    //load
 //    //new
 //
 //    cout<<"sst_capacity:"<<bench->SSTable_kv_capacity<<endl;
@@ -658,7 +658,6 @@ void *straight_dump(void *arg){
 //        bench->bg_run[old_big].bitmap_mbrs[i].print();
 //    }
 
-    ofstream SSTable_of;
     uint total_index = 0;
     uint sst_count = 0;
     dump_args * pargs = new dump_args[bench->config->CTF_count];

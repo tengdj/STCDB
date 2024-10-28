@@ -215,10 +215,10 @@ void workbench::claim_space(){
 
 box workbench::make_bit_box(box b){
     box new_b;
-    new_b.low[0] = (b.low[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * ((1ULL << (SID_BIT / 2)) - 1);
-    new_b.low[1] = (b.low[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * ((1ULL << (SID_BIT / 2)) - 1);
-    new_b.high[0] = (b.high[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * ((1ULL << (SID_BIT / 2)) - 1);
-    new_b.high[1] = (b.high[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * ((1ULL << (SID_BIT / 2)) - 1);
+    new_b.low[0] = (b.low[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * (1ULL << (SID_BIT/2));
+    new_b.low[1] = (b.low[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * (1ULL << (SID_BIT/2));
+    new_b.high[0] = (b.high[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * (1ULL << (SID_BIT/2));
+    new_b.high[1] = (b.high[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * (1ULL << (SID_BIT/2));
     return new_b;
 }
 
@@ -295,7 +295,7 @@ void workbench::clear_all_keys(){
     }
 }
 
-bool workbench::search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vector<uint> & v_indices){          //wid_pid       //for dump
+bool workbench::search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vector<uint> & v_indices){
     cout<<"memtable search "<<pid<<endl;
     uint offset = 0;
     if(ctb_count % 2 == 1){
@@ -407,8 +407,8 @@ bool new_bench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
     }
     else if(ctbs[i].sids[pid] == 1){
         //cout << "oid search buffer" << endl;
-        uint buffer_find = ctbs[i].o_buffer.search_buffer(pid, &tq_temp);
-        search_count.fetch_add(buffer_find, std::memory_order_relaxed);
+        uint buffer_find = ctbs[i].o_buffer.search_buffer(pid, &tq_temp, search_multi, search_count, search_multi_pid);
+        //search_count.fetch_add(buffer_find, std::memory_order_relaxed);
     }
     else{
         wp += ((uint64_t)ctbs[i].sids[pid] << OID_BIT);
@@ -450,8 +450,8 @@ bool new_bench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
         if(!ctbs[i].ctfs[high].keys){
             load_CTF_keys(i, high);
         }
-        uint target_count = ctbs[i].ctfs[high].search_SSTable(wp, search_multi, ctbs[i].CTF_capacity[high], search_multi_length, search_multi_pid);
-        search_count.fetch_add(target_count, std::memory_order_relaxed);
+        uint target_count = ctbs[i].ctfs[high].search_SSTable(wp, tq, search_multi, ctbs[i].CTF_capacity[high], search_count, search_multi_pid);
+        //search_count.fetch_add(target_count, std::memory_order_relaxed);
         delete[] ctbs[i].ctfs[high].keys;
         ctbs[i].ctfs[high].keys = nullptr;
         if(target_count){
@@ -471,8 +471,7 @@ bool new_bench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
         if(temp_wp == wp){
             uint old_search_count = search_count.fetch_add(1, std::memory_order_relaxed);;
             if(search_multi){
-                search_multi_pid[old_search_count] = get_key_oid(ctbs[i].ctfs[high].keys[cursor]);
-                search_multi_length++;
+                search_multi_pid[old_search_count] = get_key_target(ctbs[i].ctfs[high].keys[cursor]);
             }
         }
         else break;
@@ -688,7 +687,7 @@ void workbench::dump_CTB_meta(const char *path, int i) {
     wf.write((char *)ctbs[i].o_buffer.boxes, ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box));
     //RTree
     wf.close();
-    logt("CTB meta %d dump to %s",start_time, i, path);
+    //logt("CTB meta %d dump to %s",start_time, i, path);
 
     delete[] ctbs[i].sids;
     ctbs[i].sids = NULL;

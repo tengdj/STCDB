@@ -887,7 +887,7 @@ void write_bitmap(workbench *bench){
     uint bit_pos = 0;
     for(uint i=low0;i<=high0;i++){
         for(uint j=low1;j<=high1;j++){
-            bit_pos = xy2d(SID_BIT/2,i,j);
+            bit_pos = xy2d(SID_BIT/2,i,j);          //have noting to do with hilbert, just dimension change
             //bench->d_bitmaps[bitmap_id*(bench->bit_count/8)+bit_pos/8] |= (1<<(bit_pos%8));
             //unsigned int *bitmap_ptr = reinterpret_cast<unsigned int *>(&bench->d_bitmaps[bitmap_id * (bench->bit_count / 8) + bit_pos / 32]);
             unsigned int *bitmap_ptr = reinterpret_cast<unsigned int *>(bench->d_bitmaps);
