@@ -26,8 +26,8 @@ workbench * a_load_meta(const char *path) {
     in.read((char *)config, sizeof(generator_configuration));               //also read meta
     in.read((char *)bench, sizeof(workbench));      //bench->config = NULL
     bench->config = config;
-    bench->ctbs = new CTB[config->big_sorted_run_capacity];
-    for(int i = 0; i < bench->ctb_count; i++){
+    bench->ctbs = new CTB[20];
+    for(int i = 0; i < 20; i++){
         //CTB temp_ctb;
         string CTB_path = string(path) + "CTB" + to_string(i);
         bench->load_CTB_meta(CTB_path.c_str(), i);
@@ -107,12 +107,12 @@ void *a_parallel_dump(void *arg){
     return NULL;
 }
 
-void * merge_dump(void *arg){
-    uint start_ctb = 0;         //0~4   //compactiong_start_ctb
-    uint merge_ctb_count = 5;         //bench->config->MemTable_capacity/2
+void * merge_dump(new_bench * bench, uint start_ctb, uint merge_ctb_count){
+    //uint start_ctb = 0;         //0~4   //compactiong_start_ctb
+    //uint merge_ctb_count = 5;         //bench->config->MemTable_capacity/2
     uint c_ctb_id = start_ctb / merge_ctb_count;
     cout<<"step into the sst_dump"<<endl;
-    new_bench *bench = (new_bench *)arg;
+    //new_bench *bench = (new_bench *)arg;
     for(int i = start_ctb; i < start_ctb + merge_ctb_count; i++){
         bench->load_big_sorted_run(i);
     }
@@ -202,7 +202,7 @@ void * merge_dump(void *arg){
     }
 
     double sid_key_box_time = get_time_elapsed(bg_start,true);
-    fprintf(stdout,"\tsid_time:\t%.2f\n",sid_key_box_time);
+    fprintf(stdout,"\tsid_key_box_time:\t%.2f\n",sid_key_box_time);
 
     for(uint i = 0; i < bench->config->CTF_count; i++){
         bench->compacted_ctbs[c_ctb_id].first_widpid[i] = keys_with_wid[i][0] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
@@ -254,7 +254,6 @@ void * merge_dump(void *arg){
                 count_p++;
             }
         }
-        cout << "bit_points.size():" << count_p << endl;
         print_points(bit_points, count_p);
     }
     delete[] bit_points;
@@ -340,7 +339,15 @@ int main(int argc, char **argv){
     nb->compacted_ctbs = new CTB[10];
     cout << nb->ctb_count << endl;
     cout << "search begin" << endl;
-    merge_dump((void *)nb);
+
+    uint merge_ctb_count = 2;
+    for(int i = 0; i < 10; i += merge_ctb_count){
+        struct timeval bg_start = get_cur_time();
+        merge_dump(nb, i, merge_ctb_count);
+        double compaction_total = get_time_elapsed(bg_start,true);
+        fprintf(stdout,"\tcompaction_total:\t%.2f\n",compaction_total);
+    }
+
 
     return 0;
 }
