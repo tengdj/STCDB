@@ -7,7 +7,7 @@ OBJS := $(patsubst %.cpp,%.o,$(SRCS))
 
 INCLUDES	= -I /usr/include -I ./src -I /usr/local/cuda/targets/x86_64-linux/include/
 LIBS		= -L/usr/lib/x86_64-linux-gnu -lboost_program_options -lpthread -fopenmp -pg
-CPPFLAGS	= -g -std=c++14 -Wno-cpp -fopenmp
+CPPFLAGS	= -g -std=c++17 -Wno-cpp -fopenmp
 
 CUDALIBS	= -L/usr/local/cuda/lib64 -lcudart
 
@@ -29,7 +29,7 @@ ifdef USE_GPU
 endif
 
 %_cu.o: %.cu
-	$(NVCC) -c -g -std=c++14 -arch=sm_60 -DCUB_IGNORE_DEPRECATED_CPP_DIALECT --extended-lambda $(INCLUDES) -o $@ $<
+	$(NVCC) -c -g -std=c++17 -arch=sm_60 -DCUB_IGNORE_DEPRECATED_CPP_DIALECT --extended-lambda $(INCLUDES) -o $@ $<
 
 %.o:	%.cpp
 	$(CXX) -c $(CPPFLAGS) $(INCLUDES) -o $@ $<

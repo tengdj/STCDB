@@ -247,6 +247,15 @@ public:
     float low[2] = {100000.0,100000.0};
     float high[2] = {-100000.0,-100000.0};
 
+    f_box(){}
+
+    f_box(box * b){
+        low[0] = b->low[0];
+        low[1] = b->low[1];
+        high[0] = b->high[0];
+        high[1] = b->high[1];
+    }
+
     void print_vertices(){
         fprintf(stderr,"%f %f, %f %f, %f %f, %f %f, %f %f",
                 low[0],low[1],

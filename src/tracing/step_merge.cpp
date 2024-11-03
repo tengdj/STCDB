@@ -12,6 +12,7 @@ oversize_buffer::~oversize_buffer() {
     delete []boxes;
 }
 
+//total binary search must be faster
 uint oversize_buffer::search_buffer(uint32_t oid, time_query * tq, bool search_multi, atomic<long long> &search_count, uint *search_multi_pid) {
     uint count = 0;
     //cout<<"into search_SSTable"<<endl;
