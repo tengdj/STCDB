@@ -1,7 +1,6 @@
 #include "../geometry/Map.h"
 #include "../tracing/generator.h"
 #include "../tracing/trace.h"
-//#include <boost/sort/sort.hpp>
 
 using namespace std;
 
@@ -13,13 +12,6 @@ using namespace std;
 //
 //    PaddedAtomicBool() : value(false) {}
 //};
-
-bool cmp(pair< __uint128_t, f_box > a, pair< __uint128_t, f_box > b){
-    if(a.first > b.first){
-        return false;
-    }
-    return true;
-}
 
 void a_clear_cache(){
     string cmd = "sync; sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'";        //sudo!!!
@@ -124,11 +116,11 @@ void *a_parallel_dump(void *arg){
     return NULL;
 }
 
-void * merge_dump(new_bench * bench, uint start_ctb, uint merge_ctb_count) {
+void * merge_dump(new_bench * bench, uint start_ctb, uint merge_ctb_count){
     //uint start_ctb = 0;         //0~4   //compactiong_start_ctb
     //uint merge_ctb_count = 5;         //bench->config->MemTable_capacity/2
     uint c_ctb_id = start_ctb / merge_ctb_count;
-    cout << "step into the sst_dump" << endl;
+    cout<<"step into the sst_dump"<<endl;
     //new_bench *bench = (new_bench *)arg;
     bench->compacted_ctbs[c_ctb_id].first_widpid = new uint64_t[bench->config->CTF_count];
     bench->compacted_ctbs[c_ctb_id].sids = new unsigned short[bench->config->num_objects];
@@ -137,110 +129,45 @@ void * merge_dump(new_bench * bench, uint start_ctb, uint merge_ctb_count) {
     bench->compacted_ctbs[c_ctb_id].CTF_capacity = new uint[bench->config->CTF_count];
     bench->dumping = true;
     bench->compacted_ctbs[c_ctb_id].ctfs = NULL;
-    cout << "sst_capacity:" << bench->config->kv_capacity << endl;
+    cout<<"sst_capacity:"<<bench->config->kv_capacity<<endl;
     bench->merge_kv_capacity = bench->config->kv_restriction * merge_ctb_count;
 
-    vector<vector<__uint128_t> > keys_with_wid(bench->config->CTF_count);
-    vector<vector<box> > mbrs_with_wid(bench->config->CTF_count);
-    vector<vector<uint> > invert_index(bench->config->CTF_count);
-    for (auto &vec: invert_index) {
+    vector< vector<__uint128_t> > keys_with_wid(bench->config->CTF_count);
+    vector< vector<box> > mbrs_with_wid(bench->config->CTF_count);
+    vector< vector<uint> > invert_index(bench->config->CTF_count);
+    for (auto& vec : invert_index) {
         vec.reserve(200000);        //20000000 / 100
     }
-    vector<pair<vector<__uint128_t>, vector<box> > > objects_map(bench->config->num_objects);
-    copy(bench->ctbs[start_ctb].sids, bench->ctbs[start_ctb].sids + bench->config->num_objects,
-         bench->compacted_ctbs[c_ctb_id].sids);
-    atomic<int> sid1_count;
-    sid1_count = 0;
-    vector<pair<__uint128_t, f_box> > temp_over_buffer(bench->config->kv_capacity / 10);        //mustn't overflow /100 *5
+    vector< pair< vector<__uint128_t>, vector<box> > > objects_map(bench->config->num_objects);
+    copy(bench->ctbs[start_ctb].sids, bench->ctbs[start_ctb].sids + bench->config->num_objects, bench->compacted_ctbs[c_ctb_id].sids);
+
     struct timeval bg_start = get_cur_time();
-    for (int i = 0; i < merge_ctb_count; i++) {
+    for(int i = 0; i < merge_ctb_count; i++){
 #pragma omp parallel for num_threads(bench->config->CTF_count)
         for (int j = 0; j < bench->config->CTF_count; j++) {
             for (int k = 0; k < bench->ctbs[start_ctb + i].CTF_capacity[j]; k++) {
                 uint oid = get_key_oid(bench->ctbs[start_ctb + i].ctfs[j].keys[k]);
-                box temp_mbr;
-                parse_mbr(bench->ctbs[start_ctb + i].ctfs[j].keys[k], temp_mbr,
-                          bench->ctbs[start_ctb + i].bitmap_mbrs[j]);
                 if (bench->ctbs[start_ctb + i].sids[oid] == 1) {
-                    int old_count = sid1_count.fetch_add(1, std::memory_order_relaxed);
-                    f_box temp_fb(&temp_mbr);
-                    temp_over_buffer[old_count] = {bench->ctbs[start_ctb + i].ctfs[j].keys[k], temp_fb};
+
                 } else {
-                    if (i == 0) {
-                        if (invert_index[j].empty() || invert_index[j].back() != oid) {
-                            invert_index[j].emplace_back(oid);
+                    if(i == 0){
+                        if(invert_index[j].empty() || invert_index[j].back() != oid){
+                            invert_index[j].push_back(oid);
                         }
                     }
-                    objects_map[oid].first.emplace_back(bench->ctbs[start_ctb + i].ctfs[j].keys[k]);
-                    objects_map[oid].second.emplace_back(temp_mbr);
+                    box temp_mbr;
+                    parse_mbr(bench->ctbs[start_ctb + i].ctfs[j].keys[k], temp_mbr,
+                              bench->ctbs[start_ctb + i].bitmap_mbrs[j]);
+                    objects_map[oid].first.push_back(bench->ctbs[start_ctb + i].ctfs[j].keys[k]);
+                    objects_map[oid].second.push_back(temp_mbr);
                 }
             }
         }
     }
-    double invert_index_time = get_time_elapsed(bg_start, true);
-    fprintf(stdout, "\tinvert_index:\t%.2f\n", invert_index_time);
-    temp_over_buffer.resize(sid1_count);
+    double invert_index_time = get_time_elapsed(bg_start,true);
+    fprintf(stdout,"\tinvert_index:\t%.2f\n",invert_index_time);
 
-    //sort(std::execution::par, temp_over_buffer.begin(), temp_over_buffer.end(), cmp);
-    //boost::sort::parallel::sort(temp_over_buffer.begin(), temp_over_buffer.end(), cmp);
-    sort(temp_over_buffer.begin(), temp_over_buffer.end(), cmp);
-    double temp_sort_time = get_time_elapsed(bg_start, true);
-    fprintf(stdout, "\ttemp_sort_time:\t%.2f\n", temp_sort_time);
-
-    vector<__uint128_t> total_over_keys_buffer(bench->config->kv_capacity / 5);
-    vector<f_box> total_over_boxes_buffer(bench->config->kv_capacity / 5);
-    uint total_buffer_index  = 0;
-    uint temp_buffer_index = 0;
-    vector<uint> key_index(merge_ctb_count, 0);
-    __uint128_t temp_key;
-    f_box temp_box;
-    uint taken_id = 0;
-    uint finish = 0;
-    while(finish <= merge_ctb_count){
-        finish = 0;
-        temp_key = ((__uint128_t)1 << 127) - 1 + ((__uint128_t)1 << 127);
-        if(temp_buffer_index == temp_over_buffer.size()){
-            finish++;
-        }
-        else{
-            temp_key = temp_over_buffer[temp_buffer_index].first;
-            temp_box = temp_over_buffer[temp_buffer_index].second;
-            taken_id = -1;
-        }
-
-        for (int i = 0; i < merge_ctb_count; i++) {
-            if (key_index[i] == bench->ctbs[start_ctb + i].o_buffer.oversize_kv_count) {              //empty kv
-                finish++;
-                continue;
-            }
-            if (temp_key > bench->ctbs[start_ctb + i].o_buffer.keys[key_index[i]]) {
-                temp_key = bench->ctbs[start_ctb + i].o_buffer.keys[key_index[i]];
-                temp_box = bench->ctbs[start_ctb + i].o_buffer.boxes[key_index[i]];
-                taken_id = i;
-            }
-        }
-        if (finish < merge_ctb_count) {
-            total_over_keys_buffer[total_buffer_index] = temp_key;
-            total_over_boxes_buffer[total_buffer_index] = temp_box;
-            total_buffer_index++;
-            if(taken_id == -1){
-                temp_buffer_index++;
-            }
-            else{
-                key_index[taken_id]++;
-            }
-        }
-    }
-    double merge_sort_time = get_time_elapsed(bg_start, true);
-    fprintf(stdout, "\tmerge_sort_time:\t%.2f\n", merge_sort_time);
-    temp_over_buffer.clear();
-    temp_over_buffer.shrink_to_fit();
-    total_over_keys_buffer.resize(total_buffer_index);
-    total_over_boxes_buffer.resize(total_buffer_index);
-    bench->compacted_ctbs[c_ctb_id].o_buffer.keys = total_over_keys_buffer.data();
-    bench->compacted_ctbs[c_ctb_id].o_buffer.boxes = total_over_boxes_buffer.data();
-
-            //bg_start = get_cur_time();
+    //bg_start = get_cur_time();
 #pragma omp parallel for num_threads(bench->config->CTF_count)
     for (int j = 0; j < bench->config->CTF_count; j++) {
         uint v_capacity = 0;
@@ -252,9 +179,9 @@ void * merge_dump(new_bench * bench, uint start_ctb, uint merge_ctb_count) {
         mbrs_with_wid[j].reserve(v_capacity);
         for (int k = 0; k < invert_index[j].size(); k++) {
             copy(objects_map[invert_index[j][k]].first.begin(),objects_map[invert_index[j][k]].first.end(),
-                    std::back_inserter(keys_with_wid[j]) );
+                 std::back_inserter(keys_with_wid[j]) );
             copy(objects_map[invert_index[j][k]].second.begin(),objects_map[invert_index[j][k]].second.end(),
-                    std::back_inserter(mbrs_with_wid[j]) );
+                 std::back_inserter(mbrs_with_wid[j]) );
 //            keys_with_wid[j].insert(keys_with_wid[j].end(),
 //                                    objects_map[invert_index[j][k]].first.begin(), objects_map[invert_index[j][k]].first.end());
 //            mbrs_with_wid[j].insert(mbrs_with_wid[j].end(),
@@ -275,10 +202,13 @@ void * merge_dump(new_bench * bench, uint start_ctb, uint merge_ctb_count) {
     }
     cout << "rest_total_count" << rest_total_count << endl;
 
+    double other_time = get_time_elapsed(bg_start,true);
+    fprintf(stdout,"\tother_time:\t%.2f\n",other_time);
+
     //bitmap is not important, with low filter rate
     copy(bench->ctbs[start_ctb].bitmaps, bench->ctbs[start_ctb].bitmaps + bench->bitmaps_size, bench->compacted_ctbs[c_ctb_id].bitmaps);
 
-        //simple parallel with good performence
+//    //simple parallel with good performence
 //#pragma omp parallel for num_threads(bench->config->CTF_count)
 //    for(uint i = 0; i < bench->config->CTF_count; i++){
 //        for(int j = 0; j < mbrs_with_wid[i].size(); j++) {
@@ -300,10 +230,10 @@ void * merge_dump(new_bench * bench, uint start_ctb, uint merge_ctb_count) {
 //            //bench->bg_run[old_big].bitmap_mbrs[bitmap_id].update(temp_real_mbrs[i]);        //not use bitmap
 //        }
 //    }
-//    double write_bitmap_time = get_time_elapsed(bg_start,true);
-//    fprintf(stdout,"\twrite_bitmap_time:\t%.2f\n",write_bitmap_time);
+    double write_bitmap_time = get_time_elapsed(bg_start,true);
+    fprintf(stdout,"\twrite_bitmap_time:\t%.2f\n",write_bitmap_time);
 
-        //parallel but atomic
+    //parallel but atomic
 //    vector<PaddedAtomicBool> atomic_bitmap(bench->bit_count);
 //#pragma omp parallel for num_threads(bench->config->num_threads)
 //    for (size_t i = 0; i < bench->bit_count; ++i) {                 //the only init method
@@ -401,7 +331,7 @@ void * merge_dump(new_bench * bench, uint start_ctb, uint merge_ctb_count) {
             __uint128_t value_mbr = serialize_mbr(&mbrs_with_wid[i][j],
                                                   &bench->compacted_ctbs[c_ctb_id].bitmap_mbrs[i]);
             keys_with_wid[i][j] = (keys_with_wid[i][j] & ~( ( ( (__uint128_t) 1 << MBR_BIT) - 1) << (DURATION_BIT + END_BIT)))
-                           + (value_mbr << (DURATION_BIT + END_BIT));
+                                  + (value_mbr << (DURATION_BIT + END_BIT));
         }
     }
     double write_kv_mbr_time = get_time_elapsed(bg_start,true);
@@ -446,12 +376,12 @@ int main(int argc, char **argv){
     workbench * bench = a_load_meta(path.c_str());
     new_bench * nb = new new_bench(bench->config);
     memcpy(nb, bench, sizeof(workbench));
-    nb->compacted_ctbs = new CTB[10];
+    nb->compacted_ctbs = new CTB[20];
     cout << nb->ctb_count << endl;
     cout << "search begin" << endl;
 
     uint merge_ctb_count = 5;
-    for(uint i = 0; i < 10; i += merge_ctb_count){
+    for(uint i = 0; i < 20; i += merge_ctb_count){
         for(uint j = i; j < i + merge_ctb_count; j++){
             bench->load_big_sorted_run(j);
         }
