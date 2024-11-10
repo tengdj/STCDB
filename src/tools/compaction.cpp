@@ -191,9 +191,9 @@ void * merge_dump(new_bench * bench, uint start_ctb, uint merge_ctb_count){
     double expend_time = get_time_elapsed(bg_start,true);
     fprintf(stdout,"\texpend_time:\t%.2f\n",expend_time);
     invert_index.clear();
-    invert_index.shrink_to_fit();
+//    invert_index.shrink_to_fit();
     objects_map.clear();
-    objects_map.shrink_to_fit();
+//    objects_map.shrink_to_fit();
 
     uint rest_total_count = 0;
     for(uint i = 0; i < bench->config->CTF_count; i++){
