@@ -65,7 +65,7 @@ public:
 		}
 		//log("%d %d %d %d",start,next_report,num_objects,report_gap);
 		if(report_gap<100&&end>=next_report&&start<num_units){
-			log("%ld%%",(end+1)*100/num_units);
+			//log("%ld%%",(end+1)*100/num_units);
 			next_report += num_units*report_gap/100;
 		}
 

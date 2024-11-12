@@ -366,7 +366,6 @@ void exp4_search_box_single(new_bench *bench){
             pthread_join(threads[j], &status);
         }
         double multi_thread_consume = get_time_elapsed(multi_thread_start, true);
-        cout << "multi_thread_consume" << multi_thread_consume << endl;
         q << edge_length*edge_length << ',' << bench->search_count << ',' << multi_thread_consume << ','
           << bench->intersect_sst_count <<',' << bench->bit_find_count << ',' << prepare_consume << endl;
         bench->box_search_queue.clear();
@@ -382,7 +381,7 @@ void experiment_search_box(new_bench *bench){
     ofstream q;
     q.open("ex_search_box.csv", ios::out|ios::binary|ios::trunc);
     q << "search area" << ',' << "find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ',' << "prepare_time(ms)" << endl;
-    for(int i = 0; i < 100; i++){
+    for(int i = 0; i < 10; i++){
         bench->clear_all_keys();
         clear_cache();
         struct timeval prepare_start = get_cur_time();
@@ -392,8 +391,8 @@ void experiment_search_box(new_bench *bench){
         bench->bit_find_count = 0;
         double edge_length = 0.01;
         Point mid;
-        mid.x = -87.9 + 0.4*get_rand_double();
-        mid.y = 41.6 + 0.4*get_rand_double();
+        mid.x = -87.9 + 0.2;
+        mid.y = 41.6 + 0.2;
         box search_area(mid.x - edge_length/2, mid.y - edge_length/2, mid.x + edge_length/2, mid.y + edge_length/2);
         search_area.print();
         for(uint j = 0; j < min((uint)1215, bench->ctb_count); j++){
@@ -416,11 +415,68 @@ void experiment_search_box(new_bench *bench){
             pthread_join(threads[j], &status);
         }
         double multi_thread_consume = get_time_elapsed(multi_thread_start, true);
-        cout << "multi_thread_consume" << multi_thread_consume << endl;
         q << edge_length*edge_length << ',' << bench->search_count << ',' << multi_thread_consume << ','
           << bench->intersect_sst_count <<',' << bench->bit_find_count << ',' << prepare_consume << endl;
         bench->box_search_queue.clear();
+    }
+    q.close();
+}
+
+void experiment_box_openmp(new_bench *bench){
+    bench->box_search_queue.reserve(bench->ctb_count * bench->config->CTF_count / 20);
+    time_query tq;
+    tq.abandon = true;
+    ofstream q;
+    q.open("ex_search_box_omp.csv", ios::out|ios::binary|ios::trunc);
+    q << "search area" << ',' << "find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ',' << "prepare_time(ms)" << endl;
+    for(int i = 0; i < 10; i++){
+        bench->clear_all_keys();
+        clear_cache();
+        struct timeval prepare_start = get_cur_time();
         bench->search_count = 0;
+        bench->mbr_find_count = 0;
+        bench->intersect_sst_count = 0;
+        bench->bit_find_count = 0;
+        double edge_length = 0.01;
+        Point mid;
+        mid.x = -87.9 + 0.2;
+        mid.y = 41.6 + 0.2;
+        box search_area(mid.x - edge_length/2, mid.y - edge_length/2, mid.x + edge_length/2, mid.y + edge_length/2);
+        search_area.print();
+        for(uint j = 0; j < min((uint)1215, bench->ctb_count); j++){
+            bench->mbr_search_in_disk(search_area, &tq, j);
+        }
+        double prepare_consume = get_time_elapsed(prepare_start, true);
+        struct timeval multi_thread_start = get_cur_time();
+
+#pragma omp parallel for num_threads(bench->config->num_threads)
+        for(auto info : bench->box_search_queue){
+            uint mbr_find_count = 0;
+            if(!bench->ctbs[info.ctb_id].ctfs[info.ctf_id].keys){
+                bench->load_CTF_keys(info.ctb_id, info.ctf_id);
+            }
+            for(uint q = 0; q < bench->ctbs[info.ctb_id].CTF_capacity[info.ctf_id]; q++){
+                __uint128_t temp_key = bench->ctbs[info.ctb_id].ctfs[info.ctf_id].keys[q];
+                if(info.tq.abandon || info.tq.check_key_time(temp_key)){
+                    uint pid = get_key_oid(temp_key);
+                    box key_box;
+                    parse_mbr(temp_key, key_box, *info.bmap_mbr);
+                    if(search_area.intersect(key_box)){
+                        mbr_find_count++;
+                        //cout<<"box find!"<<endl;
+                        //key_box.print();
+                    }
+                }
+            }
+            delete[] bench->ctbs[info.ctb_id].ctfs[info.ctf_id].keys;
+            bench->ctbs[info.ctb_id].ctfs[info.ctf_id].keys = nullptr;
+            bench->search_count.fetch_add(mbr_find_count, std::memory_order_relaxed);
+        }
+
+        double multi_thread_consume = get_time_elapsed(multi_thread_start, true);
+        q << edge_length*edge_length << ',' << bench->search_count << ',' << multi_thread_consume << ','
+          << bench->intersect_sst_count <<',' << bench->bit_find_count << ',' << prepare_consume << endl;
+        bench->box_search_queue.clear();
     }
     q.close();
 }
@@ -510,17 +566,17 @@ int main(int argc, char **argv){
     new_bench * nb = new new_bench(bench->config);
     memcpy(nb, bench, sizeof(workbench));
     cout << nb->ctb_count << endl;
-    nb->ctb_count = 10;
-    nb->ctbs[0].ctfs = NULL;
-    nb->ctbs[1].ctfs = NULL;
-    nb->ctbs[2].ctfs = NULL;
-    nb->ctbs[3].ctfs = NULL;
-    nb->ctbs[4].ctfs = NULL;
-    nb->ctbs[5].ctfs = NULL;
-    nb->ctbs[6].ctfs = NULL;
-    nb->ctbs[7].ctfs = NULL;
-    nb->ctbs[8].ctfs = NULL;
-    nb->ctbs[9].ctfs = NULL;
+//    nb->ctb_count = 10;
+//    nb->ctbs[0].ctfs = NULL;
+//    nb->ctbs[1].ctfs = NULL;
+//    nb->ctbs[2].ctfs = NULL;
+//    nb->ctbs[3].ctfs = NULL;
+//    nb->ctbs[4].ctfs = NULL;
+//    nb->ctbs[5].ctfs = NULL;
+//    nb->ctbs[6].ctfs = NULL;
+//    nb->ctbs[7].ctfs = NULL;
+//    nb->ctbs[8].ctfs = NULL;
+//    nb->ctbs[9].ctfs = NULL;
     cout << "search begin" << endl;
 
 
@@ -538,6 +594,7 @@ int main(int argc, char **argv){
     //experiment_search_oid(nb);
     //exp4_search_box_single(nb);
     experiment_search_box(nb);
+    experiment_box_openmp(nb);
     //experiment_search_time(bench);
     //query_search_id(bench);
     //query_search_box(bench);
