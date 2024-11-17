@@ -589,15 +589,82 @@ int main(int argc, char **argv){
 
     clear_cache();
     nb->clear_all_keys();
+    cout << "begin test" << endl;
+    struct timeval start_time = get_cur_time();
+
+    for(int i = 0; i < 84; i++){
+        nb->ctbs[i].ctfs = new CTF[nb->config->CTF_count];
+        for(int j = 0; j < 100; j += 8){
+            nb->load_CTF_keys(i, j);
+        }
+        if(i%83==82){
+            double time_consume = get_time_elapsed(start_time, true);
+            cout << "ctb " << i << "time_consume" << time_consume << endl;
+            clear_cache();
+            nb->clear_all_keys();
+        }
+    }
+
+
+//    start_time = get_cur_time();
+//    for(int i = 0; i < 84; i++){
+//        nb->ctbs[i].ctfs = new CTF[nb->config->CTF_count];
+//#pragma omp parallel for num_threads(128)
+//        for(int j = 0; j < 100; j += 8){
+//            nb->load_CTF_keys(i, j);
+//        }
+//        if(i%83==82){
+//            double time_consume = get_time_elapsed(start_time, true);
+//            cout << "ctb " << i << "time_consume" << time_consume << endl;
+//            clear_cache();
+//            nb->clear_all_keys();
+//        }
+//    }
+
+
     //experiment_twice(nb);
     //exp4_search_oid_single(nb);
     //experiment_search_oid(nb);
     //exp4_search_box_single(nb);
-    experiment_search_box(nb);
-    experiment_box_openmp(nb);
+    //experiment_search_box(nb);
+    //experiment_box_openmp(nb);
     //experiment_search_time(bench);
     //query_search_id(bench);
     //query_search_box(bench);
 
     return 0;
 }
+
+
+//    char * a = new char[100 * 1024 * 1024];
+//    for(int i = 0; i < 2000; i++){
+//        ofstream q;
+//        string path = "/data3/ssd" + to_string(i%8) + "/testblock" + to_string(i);
+//        q.open(path, ios::out|ios::binary|ios::trunc);
+//        q.write(a, sizeof(char) * 100 * 1024 * 1024);
+//        q.close();
+//    }
+
+//    clear_cache();
+//    uint open_count = 0;
+//    vector<char *> b(2000);
+//    for(int i = 0; i < 2000; i++){
+//        b[i] = new char[100 * 1024 * 1024];
+//    }
+//
+//
+//    struct timeval start_time = get_cur_time();
+//#pragma omp parallel for num_threads(32)
+//    for(int i = 0; i < 960; i+=4){
+//        string path = "/data3/ssd" + to_string(i%8) + "/testblock" + to_string(i);
+//        ifstream in(path, ios::in | ios::binary);
+//        if(in.is_open()){
+//            open_count++;
+//            in.read(b[i], sizeof(char) * 100 * 1024 * 1024);
+//            in.close();
+//        }
+//
+//    }
+//    double time_consume = get_time_elapsed(start_time, true);
+//    cout << "time_consume" << time_consume << endl;
+//    cout << "open_count " << open_count << endl;

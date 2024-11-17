@@ -190,9 +190,9 @@ void * merge_dump(new_bench * bench, uint start_ctb, uint merge_ctb_count){
     }
     double expend_time = get_time_elapsed(bg_start,true);
     fprintf(stdout,"\texpend_time:\t%.2f\n",expend_time);
-    invert_index.clear();
+//    invert_index.clear();
 //    invert_index.shrink_to_fit();
-    objects_map.clear();
+//    objects_map.clear();
 //    objects_map.shrink_to_fit();
 
     uint rest_total_count = 0;
@@ -206,30 +206,30 @@ void * merge_dump(new_bench * bench, uint start_ctb, uint merge_ctb_count){
     fprintf(stdout,"\tother_time:\t%.2f\n",other_time);
 
     //bitmap is not important, with low filter rate
-    copy(bench->ctbs[start_ctb].bitmaps, bench->ctbs[start_ctb].bitmaps + bench->bitmaps_size, bench->compacted_ctbs[c_ctb_id].bitmaps);
+    //copy(bench->ctbs[start_ctb].bitmaps, bench->ctbs[start_ctb].bitmaps + bench->bitmaps_size, bench->compacted_ctbs[c_ctb_id].bitmaps);
 
-//    //simple parallel with good performence
-//#pragma omp parallel for num_threads(bench->config->CTF_count)
-//    for(uint i = 0; i < bench->config->CTF_count; i++){
-//        for(int j = 0; j < mbrs_with_wid[i].size(); j++) {
-//            uint low0 = (mbrs_with_wid[i][j].low[0] - bench->mbr.low[0]) / (bench->mbr.high[0] - bench->mbr.low[0]) *
-//                        (1ULL << (SID_BIT / 2));
-//            uint low1 = (mbrs_with_wid[i][j].low[1] - bench->mbr.low[1]) / (bench->mbr.high[1] - bench->mbr.low[1]) *
-//                        (1ULL << (SID_BIT / 2));
-//            uint high0 = (mbrs_with_wid[i][j].high[0] - bench->mbr.low[0]) / (bench->mbr.high[0] - bench->mbr.low[0]) *
-//                         (1ULL << (SID_BIT / 2));
-//            uint high1 = (mbrs_with_wid[i][j].high[1] - bench->mbr.low[1]) / (bench->mbr.high[1] - bench->mbr.low[1]) *
-//                         (1ULL << (SID_BIT / 2));
-//            for (uint m = low0; m <= high0; m++) {
-//                for (uint n = low1; n <= high1; n++) {
-//                    uint bit_pos = xy2d(SID_BIT / 2, m, n);
-//                    bench->compacted_ctbs[c_ctb_id].bitmaps[i * (bench->bit_count / 8) + bit_pos / 8] |= (1
-//                            << (bit_pos % 8));
-//                }
-//            }
-//            //bench->bg_run[old_big].bitmap_mbrs[bitmap_id].update(temp_real_mbrs[i]);        //not use bitmap
-//        }
-//    }
+    //simple parallel with good performence
+#pragma omp parallel for num_threads(bench->config->CTF_count)
+    for(uint i = 0; i < bench->config->CTF_count; i++){
+        for(int j = 0; j < mbrs_with_wid[i].size(); j++) {
+            uint low0 = (mbrs_with_wid[i][j].low[0] - bench->mbr.low[0]) / (bench->mbr.high[0] - bench->mbr.low[0]) *
+                        (1ULL << (SID_BIT / 2));
+            uint low1 = (mbrs_with_wid[i][j].low[1] - bench->mbr.low[1]) / (bench->mbr.high[1] - bench->mbr.low[1]) *
+                        (1ULL << (SID_BIT / 2));
+            uint high0 = (mbrs_with_wid[i][j].high[0] - bench->mbr.low[0]) / (bench->mbr.high[0] - bench->mbr.low[0]) *
+                         (1ULL << (SID_BIT / 2));
+            uint high1 = (mbrs_with_wid[i][j].high[1] - bench->mbr.low[1]) / (bench->mbr.high[1] - bench->mbr.low[1]) *
+                         (1ULL << (SID_BIT / 2));
+            for (uint m = low0; m <= high0; m++) {
+                for (uint n = low1; n <= high1; n++) {
+                    uint bit_pos = xy2d(SID_BIT / 2, m, n);
+                    bench->compacted_ctbs[c_ctb_id].bitmaps[i * (bench->bit_count / 8) + bit_pos / 8] |= (1
+                            << (bit_pos % 8));
+                }
+            }
+            //bench->bg_run[old_big].bitmap_mbrs[bitmap_id].update(temp_real_mbrs[i]);        //not use bitmap
+        }
+    }
     double write_bitmap_time = get_time_elapsed(bg_start,true);
     fprintf(stdout,"\twrite_bitmap_time:\t%.2f\n",write_bitmap_time);
 
@@ -379,6 +379,7 @@ int main(int argc, char **argv){
     nb->compacted_ctbs = new CTB[20];
     cout << nb->ctb_count << endl;
     cout << "search begin" << endl;
+
 
     uint merge_ctb_count = 5;
     for(uint i = 0; i < 20; i += merge_ctb_count){

@@ -374,7 +374,7 @@ uint workbench::search_time_in_disk(time_query * tq){          //not finish
             }
             time_query tq_temp;
             tq_temp.t_start = tq->t_start - ctbs[i].start_time_min;
-            tq_temp.t_end = tq->t_start - ctbs[i].start_time_min;
+            tq_temp.t_end = tq->t_end - ctbs[i].start_time_min;
             tq_temp.abandon = tq->abandon;
             if(!ctbs[i].ctfs){
                 ctbs[i].ctfs = new CTF[config->CTF_count];
@@ -399,7 +399,7 @@ bool new_bench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
     uint64_t wp = pid;
     time_query tq_temp;
     tq_temp.t_start = tq->t_start - ctbs[i].start_time_min;
-    tq_temp.t_end = tq->t_start - ctbs[i].start_time_min;
+    tq_temp.t_end = tq->t_end - ctbs[i].start_time_min;
     tq_temp.abandon = tq->abandon;
     if(ctbs[i].sids[pid] == 0){
         wid_filter_count++;
@@ -571,7 +571,7 @@ bool PolygonSearchCallback(short * i, box poly_mbr,void* arg){
 ////            uint this_find = 0;
 ////            time_query tq_temp;
 ////            tq_temp.t_start = tq->t_start - ctbs[i].start_time_min;
-////            tq_temp.t_end = tq->t_start - ctbs[i].start_time_min;
+////            tq_temp.t_end = tq->t_end - ctbs[i].start_time_min;
 ////            tq_temp.abandon = tq->abandon;
 ////            box_search_info bs_uint;
 ////            bs_uint.ctb_id = i;
@@ -627,7 +627,7 @@ bool new_bench::mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, 
             uint this_find = 0;
             time_query tq_temp;
             tq_temp.t_start = tq->t_start - ctbs[i].start_time_min;
-            tq_temp.t_end = tq->t_start - ctbs[i].start_time_min;
+            tq_temp.t_end = tq->t_end - ctbs[i].start_time_min;
             tq_temp.abandon = tq->abandon;
             box_search_info bs_uint;
             bs_uint.ctb_id = i;

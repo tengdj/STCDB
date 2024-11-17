@@ -98,7 +98,7 @@ public:
     uint t_end = 0;
     bool abandon = true;
     bool check_key_time(__uint128_t key){           // tq->t_start -= ctb.start_min   tq->t_end -= ctb.start_min
-        uint key_end = get_key_end(key);
+        uint key_end = get_key_end(key);            //wrong, need end_time_min
         uint key_start = key_end - get_key_duration(key);
         return abandon || (key_start < t_end) && (t_start < key_end);
     }

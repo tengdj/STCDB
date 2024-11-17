@@ -34,7 +34,7 @@ endif
 %.o:	%.cpp
 	$(CXX) -c $(CPPFLAGS) $(INCLUDES) -o $@ $<
 
-all:	 pipeline datagen load_search compaction to_csv
+all:	 pipeline datagen load_search compaction points_to_csv meetings_to_csv
 
 
 # for macro queries
@@ -53,7 +53,10 @@ load_search:		tools/load_search.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
 compaction:		tools/compaction.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
 	$(CXX) -o ../build/$@ $^ $(LIBS)
 
-to_csv:		tools/points_to_csv.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
+points_to_csv:		tools/points_to_csv.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
+	$(CXX) -o ../build/$@ $^ $(LIBS)
+
+meetings_to_csv:		tools/meetings_to_csv.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
 	$(CXX) -o ../build/$@ $^ $(LIBS)
 
 #searchsst:	tools/searchsst.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
