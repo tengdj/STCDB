@@ -113,26 +113,28 @@ uint CTF::search_SSTable(uint64_t wp, time_query * tq, bool search_multi, uint S
         cursor--;
         temp_wp = keys[cursor] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
     }
-    if(temp_wp == wp && cursor == 0){
-        count++;
-        //cout<<wp<<endl;
-        if(tq->abandon || tq->check_key_time(keys[cursor])) {
-            count++;
-            long long search_multi_length = search_count.fetch_add(1, std::memory_order_relaxed);
-            if(search_multi){
-                search_multi_pid[search_multi_length] = get_key_target(keys[0]);
-            }
-        }
-    }
+//    if(temp_wp == wp && cursor == 0){
+//        count++;
+//        //cout<<wp<<endl;
+//        if(tq->abandon || tq->check_key_time(keys[cursor])) {
+//            count++;
+//            long long search_multi_length = search_count.fetch_add(1, std::memory_order_relaxed);
+//            if(search_multi){
+//                search_multi_pid[search_multi_length] = get_key_target(keys[0]);
+//            }
+//        }
+//    }
     while(cursor+1<SSTable_kv_capacity){
         cursor++;
         temp_wp = keys[cursor] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
         if(temp_wp == wp){
-            count++;
-            //cout<<get_key_target(keys[cursor])<<endl;
-            long long search_multi_length = search_count.fetch_add(1, std::memory_order_relaxed);
-            if(search_multi){
-                search_multi_pid[search_multi_length] = get_key_target(keys[cursor]);
+            if(tq->abandon || tq->check_key_time(keys[cursor])) {
+                count++;
+                //cout<<get_key_target(keys[cursor])<<endl;
+                long long search_multi_length = search_count.fetch_add(1, std::memory_order_relaxed);
+                if (search_multi) {
+                    search_multi_pid[search_multi_length] = get_key_target(keys[cursor]);
+                }
             }
         }
         else break;
