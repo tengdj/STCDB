@@ -407,7 +407,8 @@ bool new_bench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
     }
     else if(ctbs[i].sids[pid] == 1){
         //cout << "oid search buffer" << endl;
-        uint buffer_find = ctbs[i].o_buffer.search_buffer(pid, &tq_temp, search_multi, search_count, search_multi_pid);
+        return false;
+        //uint buffer_find = ctbs[i].o_buffer.search_buffer(pid, &tq_temp, search_multi, search_count, search_multi_pid);
         //search_count.fetch_add(buffer_find, std::memory_order_relaxed);
     }
     else{
@@ -598,7 +599,7 @@ bool new_bench::mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, 
     uint buffer_find = 0;
     for(uint q = 0; q < ctbs[i].o_buffer.oversize_kv_count; q++){
         if(ctbs[i].o_buffer.boxes[q].intersect(b)){
-            uni.insert(get_key_oid(ctbs[i].o_buffer.keys[i]));
+            //uni.insert(get_key_oid(ctbs[i].o_buffer.keys[i]));
             buffer_find++;
             //cout<<"box find!"<<endl;
             //ctbs[i].o_buffer.boxes[q].print();

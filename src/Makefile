@@ -34,7 +34,7 @@ endif
 %.o:	%.cpp
 	$(CXX) -c $(CPPFLAGS) $(INCLUDES) -o $@ $<
 
-all:	 pipeline datagen load_search compaction points_to_csv meetings_to_csv
+all:	 pipeline datagen load_search compaction points_to_csv meetings_to_csv trace
 
 
 # for macro queries

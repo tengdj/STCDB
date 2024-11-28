@@ -64,7 +64,6 @@ void *reachability_unit(void *arg){
 }
 
 void workbench::reachability(){
-
 	query_context tctx;
 	tctx.config = config;
 	tctx.num_units = grid_check_counter;
