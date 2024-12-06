@@ -197,6 +197,7 @@ void tracer::print_trace(int oid){
 	print_points(points);
 	points.clear();
 }
+
 void tracer::print_traces(){
 	vector<Point *> points;
 	for(int oid=0;oid<config->num_objects;oid++){
@@ -752,7 +753,9 @@ void process_with_gpu(workbench *bench,workbench *d_bench, gpu_info *gpu);
 #endif
 
 void tracer::process(){
-	struct timeval start = get_cur_time();
+    //config->reach_distance /= sqrt(config->num_objects / 10000000);
+    //config->num_threads = 1;
+    struct timeval start = get_cur_time();
     std::cout << "Running main program..." << std::endl;
 	for(int st=config->start_time;st<config->start_time+config->duration;st+=100){
         config->cur_duration = min((config->start_time+config->duration-st),(uint)100);
@@ -822,8 +825,8 @@ void tracer::process(){
 				bench->pro.filter_time += get_time_elapsed(ct,true);
 				bench->reachability();
 				bench->pro.refine_time += get_time_elapsed(ct,true);
-				//bench->update_meetings();
-				//bench->pro.meeting_identify_time += get_time_elapsed(ct,true);
+				bench->update_meetings();
+				bench->pro.meeting_identify_time += get_time_elapsed(ct,true);
 			}else{
 #ifdef USE_GPU
                 process_with_gpu(bench,d_bench,gpu);
@@ -973,7 +976,7 @@ void tracer::process(){
 //                    merge_dump((void *)bench);
 //                }
 
-                straight_dump((void *)bench);
+                //f((void *)bench);
 
                 //init
                 bench->ctb_count++;
@@ -1083,9 +1086,9 @@ void tracer::process(){
                 bench->dump_meetings(st);
             }
 
-            if(st+t+1 == config->start_time+config->duration - 5  || (st+t+1) % 100000 == 0){
-                bench->dump_meta(config->CTB_meta_path);
-            }
+//            if(st+t+1 == config->start_time+config->duration - 5  || (st+t+1) % 100000 == 0){
+//                bench->dump_meta(config->CTB_meta_path);
+//            }
 		}
 	}
 	bench->print_profile();

@@ -26,8 +26,8 @@ public:
 
     // for query only
     uint start_time = 0;
-    uint grid_capacity = 100;
-    uint zone_capacity = 100;
+    uint grid_capacity = 50;
+    uint zone_capacity = 20;
     size_t num_meeting_buckets = 100000;
 
     double grid_amplify = 2;

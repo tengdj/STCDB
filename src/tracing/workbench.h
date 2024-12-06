@@ -366,6 +366,8 @@ public:
     bool mbr_search_in_disk(box b, time_query * tq, uint CTB_id);
     bool id_search_in_CTB(uint pid, uint CTB_id, time_query * tq);
     bool id_search_in_disk(uint pid, time_query * tq);
+
+    bool old_mbr_search_in_CTB(box b, uint CTB_id);
 };
 
 

@@ -124,10 +124,10 @@ void workbench::claim_space(){
 //	meetings = (meeting_unit *)allocate(size);
 //	log("\t%.2f MB\tmeeting space",size/1024.0/1024.0);
 //
-//#pragma omp parallel for
-//	for(size_t i=0;i<config->num_meeting_buckets;i++){
-//		meeting_buckets[i].key = ULL_MAX;
-//	}
+#pragma omp parallel for
+	for(size_t i=0;i<config->num_meeting_buckets;i++){
+		meeting_buckets[i].key = ULL_MAX;
+	}
 
     size = config->MemTable_capacity * sizeof(__uint128_t *);                 //sort
     h_keys = (__uint128_t **)allocate(size);
@@ -166,7 +166,7 @@ void workbench::claim_space(){
     size = config->big_sorted_run_capacity*sizeof(CTB);
     ctbs = (CTB *)allocate(size);
 
-    if(config->save_meetings_pers || config->load_meetings_pers){
+    if(config->save_meetings_pers || config->load_meetings_pers || !config->gpu){
         size = config->num_objects * 10 *sizeof(meeting_unit);              //100 * size of d_meetings_ps
         h_meetings_ps = (meeting_unit *) allocate(size);
         log("\t%.2f MB\t h_meetings_ps",1.0*size/1024/1024);
@@ -526,65 +526,69 @@ bool PolygonSearchCallback(short * i, box poly_mbr,void* arg){
     return true;
 }
 
-//bool workbench::mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq){
-//    uint i = CTB_id;
-//    bool ret = false, find = false;
-////    box bit_b = make_bit_box(b);
-////    uint bit_pos = 0;
-////    if(!ctbs[i].ctfs){
-////        ctbs[i].ctfs = new CTF[config->CTF_count];
-////    }
-////    //cout << "in bg_run" << i << endl;
-////
-////    uint buffer_find = 0;
-////    for(uint q = 0; q < ctbs[i].o_buffer.oversize_kv_count; q++){
-////        if(ctbs[i].o_buffer.boxes[q].intersect(b)){
-////            uni.insert(get_key_oid(ctbs[i].o_buffer.keys[i]));
-////            buffer_find++;
-////            mbr_find_count++;
-////            //cout<<"box find!"<<endl;
-////            //ctbs[i].o_buffer.boxes[q].print();
-////        }
-////    }
-////
-////    vector<pair<short, box>> intersect_mbrs;
-////    ctbs[i].box_rtree->Search(b.low, b.high, PolygonSearchCallback, (void *)&intersect_mbrs);
-////    intersect_sst_count += intersect_mbrs.size();
-////    for (uint j = 0; j < intersect_mbrs.size(); j++) {
-////        uint CTF_id = intersect_mbrs[j].first;
-////        find = false;
-////        for (uint p = bit_b.low[0]-1; (p <= bit_b.high[0]+1) && (!find); p++) {
-////            for (uint q = bit_b.low[1]-1; (q <= bit_b.high[1]+1) && (!find); q++) {
-////                bit_pos = xy2d(SID_BIT / 2, p, q);
-////                if (ctbs[i].bitmaps[CTF_id * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
-////                    //cerr << "SSTable_" << CTF_id << "bit_pos" << bit_pos << endl;
-////                    find = true;
-////                    ret = true;
-////                    break;
-////                }
-////            }
-////        }
-////        if(find){
-////            bit_find_count++;
-////            if(!ctbs[i].ctfs[CTF_id].keys){
-////                load_CTF_keys(i, CTF_id);
-////            }
-////            uint this_find = 0;
-////            time_query tq_temp;
-////            tq_temp.t_start = tq->t_start - ctbs[i].start_time_min;
-////            tq_temp.t_end = tq->t_end - ctbs[i].start_time_min;
-////            tq_temp.abandon = tq->abandon;
-////            box_search_info bs_uint;
-////            bs_uint.ctb_id = i;
-////            bs_uint.ctf_id = CTF_id;
-////            bs_uint.bmap_mbr = &ctbs[i].bitmap_mbrs[CTF_id];
-////            bs_uint.tq = tq_temp;
-////            //box_search_queue.push_back(bs_uint);
-////            //cerr<<this_find<<"finds in sst "<<CTF_id<<endl;
-////        }
-////    }
-//    return ret;
-//}
+bool new_bench::old_mbr_search_in_CTB(box b, uint CTB_id){
+    uint i = CTB_id;
+    bool ret = false, find = false;
+    box bit_b = make_bit_box(b);
+    uint bit_pos = 0;
+    if(!ctbs[i].ctfs){
+        ctbs[i].ctfs = new CTF[config->CTF_count];
+    }
+    //cout << "in bg_run" << i << endl;
+
+    uint buffer_find = 0;
+//    for(uint q = 0; q < ctbs[i].o_buffer.oversize_kv_count; q++){
+//        if(ctbs[i].o_buffer.boxes[q].intersect(b)){
+//            //uni.insert(get_key_oid(ctbs[i].o_buffer.keys[i]));
+//            buffer_find++;
+//            mbr_find_count++;
+//            //cout<<"box find!"<<endl;
+//            //ctbs[i].o_buffer.boxes[q].print();
+//        }
+//    }
+
+    vector<pair<short, box>> intersect_mbrs;
+    ctbs[i].box_rtree->Search(b.low, b.high, PolygonSearchCallback, (void *)&intersect_mbrs);
+    intersect_sst_count += intersect_mbrs.size();
+    for (uint j = 0; j < intersect_mbrs.size(); j++) {
+        uint CTF_id = intersect_mbrs[j].first;
+        find = false;
+        for (uint p = bit_b.low[0]-1; (p <= bit_b.high[0]+1) && (!find); p++) {
+            for (uint q = bit_b.low[1]-1; (q <= bit_b.high[1]+1) && (!find); q++) {
+                bit_pos = xy2d(SID_BIT / 2, p, q);
+                if (ctbs[i].bitmaps[CTF_id * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
+                    //cerr << "SSTable_" << CTF_id << "bit_pos" << bit_pos << endl;
+                    find = true;
+                    ret = true;
+                    break;
+                }
+            }
+        }
+        if(find){
+            bit_find_count++;
+            if(!ctbs[i].ctfs[CTF_id].keys){
+                load_CTF_keys(i, CTF_id);
+            }
+            uint this_find = 0;
+            for(uint q = 0; q < ctbs[i].CTF_capacity[CTF_id]; q++){
+                uint pid = get_key_oid(ctbs[i].ctfs[CTF_id].keys[q]);
+                box key_box;
+                parse_mbr(ctbs[i].ctfs[CTF_id].keys[q], key_box, intersect_mbrs[j].second);
+                if(b.intersect(key_box)){
+                    //uni.insert(pid);
+                    this_find++;
+                    mbr_find_count++;
+                    //cout<<"box find!"<<endl;
+                    //key_box.print();
+
+                }
+            }
+            //cerr<<this_find<<"finds in sst "<<CTF_id<<endl;
+
+        }
+    }
+    return ret;
+}
 
 bool new_bench::mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq){
     uint i = CTB_id;

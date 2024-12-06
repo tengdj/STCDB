@@ -637,22 +637,36 @@ void ex_pg_search_box(new_bench *bench){
 }
 
 int main(int argc, char **argv){
+    cout << sizeof(checking_unit) << endl;
+    clear_cache();
     string path = "../data/meta/";
     workbench * bench = temp_load_meta(path.c_str());
     new_bench * nb = new new_bench(bench->config);
     memcpy(nb, bench, sizeof(workbench));
     cout << nb->ctb_count << endl;
 
-
-    nb->ctbs[10].ctfs = new CTF[100];
+    double edge_length = 0.01;
+    Point mid;
+    mid.x = -87.9 + 0.2;
+    mid.y = 41.6 + 0.2;
+    box search_area(mid.x - edge_length/2, mid.y - edge_length/2, mid.x + edge_length/2, mid.y + edge_length/2);
+    search_area.print();
     struct timeval start_time = get_cur_time();
-    for(int j = 0; j < 100; j++){
-        nb->load_CTF_keys(10,j);
-    }
+    nb->old_mbr_search_in_CTB(search_area, 10);
     double time_consume = get_time_elapsed(start_time, true);
     cout << "ctb " << 10 << "time_consume" << time_consume << endl;
+    cout << nb->bit_find_count << " " << nb->mbr_find_count << endl;
 
-    ex_pg_search_box(nb);
+
+//    nb->ctbs[10].ctfs = new CTF[100];
+//    struct timeval start_time = get_cur_time();
+//    for(int j = 0; j < 100; j++){
+//        nb->load_CTF_keys(10,j);
+//    }
+//    double time_consume = get_time_elapsed(start_time, true);
+//    cout << "ctb " << 10 << "time_consume" << time_consume << endl;
+//
+//    ex_pg_search_box(nb);
 
     return 0;
 }
