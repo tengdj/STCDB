@@ -350,8 +350,8 @@ public:
 extern void lookup_rec(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);
 extern void lookup_stack(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);
 
-extern void clear_cache();
-extern workbench * load_meta(const char *path);
+//extern void clear_cache();
+//extern workbench * load_meta(const char *path);
 
 class new_bench : public workbench{
 public:

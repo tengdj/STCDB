@@ -49,7 +49,7 @@ namespace{
 #define MBR_BIT 36
 #define DURATION_BIT 12
 #define END_BIT 12
-
+//26 + 26 + 12 = 64
 
 const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
 
@@ -514,6 +514,14 @@ const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
         for (int i = 7; i >= 0; --i) {
             cout << ((byte >> i) & 1);
         }
+    }
+
+    void clear_cache(){
+        string cmd = "sync; sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'";        //sudo!!!
+        if(system(cmd.c_str())!=0){
+            fprintf(stderr, "Error when disable buffer cache\n");
+        }
+        //cout << "clear_cache" << endl;
     }
 }
 #endif

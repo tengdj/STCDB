@@ -6,7 +6,7 @@ SRCS := $(wildcard */*.cpp)
 OBJS := $(patsubst %.cpp,%.o,$(SRCS))
 
 INCLUDES	= -I /usr/include -I ./src -I /usr/local/cuda/targets/x86_64-linux/include/
-LIBS		= -L/usr/lib/x86_64-linux-gnu -lboost_program_options -lpthread -fopenmp -pg
+LIBS		= -L/usr/lib/x86_64-linux-gnu -lboost_program_options -lpthread -fopenmp -pg -lrocksdb -L/usr/local/lib -I/usr/local/include
 CPPFLAGS	= -g -std=c++17 -Wno-cpp -fopenmp
 
 CUDALIBS	= -L/usr/local/cuda/lib64 -lcudart
@@ -34,7 +34,7 @@ endif
 %.o:	%.cpp
 	$(CXX) -c $(CPPFLAGS) $(INCLUDES) -o $@ $<
 
-all:	 pipeline datagen load_search compaction points_to_csv meetings_to_csv trace
+all:	 pipeline datagen load_search compaction points_to_csv meetings_to_csv trace rocksdb
 
 
 # for macro queries
@@ -57,6 +57,9 @@ points_to_csv:		tools/points_to_csv.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
 	$(CXX) -o ../build/$@ $^ $(LIBS)
 
 meetings_to_csv:		tools/meetings_to_csv.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
+	$(CXX) -o ../build/$@ $^ $(LIBS)
+
+rocksdb:		tools/rocksdb.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
 	$(CXX) -o ../build/$@ $^ $(LIBS)
 
 #searchsst:	tools/searchsst.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
