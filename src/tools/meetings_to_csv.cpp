@@ -72,6 +72,8 @@ int main(int argc, char **argv){
     new_bench * nb = new new_bench(bench->config);
     memcpy(nb, bench, sizeof(workbench));
     cout << nb->ctb_count << endl;
+    char new_raid[24] = "/data3/raid0_num";
+    memcpy(nb->config->raid_path, new_raid, sizeof(nb->config->raid_path));
 
     for(int j = 0; j < 100; j++){
         uint size = nb->ctbs[10].CTF_capacity[j] * sizeof(__uint128_t);
@@ -79,85 +81,51 @@ int main(int argc, char **argv){
     }
 
     nb->ctbs[10].ctfs = new CTF[100];
-    std::ofstream outFile("meetings"+ to_string(10) +".csv");
+
+//    std::ofstream pg_outFile("pg_meetings"+ to_string(10) +".csv");
+//    if(pg_outFile.is_open()){
+//        cout << "open" << endl;
+//    }
+//    pg_outFile << "ctfid" << ',' << "oid" << ',' << "target" << ',' << "start_time" << ',' << "end_time" << ',' << "geom" << endl;
+
+    std::ofstream outFile("mem_meetings"+ to_string(10) + ".csv");
     if(outFile.is_open()){
         cout << "open" << endl;
     }
-    outFile << "ctfid" << ',' << "oid" << ',' << "target" << ',' << "start_time" << ',' << "end_time" << ',' << "geom" << endl;
+    outFile << "id" << ',' << "start" << ',' << "end" << ',' << "box1,box2,box3,box4" << ',' << "person2_id" << endl;
     for(int j = 0; j < 100; j++){
         nb->load_CTF_keys(10,j);
-        for (int i = 0; i < nb->ctbs[10].CTF_capacity[j]; i++) {
-            __uint128_t & temp_key = nb->ctbs[10].ctfs[j].keys[i];
-            uint id = get_key_oid(temp_key);
-            uint end = 546;
-            uint start = 235;
-            uint person2_id = get_key_target(temp_key);
-            outFile << j << ','
-                    << id << ','
-                    << person2_id << ','
-                    << start << ','
-                    << end << ',';
-            box key_box;
-            parse_mbr(temp_key, key_box, nb->ctbs[10].bitmap_mbrs[j]);
-            outFile << "\"" << generate_wkt(key_box) << "\"" << endl;
-        }
-
-
-//        std::ofstream outFile("meetings"+ to_string(10) + '-' + to_string(j) +".csv");
-//        if(outFile.is_open()){
-//            cout << "open" << endl;
-//        }
-//        outFile << "id" << ',' << "start" << ',' << "end" << ',' << "box1,box2,box3,box4" << ',' << "person2_id" << endl;
 //        for (int i = 0; i < nb->ctbs[10].CTF_capacity[j]; i++) {
 //            __uint128_t & temp_key = nb->ctbs[10].ctfs[j].keys[i];
 //            uint id = get_key_oid(temp_key);
-//            uint end = get_key_end(temp_key) - nb->ctbs[10].start_time_min;
-//            uint start = end - get_key_duration(temp_key);
+//            uint end = 546;
+//            uint start = 235;
+//            uint person2_id = get_key_target(temp_key);
+//            pg_outFile << j << ','
+//                    << id << ','
+//                    << person2_id << ','
+//                    << start << ','
+//                    << end << ',';
 //            box key_box;
 //            parse_mbr(temp_key, key_box, nb->ctbs[10].bitmap_mbrs[j]);
-//            uint person2_id = get_key_target(temp_key);
-//            outFile << id << ',' << start << ',' << end << ','
-//                    << key_box.low[0] << ',' << key_box.low[1] << ',' << key_box.high[0] << ',' << key_box.high[1] << ',' << person2_id << endl;
+//            pg_outFile << "\"" << generate_wkt(key_box) << "\"" << endl;
 //        }
-//        outFile.close();
+
+        for (int i = 0; i < nb->ctbs[10].CTF_capacity[j]; i++) {
+            __uint128_t & temp_key = nb->ctbs[10].ctfs[j].keys[i];
+            uint id = get_key_oid(temp_key);
+            uint end = get_key_end(temp_key) - nb->ctbs[10].start_time_min;
+            uint start = end - get_key_duration(temp_key);
+            box key_box;
+            parse_mbr(temp_key, key_box, nb->ctbs[10].bitmap_mbrs[j]);
+            uint person2_id = get_key_target(temp_key);
+            outFile << id << ',' << start << ',' << end << ','
+                    << key_box.low[0] << ',' << key_box.low[1] << ',' << key_box.high[0] << ',' << key_box.high[1] << ',' << person2_id << endl;
+        }
     }
     outFile.close();
+//    pg_outFile.close();
 
-
-
-//    time_query tq;
-//    tq.abandon = true;
-//
-//    uint total_count = 0;
-//    struct timeval total_start = get_cur_time();
-//
-//    for(int j = 0; j < 100000; j++){
-//        for(int i = 0; i < 100; i++){
-//            uint64_t wp = ((uint64_t)(j+2) << OID_BIT) + i;
-//            //struct timeval prepare_start = get_cur_time();
-//            uint target_count = nb->ctbs[10].ctfs[j].search_SSTable(wp, &tq, false, nb->ctbs[10].CTF_capacity[j], nb->search_count, nb->search_multi_pid);
-//            total_count += target_count;
-//            //double prepare_consume = get_time_elapsed(prepare_start, true);
-////        if(target_count > 0)
-////            cout << i << ',' << prepare_consume << ',' << target_count << endl;
-//        }
-//    }
-//
-//
-//    double total_time = get_time_elapsed(total_start, true);
-//    cout << "search total " << total_time << endl;
-//    cout << " total_count " << total_count << endl;
-
-//    struct timeval dump_start = get_cur_time();
-//    ofstream SSTable_of;
-//    SSTable_of.open("test_ctf" , ios::out|ios::binary|ios::trunc);
-//    //cout << pargs->path << endl;
-//    assert(SSTable_of.is_open());
-//    SSTable_of.write((char *)nb->ctbs[10].ctfs[50].keys, nb->ctbs[10].CTF_capacity[50]);
-//    SSTable_of.flush();
-//    SSTable_of.close();
-//    double dump_time = get_time_elapsed(dump_start, true);
-//    cout << "dump_time" << dump_time << endl;
 
     return 0;
 }

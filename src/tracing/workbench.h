@@ -357,9 +357,11 @@ class new_bench : public workbench{
 public:
     vector<box_search_info> box_search_queue;
     atomic<long long> search_count;
+    atomic<uint> hit_buffer;
+    atomic<uint> hit_ctf;
     //vector<id_search_info> id_search_queue;
     CTB * compacted_ctbs = nullptr;
-
+    uint raid_count = 2;
 
     new_bench(configuration * config) : workbench(config){}
     bool mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq);

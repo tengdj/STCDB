@@ -13,7 +13,6 @@ int main(int argc, char **argv){
     Point *traces = new Point[config.num_objects*100];
     tracer *t = new tracer(&config, *m->getMBR(), traces, gen);
     t->process();
-
     delete t;
     cout<<"delete right"<<endl;
     cerr<<"delete right"<<endl;

@@ -73,6 +73,7 @@ tracer::~tracer(){
 	}
 	if(bench){
 		delete bench;
+        //bench->clear();
 	}
     if(trace){
         delete[] trace;
@@ -239,7 +240,7 @@ uint search_keys_by_pid(__uint128_t* keys, uint64_t wp, uint capacity, vector<__
 //        cout << "temp_wp" << temp_wp << endl;
         if (temp_wp == wp){
             find = mid;
-            break;
+            high = mid - 1;
         }
         else if (temp_wp > wp){
             high = mid - 1;
@@ -254,17 +255,7 @@ uint search_keys_by_pid(__uint128_t* keys, uint64_t wp, uint capacity, vector<__
     }
     //cout<<"exactly find"<<endl;
     uint cursor = find;
-    while(temp_wp == wp && cursor >= 1){
-        cursor--;
-        temp_wp = keys[cursor] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
-    }
-    if(temp_wp == wp && cursor == 0){
-        count++;
-        v_keys.push_back(keys[cursor]);
-        v_indices.push_back(cursor);
-    }
-    while(cursor+1<capacity){
-        cursor++;
+    while(cursor<capacity){
         temp_wp = keys[cursor] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
         if(temp_wp == wp){
             count++;
@@ -272,6 +263,7 @@ uint search_keys_by_pid(__uint128_t* keys, uint64_t wp, uint capacity, vector<__
             v_indices.push_back(cursor);
         }
         else break;
+        cursor++;
     }
     //cout<<"find !"<<endl;
     return count;
@@ -603,6 +595,7 @@ void *parallel_dump(void *arg){
 }
 
 void *straight_dump(void *arg){
+    struct timeval bg_start = get_cur_time();
     cout<<"step into the sst_dump"<<endl;
     workbench *bench = (workbench *)arg;
     cout<<"cur_time: "<<bench->cur_time<<endl;
@@ -659,68 +652,33 @@ void *straight_dump(void *arg){
 //        bench->bg_run[old_big].bitmap_mbrs[i].print();
 //    }
 
+    logt("CPU organization time",bg_start);
+
     uint total_index = 0;
     uint sst_count = 0;
-    dump_args * pargs = new dump_args[bench->config->CTF_count];
-    struct timeval bg_start = get_cur_time();
-    pthread_t threads[bench->config->CTF_count];        //may be larger than config->num_threads
-    for(sst_count=0; sst_count<bench->config->CTF_count; sst_count++){
-        bench->ctbs[old_big].first_widpid[sst_count] = bench->h_keys[offset][total_index] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
-//        cout<<bench->bg_run[old_big].first_widpid[sst_count]<<endl;
-//        cout<<get_key_wid(bench->h_keys[offset][total_index])<<endl;
-//        cout<<get_key_pid(bench->h_keys[offset][total_index])<<endl<<endl;
-        pargs[sst_count].path = bench->config->raid_path + to_string(sst_count%8) + "/SSTable_"+to_string(old_big)+"-"+to_string(sst_count);
-        pargs[sst_count].SIZE = sizeof(__uint128_t)*bench->h_CTF_capacity[offset][sst_count];
-        pargs[sst_count].keys = bench->h_keys[offset] + total_index;
-        pthread_create(&threads[sst_count], NULL, parallel_dump, (void *)&pargs[sst_count]);
+#pragma omp parallel for num_threads(bench->config->CTF_count)          //there is little improvement when 100->128 threads
+    for(sst_count=0; sst_count < bench->config->CTF_count; sst_count++){
+        string sst_path = bench->config->raid_path + to_string(sst_count%2) + "/C_SSTable_"+to_string(old_big)+"-"+to_string(sst_count);
+        ofstream SSTable_of;
+        SSTable_of.open(sst_path , ios::out|ios::binary|ios::trunc);
+        assert(SSTable_of.is_open());
+        SSTable_of.write((char *)(bench->h_keys[offset] + total_index), sizeof(__uint128_t)*bench->h_CTF_capacity[offset][sst_count]);
+        SSTable_of.flush();
+        SSTable_of.close();
         total_index += bench->h_CTF_capacity[offset][sst_count];
     }
-    //but, the last sst may not be full
-    for(int i = 0; i < bench->config->CTF_count; i++ ){
-        void *status;
-        pthread_join(threads[i], &status);
-    }
     cout << "total_index" << total_index << " 2G:" <<bench->config->kv_restriction << endl;
-    cerr << "total_index" << total_index << " 2G:" <<bench->config->kv_restriction << endl;
     bench->pro.bg_merge_time += get_time_elapsed(bg_start,false);
     logt("dumped keys for CTB %d",bg_start, old_big);
-    delete[] pargs;
-
-//
-//
-
-//    for(sst_count=0; sst_count<bench->config->CTF_count; sst_count++){
-//        bench->ctbs[old_big].first_widpid[sst_count] = bench->h_keys[offset][total_index] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
-////        cout<<bench->bg_run[old_big].first_widpid[sst_count]<<endl;
-////        cout<<get_key_wid(bench->h_keys[offset][total_index])<<endl;
-////        cout<<get_key_pid(bench->h_keys[offset][total_index])<<endl<<endl;
-//        //copy(bench->h_keys[offset] + total_index, bench->h_keys[offset] + total_index + bench->h_CTF_capacity[offset][sst_count], keys);
-//        total_index += bench->h_CTF_capacity[offset][sst_count];
-//        //assert(total_index<=bench->config->kv_restriction);
-//        bench->pro.bg_merge_time += get_time_elapsed(bg_start,true);
-//        cout << bench->config->raid_path + to_string(sst_count%8) + "/SSTable_"+to_string(old_big)+"-"+to_string(sst_count) << endl;
-//        SSTable_of.open(bench->config->raid_path + to_string(sst_count%8) + "/SSTable_"+to_string(old_big)+"-"+to_string(sst_count), ios::out|ios::binary|ios::trunc);
-//        bench->pro.bg_open_time += get_time_elapsed(bg_start,true);
-//        SSTable_of.write((char *)keys, sizeof(__uint128_t)*bench->h_CTF_capacity[offset][sst_count]);
-//        SSTable_of.flush();
-//        SSTable_of.close();
-//        bench->pro.bg_flush_time += get_time_elapsed(bg_start,true);
-//    }
-//    //but, the last sst may not be full
-
-    fprintf(stdout,"\tmerge sort:\t%.2f\n",bench->pro.bg_merge_time);
-//    fprintf(stdout,"\tflush:\t%.2f\n",bench->pro.bg_flush_time);
-//    fprintf(stdout,"\topen:\t%.2f\n",bench->pro.bg_open_time);
-    //cout<<"sst_count :"<<sst_count<<" less than"<<1024<<endl;
 
     bench->ctbs[old_big].print_meta();
     //logt("merge sort and flush", bg_start);
     //delete[] bit_points;
     bench->dumping = false;
 
-    string CTB_path = string(bench->config->CTB_meta_path) + "CTB" + to_string(old_big);
+    string CTB_path = string(bench->config->CTB_meta_path) + "C_CTB" + to_string(old_big);
     bench->dump_CTB_meta(CTB_path.c_str(), old_big);
-
+    logt("dumped meta for CTB %d",bg_start, old_big);
     return NULL;
 }
 
@@ -969,9 +927,9 @@ void tracer::process(){
 //                p.close();
 
 
-//                if(config->MemTable_capacity==2){
-//                    straight_dump((void *)bench);
-//                }
+                if(config->MemTable_capacity==2){
+                    straight_dump((void *)bench);
+                }
 //                else{
 //                    merge_dump((void *)bench);
 //                }

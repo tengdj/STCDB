@@ -1309,6 +1309,9 @@ workbench *cuda_create_device_bench(workbench *bench, gpu_info *gpu){
 //	log("\t%.2f MB\tmeetings",1.0*size/1024/1024);
 
     //cuda sort
+    cudaMallocHost((void **)&bench->h_keys[0], bench->config->kv_capacity*sizeof(__uint128_t));
+    cudaMallocHost((void **)&bench->h_keys[1], bench->config->kv_capacity*sizeof(__uint128_t));
+
     h_bench.d_keys = (__uint128_t *)gpu->allocate(bench->config->kv_capacity*sizeof(__uint128_t));
     size = bench->config->kv_capacity*sizeof(__uint128_t);
     log("\t%.2f MB\td_keys",1.0*size/1024/1024);
@@ -1577,7 +1580,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         bench->pro.meeting_identify_time += get_time_elapsed(start,false);
         int kv_increase = h_bench.kv_count-before_kv;
         printf("second %d finished meetings : %d\n",bench->cur_time , kv_increase);
-        logt("meeting identify: %d meetings", start, kv_increase);
+        //logt("meeting identify: %d meetings", start, kv_increase);
         //cout<<"ave_s_mbr"<<(float)h_bench.s_of_all_mbr/100<<endl;
         //h_bench.s_of_all_mbr = 0;
         bench->num_active_meetings = h_bench.num_active_meetings;
@@ -1593,6 +1596,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 
     //4.5 cuda sort
     if(h_bench.kv_count>bench->config->kv_restriction){
+        struct timeval sort_start = get_cur_time();
         cout <<"1000~2000 " << h_bench.larger_than_1000s << " 2000~3000 " << h_bench.larger_than_2000s << " 3000~4000 " << h_bench.larger_than_3000s << " 4000~4096 " << h_bench.larger_than_4000s <<endl;
         bench->meeting_cut_count = h_bench.meeting_cut_count;
         bench->start_time_min = min(bench->start_time_min, h_bench.start_time_min);
@@ -1603,242 +1607,246 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
             offset = bench->config->MemTable_capacity/2;
         }
         offset += bench->MemTable_count;
-//
-//        set_oid<<<bench->config->num_objects / 1024 + 1, 1024>>>(d_bench);                  //thrust::sequence
-//        cudaDeviceSynchronize();
-//        check_execution();
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
-//        logt("set_oid: ",start);
-//
-//        thrust::device_ptr<unsigned short> d_ptr_sids = thrust::device_pointer_cast(h_bench.d_sids);
-//        thrust::device_ptr<__uint128_t> d_ptr_keys = thrust::device_pointer_cast(h_bench.d_keys);
-//        __uint128_t * box128 = reinterpret_cast<__uint128_t *>(h_bench.kv_boxs);
-//        thrust::device_ptr<__uint128_t> d_ptr_boxes = thrust::device_pointer_cast(box128);
-//        //thrust::device_vector<__uint128_t> d_vector_keys(d_ptr_keys, d_ptr_keys + h_bench.kv_count);
-//
-//        // predicate fuction
-//        auto predicate = [d_ptr_sids] __device__ (__uint128_t key) {
-//            uint oid = get_key_oid(key);
-//            return d_ptr_sids[oid] != 1;
-//        };
-//
-//        // zip_iterator
-//        auto first = thrust::make_zip_iterator(thrust::make_tuple(d_ptr_keys, d_ptr_boxes));
-//        auto last = thrust::make_zip_iterator(thrust::make_tuple(d_ptr_keys + h_bench.kv_count, d_ptr_boxes + h_bench.kv_count));
-//
-//        // remove_if is wrong, use partition
-//        auto new_end = thrust::partition(first, last, [predicate] __device__ (thrust::tuple<__uint128_t, __uint128_t> t) {
-//            return predicate(thrust::get<0>(t));
-//        });
-//        cudaDeviceSynchronize();
-//        check_execution();
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
-//        logt("remove: ",start);
-//
-//        // new length
-//        uint old_kv_count = h_bench.kv_count;
-//        h_bench.kv_count = thrust::distance(first, new_end);
-//        uint oversize_key_count = old_kv_count - h_bench.kv_count;
-//        assert(oversize_key_count < bench->config->oversize_buffer_capacity);
-//        bench->h_oversize_buffers[offset].oversize_kv_count = oversize_key_count;
-//        cout << "key cut count" << oversize_key_count << " oversize_oid_count:" << h_bench.oversize_oid_count << endl;
-//        cout << "slim h_bench.kv_count :" << h_bench.kv_count << endl;
-//        CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));   //update
-//
-//        thrust::sort_by_key(d_ptr_keys + h_bench.kv_count, d_ptr_keys + old_kv_count, d_ptr_boxes + h_bench.kv_count);
-//        cudaDeviceSynchronize();
-//        check_execution();
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//
-//        thrust::device_ptr<uint64_t> d_vector_xys = thrust::device_pointer_cast(h_bench.mid_xys);
-//        thrust::device_ptr<uint> d_vector_oids = thrust::device_pointer_cast(h_bench.d_oids);
-//        thrust::sort_by_key(d_vector_xys, d_vector_xys + bench->config->num_objects, d_vector_oids);
-//        check_execution();
-//        cudaDeviceSynchronize();
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
-//        logt("cuda_sort_by_x_time: ",start);
-//
-//        narrow_xy_to_y<<<bench->config->num_objects / 1024 + 1, 1024>>>(d_bench);
-//        check_execution();
-//        cudaDeviceSynchronize();
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
-//        logt("narrow_xy_to_y: ",start);
-//
-//        uint zero_one_sid_count = (bench->config->num_objects - h_bench.sid_count) + h_bench.oversize_oid_count;
-//        cout <<"zero_one_sid_count"<< zero_one_sid_count << endl;
-//        uint x_part_capacity = (h_bench.sid_count - h_bench.oversize_oid_count) / bench->config->split_num + 1;
-//        for(uint i = 0; i < bench->config->split_num - 1; i++){
-//            thrust::sort_by_key(d_vector_xys + zero_one_sid_count + x_part_capacity * i,
-//                                d_vector_xys + zero_one_sid_count + x_part_capacity * (i + 1),
-//                                d_vector_oids + zero_one_sid_count + x_part_capacity * i);
-//            cudaDeviceSynchronize();
-//            check_execution();
-//        }
-//        thrust::sort_by_key(d_vector_xys + zero_one_sid_count + x_part_capacity * (bench->config->split_num - 1),                    //last part
-//                            d_vector_xys + bench->config->num_objects,
-//                            d_vector_oids + zero_one_sid_count + x_part_capacity * (bench->config->split_num - 1));
-//        cudaDeviceSynchronize();
-//        check_execution();
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
-//        logt("cuda_sort_by_y_time ",start);
-//
-//        make_sid<<<bench->config->num_objects / 1024 + 1, 1024>>>(d_bench);
-//        check_execution();
-//        cudaDeviceSynchronize();
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
-//        logt("make_sid: ",start);
-//
-//        write_sid_in_key<<<h_bench.kv_count / 1024 + 1, 1024>>>(d_bench);
-//        check_execution();
-//        cudaDeviceSynchronize();
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
-//        logt("write_sid_in_key: ",start);
-//
-//
-//        thrust::sort_by_key(d_ptr_keys, d_ptr_keys + h_bench.kv_count, d_ptr_boxes);
-//        check_execution();
-//        cudaDeviceSynchronize();
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
-//        logt("sort keys: ",start);
-//
-//        get_CTF_capacity<<<bench->config->num_objects / 1024 + 1, 1024>>>(d_bench);
-//        check_execution();
-//        cudaDeviceSynchronize();
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
-//        logt("get_CTF_capacity: ",start);
-//
-//        //bitmap
-//        cout<<"h_bench.bit_count:"<<h_bench.bit_count<<endl;
-//        cout<<"h_bench.bitmaps_size:"<<h_bench.bitmaps_size<<endl;
-//        write_bitmap<<<h_bench.kv_count / 1024 + 1, 1024>>>(d_bench);
-//        check_execution();
-//        cudaDeviceSynchronize();
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//        logt("write_bitmap: ",start);
-//
-//        mbr_bitmap<<<bench->config->CTF_count, 1024>>>(d_bench);
-//        check_execution();
-//        cudaDeviceSynchronize();
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//        logt("mbr_bitmap: ",start);
-//
-//        write_key_mbr<<<h_bench.kv_count / 1024 + 1, 1024>>>(d_bench);
-//        check_execution();
-//        cudaDeviceSynchronize();
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//        logt("write_value_mbr: ",start);
-//
-//
-//        if(bench->config->bloom_filter){
-//            //BloomFilter_Add<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
-//            check_execution();
-//            cudaDeviceSynchronize();
-//            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//            logt("bloom filter ", start);
-//            CUDA_SAFE_CALL(cudaMemcpy(bench->pstFilter[bench->MemTable_count], h_bench.d_pstFilter, bench->dwFilterSize, cudaMemcpyDeviceToHost));
-//            cudaMemset(h_bench.d_pstFilter, 0, bench->dwFilterSize);
-//        }
-//
-//        //copy to device
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//
-//        CUDA_SAFE_CALL(cudaMemcpy(bench->h_oversize_buffers[offset].keys, h_bench.d_keys + h_bench.kv_count, oversize_key_count * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
-//        CUDA_SAFE_CALL(cudaMemcpy(bench->h_oversize_buffers[offset].boxes, h_bench.kv_boxs + h_bench.kv_count, oversize_key_count * sizeof(f_box), cudaMemcpyDeviceToHost));
-//
 
-//        CUDA_SAFE_CALL(cudaMemcpy(bench->h_keys[offset], h_bench.d_keys, h_bench.kv_count * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
+        set_oid<<<bench->config->num_objects / 1024 + 1, 1024>>>(d_bench);                  //thrust::sequence
+        cudaDeviceSynchronize();
+        check_execution();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("set_oid: ",start);
 
-//        CUDA_SAFE_CALL(cudaMemcpy(bench->h_sids[offset], h_bench.d_sids, bench->config->num_objects * sizeof(unsigned short), cudaMemcpyDeviceToHost));
-//        CUDA_SAFE_CALL(cudaMemcpy(bench->h_CTF_capacity[offset], h_bench.d_CTF_capacity, bench->config->CTF_count * sizeof(uint), cudaMemcpyDeviceToHost));
-//        CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps[offset], h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));
-//        CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmap_mbrs[offset], h_bench.d_bitmap_mbrs, bench->config->CTF_count * sizeof(box), cudaMemcpyDeviceToHost));
-//
-////        cout << "host test oversize" << endl;
-////        for(uint i = 0; i < bench->h_oversize_buffers[offset].oversize_kv_count ; i++){
-////            print_parse_key(bench->h_oversize_buffers[offset].keys[i]);
-////            cout << bench->h_oversize_buffers[offset].boxes[i].low[0] << endl;
-////            cout << "sid" << bench->h_sids[offset][get_key_oid(bench->h_oversize_buffers[offset].keys[i]) ] << endl;
-////        }
-//
-//
-//        //        f_box * temp_fbs = new f_box[bench->config->kv_restriction];
-////        CUDA_SAFE_CALL(cudaMemcpy(temp_fbs, h_bench.kv_boxs, bench->config->kv_restriction * sizeof(f_box), cudaMemcpyDeviceToHost));
-//
-////        cout << "sid_count" << h_bench.sid_count << endl;
-////        short * temp_same_pid_count = new short[bench->config->num_objects];
-////        CUDA_SAFE_CALL(cudaMemcpy(temp_same_pid_count, h_bench.same_pid_count, bench->config->num_objects * sizeof(unsigned short), cudaMemcpyDeviceToHost));
-////        for(uint i = 0; i < bench->config->num_objects; i++){
-////            if(temp_same_pid_count[i]>0){
-////                cout << temp_same_pid_count[i] << " ";
-////            }
-////        }
-////        cout << endl;
-//
-//
-//        logt("cudaMemcpy kv and meta",start);
-//
-//        cout<<"bench->end_time_min:"<<bench->end_time_min<<endl;
-//        print_parse_key(bench->h_keys[offset][10]);
-//
-////        cout << "cu CTF_capacitys:" << endl;
-////        for(uint i = 0; i < bench->config->SSTable_count; i++){
-////            cout << bench->h_CTF_capacity[offset][i] << endl;
-////        }
-//
-////        for(uint i = 0; i < bench->config->kv_restriction; i = i+1000){
-////            print_parse_key(bench->h_keys[offset][i]);
-////            temp_fbs[i].print();
-////        }
-//
-//
-//
-////        box b;
-////        parse_mbr(bench->h_keys[offset][10], b, bench->h_bitmap_mbrs[offset][0]);
-////        b.print();
-//
-//
-////        if(bench->cur_time > 0){
-////            bench->h_bitmap_mbrs[offset][25].print();
-////            cerr << "output the real boxes of a sst" << endl;
-////            f_box * temp_f_box = new f_box[bench->config->SSTable_kv_capacity];
-////            CUDA_SAFE_CALL(cudaMemcpy(temp_f_box, h_bench.kv_boxs + 25*bench->config->SSTable_kv_capacity, bench->config->SSTable_kv_capacity * sizeof(f_box), cudaMemcpyDeviceToHost));
-////            for(uint i = 0; i < bench->config->SSTable_kv_capacity/2; i++){
-////                temp_f_box[i].print();
-////            }
-////            delete[] temp_f_box;
-////        }
-//
-////        cerr << "kv box, real box, and then the bitmap_mbr"<<endl;
-////        bench->h_bitmap_mbrs[offset][0].print();
-////        cerr<<"bitmap_mbrs:"<<endl;
-////        for(int i = 0; i < bench->config->CTF_count; i++){
-////            bench->h_bitmap_mbrs[offset][i].print();
-////        }
-//
-////        //longer edges sort
-////        thrust::device_ptr<float> d_vec_edges = thrust::device_pointer_cast(h_bench.d_longer_edges);
-////        thrust::sort(d_vec_edges, d_vec_edges + bench->config->num_objects);
-////        check_execution();
-////        cudaDeviceSynchronize();
-////        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-////        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
-////        logt("cuda_sort_time: ",start);
-////        CUDA_SAFE_CALL(cudaMemcpy(bench->h_longer_edges, h_bench.d_longer_edges, bench->config->num_objects*sizeof(float), cudaMemcpyDeviceToHost));
-////        cudaMemset(h_bench.d_longer_edges, 0, bench->config->num_objects*sizeof(float));
-////        cout << "longest edge " <<bench->h_longer_edges[bench->config->num_objects-1] << endl;
-//////        cout << "long_meeting_count: " << h_bench.long_meeting_count << endl;
-//////        cout << "long_oid_count: " << h_bench.long_oid_count << endl;
-//////        h_bench.long_meeting_count = 0;
-//////        h_bench.long_oid_count = 0;
+        thrust::device_ptr<unsigned short> d_ptr_sids = thrust::device_pointer_cast(h_bench.d_sids);
+        thrust::device_ptr<__uint128_t> d_ptr_keys = thrust::device_pointer_cast(h_bench.d_keys);
+        __uint128_t * box128 = reinterpret_cast<__uint128_t *>(h_bench.kv_boxs);
+        thrust::device_ptr<__uint128_t> d_ptr_boxes = thrust::device_pointer_cast(box128);
+        //thrust::device_vector<__uint128_t> d_vector_keys(d_ptr_keys, d_ptr_keys + h_bench.kv_count);
+
+        // predicate fuction
+        auto predicate = [d_ptr_sids] __device__ (__uint128_t key) {
+            uint oid = get_key_oid(key);
+            return d_ptr_sids[oid] != 1;
+        };
+
+        // zip_iterator
+        auto first = thrust::make_zip_iterator(thrust::make_tuple(d_ptr_keys, d_ptr_boxes));
+        auto last = thrust::make_zip_iterator(thrust::make_tuple(d_ptr_keys + h_bench.kv_count, d_ptr_boxes + h_bench.kv_count));
+
+        // remove_if is wrong, use partition
+        auto new_end = thrust::partition(first, last, [predicate] __device__ (thrust::tuple<__uint128_t, __uint128_t> t) {
+            return predicate(thrust::get<0>(t));
+        });
+        cudaDeviceSynchronize();
+        check_execution();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("remove: ",start);
+
+        // new length
+        uint old_kv_count = h_bench.kv_count;
+        h_bench.kv_count = thrust::distance(first, new_end);
+        uint oversize_key_count = old_kv_count - h_bench.kv_count;
+        assert(oversize_key_count < bench->config->oversize_buffer_capacity);
+        bench->h_oversize_buffers[offset].oversize_kv_count = oversize_key_count;
+        cout << "key cut count" << oversize_key_count << " oversize_oid_count:" << h_bench.oversize_oid_count << endl;
+        cout << "slim h_bench.kv_count :" << h_bench.kv_count << endl;
+        CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));   //update
+
+        thrust::sort_by_key(d_ptr_keys + h_bench.kv_count, d_ptr_keys + old_kv_count, d_ptr_boxes + h_bench.kv_count);
+        cudaDeviceSynchronize();
+        check_execution();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+
+        thrust::device_ptr<uint64_t> d_vector_xys = thrust::device_pointer_cast(h_bench.mid_xys);
+        thrust::device_ptr<uint> d_vector_oids = thrust::device_pointer_cast(h_bench.d_oids);
+        thrust::sort_by_key(d_vector_xys, d_vector_xys + bench->config->num_objects, d_vector_oids);
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("cuda_sort_by_x_time: ",start);
+
+        narrow_xy_to_y<<<bench->config->num_objects / 1024 + 1, 1024>>>(d_bench);
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("narrow_xy_to_y: ",start);
+
+        uint zero_one_sid_count = (bench->config->num_objects - h_bench.sid_count) + h_bench.oversize_oid_count;
+        cout <<"zero_one_sid_count"<< zero_one_sid_count << endl;
+        uint x_part_capacity = (h_bench.sid_count - h_bench.oversize_oid_count) / bench->config->split_num + 1;
+        for(uint i = 0; i < bench->config->split_num - 1; i++){
+            thrust::sort_by_key(d_vector_xys + zero_one_sid_count + x_part_capacity * i,
+                                d_vector_xys + zero_one_sid_count + x_part_capacity * (i + 1),
+                                d_vector_oids + zero_one_sid_count + x_part_capacity * i);
+            cudaDeviceSynchronize();
+            check_execution();
+        }
+        thrust::sort_by_key(d_vector_xys + zero_one_sid_count + x_part_capacity * (bench->config->split_num - 1),                    //last part
+                            d_vector_xys + bench->config->num_objects,
+                            d_vector_oids + zero_one_sid_count + x_part_capacity * (bench->config->split_num - 1));
+        cudaDeviceSynchronize();
+        check_execution();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("cuda_sort_by_y_time ",start);
+
+        make_sid<<<bench->config->num_objects / 1024 + 1, 1024>>>(d_bench);
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("make_sid: ",start);
+
+        write_sid_in_key<<<h_bench.kv_count / 1024 + 1, 1024>>>(d_bench);
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("write_sid_in_key: ",start);
+
+        thrust::sort_by_key(d_ptr_keys, d_ptr_keys + h_bench.kv_count, d_ptr_boxes);
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("sort keys: ",start);
+
+        get_CTF_capacity<<<bench->config->num_objects / 1024 + 1, 1024>>>(d_bench);
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("get_CTF_capacity: ",start);
+
+        //bitmap
+        cout<<"h_bench.bit_count:"<<h_bench.bit_count<<endl;
+        cout<<"h_bench.bitmaps_size:"<<h_bench.bitmaps_size<<endl;
+        write_bitmap<<<h_bench.kv_count / 1024 + 1, 1024>>>(d_bench);
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        logt("write_bitmap: ",start);
+
+        mbr_bitmap<<<bench->config->CTF_count, 1024>>>(d_bench);
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        logt("mbr_bitmap: ",start);
+
+        write_key_mbr<<<h_bench.kv_count / 1024 + 1, 1024>>>(d_bench);
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        logt("write_value_mbr: ",start);
+
+
+        if(bench->config->bloom_filter){
+            //BloomFilter_Add<<<bench->config->kv_restriction / 1024 + 1,1024>>>(d_bench);
+            check_execution();
+            cudaDeviceSynchronize();
+            CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+            logt("bloom filter ", start);
+            CUDA_SAFE_CALL(cudaMemcpy(bench->pstFilter[bench->MemTable_count], h_bench.d_pstFilter, bench->dwFilterSize, cudaMemcpyDeviceToHost));
+            cudaMemset(h_bench.d_pstFilter, 0, bench->dwFilterSize);
+        }
+
+        //copy to host
+        //CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_oversize_buffers[offset].keys, h_bench.d_keys + h_bench.kv_count, oversize_key_count * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
+        logt("h_oversize_buffers keys %d MB", start, oversize_key_count * sizeof(__uint128_t) / 1024 /1024);
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_oversize_buffers[offset].boxes, h_bench.kv_boxs + h_bench.kv_count, oversize_key_count * sizeof(f_box), cudaMemcpyDeviceToHost));
+        logt("h_oversize_buffers boxes %d MB", start, oversize_key_count * sizeof(f_box) / 1024 /1024);
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_keys[offset], h_bench.d_keys, h_bench.kv_count * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
+        double keys_to_cpu = get_time_elapsed(start, true);
+        cerr << "keys_to_cpu " << keys_to_cpu << endl;
+        //logt("h_keys %d MB", start, h_bench.kv_count * sizeof(__uint128_t) / 1024 /1024);
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_sids[offset], h_bench.d_sids, bench->config->num_objects * sizeof(unsigned short), cudaMemcpyDeviceToHost));
+        logt("h_sids %d MB", start, bench->config->num_objects * sizeof(unsigned short) / 1024 /1024);
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_CTF_capacity[offset], h_bench.d_CTF_capacity, bench->config->CTF_count * sizeof(uint), cudaMemcpyDeviceToHost));
+        logt("h_CTF_capacity %d MB", start, bench->config->CTF_count * sizeof(uint) / 1024 /1024);
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps[offset], h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));
+        logt("h_bitmaps %d MB", start, bench->bitmaps_size / 1024 /1024);
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmap_mbrs[offset], h_bench.d_bitmap_mbrs, bench->config->CTF_count * sizeof(box), cudaMemcpyDeviceToHost));
+        logt("h_bitmap_mbrs %d MB", start, bench->config->CTF_count * sizeof(box) / 1024 /1024);
+//        cout << "host test oversize" << endl;
+//        for(uint i = 0; i < bench->h_oversize_buffers[offset].oversize_kv_count ; i++){
+//            print_parse_key(bench->h_oversize_buffers[offset].keys[i]);
+//            cout << bench->h_oversize_buffers[offset].boxes[i].low[0] << endl;
+//            cout << "sid" << bench->h_sids[offset][get_key_oid(bench->h_oversize_buffers[offset].keys[i]) ] << endl;
+//        }
+
+
+        //        f_box * temp_fbs = new f_box[bench->config->kv_restriction];
+//        CUDA_SAFE_CALL(cudaMemcpy(temp_fbs, h_bench.kv_boxs, bench->config->kv_restriction * sizeof(f_box), cudaMemcpyDeviceToHost));
+
+//        cout << "sid_count" << h_bench.sid_count << endl;
+//        short * temp_same_pid_count = new short[bench->config->num_objects];
+//        CUDA_SAFE_CALL(cudaMemcpy(temp_same_pid_count, h_bench.same_pid_count, bench->config->num_objects * sizeof(unsigned short), cudaMemcpyDeviceToHost));
+//        for(uint i = 0; i < bench->config->num_objects; i++){
+//            if(temp_same_pid_count[i]>0){
+//                cout << temp_same_pid_count[i] << " ";
+//            }
+//        }
+//        cout << endl;
+
+
+        logt("cudaMemcpy kv and meta",start);
+
+        cout<<"bench->end_time_min:"<<bench->end_time_min<<endl;
+        print_parse_key(bench->h_keys[offset][10]);
+
+//        cout << "cu CTF_capacitys:" << endl;
+//        for(uint i = 0; i < bench->config->SSTable_count; i++){
+//            cout << bench->h_CTF_capacity[offset][i] << endl;
+//        }
+
+//        for(uint i = 0; i < bench->config->kv_restriction; i = i+1000){
+//            print_parse_key(bench->h_keys[offset][i]);
+//            temp_fbs[i].print();
+//        }
+
+
+
+//        box b;
+//        parse_mbr(bench->h_keys[offset][10], b, bench->h_bitmap_mbrs[offset][0]);
+//        b.print();
+
+
+//        if(bench->cur_time > 0){
+//            bench->h_bitmap_mbrs[offset][25].print();
+//            cerr << "output the real boxes of a sst" << endl;
+//            f_box * temp_f_box = new f_box[bench->config->SSTable_kv_capacity];
+//            CUDA_SAFE_CALL(cudaMemcpy(temp_f_box, h_bench.kv_boxs + 25*bench->config->SSTable_kv_capacity, bench->config->SSTable_kv_capacity * sizeof(f_box), cudaMemcpyDeviceToHost));
+//            for(uint i = 0; i < bench->config->SSTable_kv_capacity/2; i++){
+//                temp_f_box[i].print();
+//            }
+//            delete[] temp_f_box;
+//        }
+
+//        cerr << "kv box, real box, and then the bitmap_mbr"<<endl;
+//        bench->h_bitmap_mbrs[offset][0].print();
+//        cerr<<"bitmap_mbrs:"<<endl;
+//        for(int i = 0; i < bench->config->CTF_count; i++){
+//            bench->h_bitmap_mbrs[offset][i].print();
+//        }
+
+//        //longer edges sort
+//        thrust::device_ptr<float> d_vec_edges = thrust::device_pointer_cast(h_bench.d_longer_edges);
+//        thrust::sort(d_vec_edges, d_vec_edges + bench->config->num_objects);
+//        check_execution();
+//        cudaDeviceSynchronize();
+//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+//        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+//        logt("cuda_sort_time: ",start);
+//        CUDA_SAFE_CALL(cudaMemcpy(bench->h_longer_edges, h_bench.d_longer_edges, bench->config->num_objects*sizeof(float), cudaMemcpyDeviceToHost));
+//        cudaMemset(h_bench.d_longer_edges, 0, bench->config->num_objects*sizeof(float));
+//        cout << "longest edge " <<bench->h_longer_edges[bench->config->num_objects-1] << endl;
+////        cout << "long_meeting_count: " << h_bench.long_meeting_count << endl;
+////        cout << "long_oid_count: " << h_bench.long_oid_count << endl;
+////        h_bench.long_meeting_count = 0;
+////        h_bench.long_oid_count = 0;
 
         //init
         cuda_init_o_boxs<<<bench->config->num_objects/1024 + 1, 1024>>>(d_bench);
@@ -1862,6 +1870,9 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         CUDA_SAFE_CALL(cudaMemcpy(d_bench, &h_bench, sizeof(workbench), cudaMemcpyHostToDevice));                       //update kv_count, other effect ???
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("init after sort",start);
+
+        double sort_total = get_time_elapsed(sort_start,false);          //sort_total = organization + copy_out
+        cerr << "sort_total " << sort_total << endl;
     }
 
 //    if(bench->crash_consistency){       //not finish

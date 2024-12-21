@@ -517,11 +517,10 @@ const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
     }
 
     void clear_cache(){
-        string cmd = "sync; sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'";        //sudo!!!
-        if(system(cmd.c_str())!=0){
-            fprintf(stderr, "Error when disable buffer cache\n");
+        string cmd = "echo 'xiangrongkai' | sudo -S sh -c 'sync; echo 1 > /proc/sys/vm/drop_caches'";
+        if(system(cmd.c_str()) != 0){
+            fprintf(stderr, "Error when disabling buffer cache\n");
         }
-        //cout << "clear_cache" << endl;
     }
 }
 #endif

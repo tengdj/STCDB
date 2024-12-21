@@ -135,7 +135,7 @@ void workbench::claim_space(){
 
     for(int i=0; i<config->MemTable_capacity; i++){
         size = config->kv_capacity*sizeof(__uint128_t);
-        h_keys[i] = (__uint128_t *)allocate(size);
+        //h_keys[i] = (__uint128_t *)allocate(size);
         log("\t%.2f MB\ta element of h_keys",size/1024.0/1024.0);
     }
 
@@ -355,9 +355,12 @@ bool workbench::search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vect
 
 void workbench::load_CTF_keys(uint CTB_id, uint CTF_id){
     ifstream read_sst;
-    string filename = config->raid_path + to_string(CTF_id%8) + "/SSTable_"+to_string(CTB_id)+"-"+to_string(CTF_id);
+    string filename = config->raid_path + to_string(CTF_id%2) + "/SSTable_"+to_string(CTB_id)+"-"+to_string(CTF_id);
     read_sst.open(filename, ios::in|ios::binary);
-    assert(read_sst.is_open());
+    if(!read_sst.is_open()){
+        cout << filename << endl;
+    }
+    //assert(read_sst.is_open());
     ctbs[CTB_id].ctfs[CTF_id].keys = new __uint128_t[ctbs[CTB_id].CTF_capacity[CTF_id]];
     read_sst.read((char *)ctbs[CTB_id].ctfs[CTF_id].keys, sizeof(__uint128_t) * ctbs[CTB_id].CTF_capacity[CTF_id]);
     read_sst.close();
@@ -396,91 +399,43 @@ uint workbench::search_time_in_disk(time_query * tq){          //not finish
 
 bool new_bench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
     uint i = CTB_id;
-    uint64_t wp = pid;
     time_query tq_temp;
     tq_temp.t_start = tq->t_start - ctbs[i].start_time_min;
     tq_temp.t_end = tq->t_end - ctbs[i].start_time_min;
     tq_temp.abandon = tq->abandon;
     if(ctbs[i].sids[pid] == 0){
-        wid_filter_count++;
+        //wid_filter_count++;
         return false;
     }
     else if(ctbs[i].sids[pid] == 1){
         //cout << "oid search buffer" << endl;
-        return false;
-        //uint buffer_find = ctbs[i].o_buffer.search_buffer(pid, &tq_temp, search_multi, search_count, search_multi_pid);
-        //search_count.fetch_add(buffer_find, std::memory_order_relaxed);
-    }
-    else{
-        wp += ((uint64_t)ctbs[i].sids[pid] << OID_BIT);
-        //cout<<"wp: "<<wp<<endl;
+        uint buffer_find = ctbs[i].o_buffer.search_buffer(pid, &tq_temp, search_multi, search_count, search_multi_pid);
+        if(!search_multi)
+            search_count.fetch_add(buffer_find, std::memory_order_relaxed);
+        hit_buffer.fetch_add(1, std::memory_order_relaxed);
+        return true;
     }
     if(!ctbs[i].ctfs){
         //cout<<"new SSTables"<<endl;
         ctbs[i].ctfs = new CTF[config->CTF_count];                   //maybe useful later, should not delete after this func , if(!NULL)
     }
-    ifstream read_sst;
-
-    //high level binary search
-    int find = -1;
-    int low = 0;
-    int high = config->CTF_count - 1;
-    int mid;
-    while (low <= high) {
-        mid = (low + high) / 2;
-        //cout << bg_run[i].first_widpid[mid] << endl;
-        if (ctbs[i].first_widpid[mid] == wp){
-            find = mid;
-            break;
-        }
-        else if (ctbs[i].first_widpid[mid] > wp){
-            high = mid - 1;
-        }
-        else {
-            low = mid + 1;
-        }
+    uint ctf_id = ctbs[i].sids[pid] - 2;
+    if(!ctbs[i].ctfs[ctf_id].keys){
+        load_CTF_keys(i, ctf_id);
     }
-    if(find==-1){
-//                cout<<"not find in first_widpid"<<endl;
-//                cout << low << "-" << bg_run[i].first_widpid[low] << endl;
-//                cout << mid << "-" << bg_run[i].first_widpid[mid] << endl;
-//                cout << high << "-" << bg_run[i].first_widpid[high] << endl;
-        if(high<0){
-            high = 0;
-        }
-        if(!ctbs[i].ctfs[high].keys){
-            load_CTF_keys(i, high);
-        }
-        uint target_count = ctbs[i].ctfs[high].search_SSTable(wp, tq, search_multi, ctbs[i].CTF_capacity[high], search_count, search_multi_pid);
-        //search_count.fetch_add(target_count, std::memory_order_relaxed);
-        delete[] ctbs[i].ctfs[high].keys;
-        ctbs[i].ctfs[high].keys = nullptr;
-        if(target_count){
-            return true;
-        }
-        else{
-            id_not_find_count++;
-            return false;
-        }
+    uint target_count = ctbs[i].ctfs[ctf_id].search_SSTable(pid, tq, search_multi, ctbs[i].CTF_capacity[ctf_id], search_count, search_multi_pid);
+    if(!search_multi)
+        search_count.fetch_add(target_count, std::memory_order_relaxed);
+    hit_ctf.fetch_add(1, std::memory_order_relaxed);
+//    delete[] ctbs[i].ctfs[ctf_id].keys;
+//    ctbs[i].ctfs[ctf_id].keys = nullptr;
+    if(target_count){
+        return true;
     }
-    //else  true
-    if(!ctbs[i].ctfs[find].keys){
-        load_CTF_keys(i, find);
+    else{
+        //id_not_find_count++;
+        return false;
     }
-    for(int cursor = 0; cursor < ctbs[i].CTF_capacity[find]; cursor++){
-        uint64_t temp_wp = ctbs[i].ctfs[high].keys[cursor] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
-        if(temp_wp == wp){
-            uint old_search_count = search_count.fetch_add(1, std::memory_order_relaxed);;
-            if(search_multi){
-                search_multi_pid[old_search_count] = get_key_target(ctbs[i].ctfs[high].keys[cursor]);
-            }
-        }
-        else break;
-    }
-
-    delete[] ctbs[i].ctfs[find].keys;
-    ctbs[i].ctfs[find].keys = nullptr;
-    return true;
 }
 
 bool new_bench::id_search_in_disk(uint pid, time_query * tq){

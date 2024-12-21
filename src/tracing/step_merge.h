@@ -32,12 +32,11 @@ public:
     //uint SSTable_kv_capacity = 327680;              //67108864 * 5 / 1024 = 327,680 (Round up)
 
     ~CTF();
-    uint search_SSTable(uint64_t wp, time_query * tq, bool search_multi, uint SSTable_kv_capacity, atomic<long long> &search_count, uint *search_multi_pid);
+    uint search_SSTable(uint pid, time_query * tq, bool search_multi, uint SSTable_kv_capacity, atomic<long long> &search_count, uint *search_multi_pid);
     //uint search_SSTable(uint64_t wp, uint SSTable_kv_capacity, vector<__uint128_t> & v_keys, vector<uint> & v_indices);
 };
 
 class CTB {             //contact tracing block
-
 public:
     CTF * ctfs = NULL;
     uint CTF_count = 0;
@@ -45,11 +44,10 @@ public:
     uint start_time_max = 0;
     uint end_time_min = 0;
     uint end_time_max = 0;
-    uint64_t *first_widpid = NULL;
+    uint64_t *first_widpid = NULL;          //useless
     unsigned short * sids = NULL;
     unsigned char * bitmaps = NULL;
     box * bitmap_mbrs = NULL;
-
     uint * CTF_capacity = NULL;
     oversize_buffer o_buffer;
     RTree<short *, double, 2, double> *box_rtree = NULL;

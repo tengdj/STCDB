@@ -16,6 +16,9 @@ workbench * load_meta(const char *path) {
     generator_configuration * config = new generator_configuration();
     workbench * bench = new workbench(config);
     in.read((char *)config, sizeof(generator_configuration));               //also read meta
+    char new_raid[24] = "/data3/raid0_num";
+    memcpy(config->raid_path, new_raid, sizeof(config->raid_path));
+    //std::copy(new_raid, new_raid + 24, config->raid_path);
     in.read((char *)bench, sizeof(workbench));      //bench->config = NULL
     bench->config = config;
     bench->ctbs = new CTB[config->big_sorted_run_capacity];
@@ -242,35 +245,23 @@ void experiment_search_oid(new_bench *bench){
     tq.abandon = true;
     ofstream q;
     q.open("ex_search_id.csv", ios::out|ios::binary|ios::trunc);
-    q << "question number" << ',' << "time_consume(ms)" << ',' << "find_id_count" << ',' << "wid_filter_count" << endl;
-    for(int i = 0; i < 100; i++){
+    q << "question number" << ',' << "time_consume(ms)" << ',' << "find_id_count" << ',' << "sid_not_zero_count" << endl;
+    for(int i = 0; i < 500; i++){
         bench->clear_all_keys();
         clear_cache();
-        struct timeval prepare_start = get_cur_time();
         bench->search_count = 0;
-        bench->wid_filter_count = 0;
+        //bench->wid_filter_count = 0;
         uint pid = get_rand_number(bench->config->num_objects);
         bench->search_multi = false;
+        struct timeval prepare_start = get_cur_time();
         uint the_min = min((uint)1215, bench->ctb_count);
-        pthread_t threads[the_min];
-        query_context * tctx = new query_context[the_min];
+#pragma omp parallel for num_threads(bench->config->num_threads)
         for(uint j = 0; j < the_min; j++){
-            tctx[j].target[0] = (void *)bench;
-            tctx[j].target[1] = (void *)&pid;
-            tctx[j].target[2] = (void *)new int(j);
-            tctx[j].target[3] = (void *)&tq;
-            pthread_create(&threads[j], NULL, id_search_unit, (void *) &tctx[j]);
-            //bench->id_search_in_CTB(pid, j, &tq);
+            bench->id_search_in_CTB(pid, j, &tq);
         }
-        for(int j = 0; j < the_min; j++ ){
-            void *status;
-            pthread_join(threads[j], &status);
-        }
-        delete[] tctx;
-        tctx = nullptr;
         double prepare_consume = get_time_elapsed(prepare_start, true);
         bench->search_multi = false;
-        q << pid << ',' << prepare_consume << ',' << bench->search_count << ',' << bench->wid_filter_count << endl;
+        q << pid << ',' << prepare_consume << ',' << bench->search_count << ',' << the_min - bench->wid_filter_count << endl;
     }
     q.close();
 }
@@ -317,13 +308,13 @@ void exp4_search_box_single(new_bench *bench){
     time_query tq;
     tq.abandon = true;
     ofstream q;
-    q.open("ex_search_box.csv", ios::out|ios::binary|ios::trunc);
+    q.open("exp4_search_box_single.csv", ios::out|ios::binary|ios::trunc);
     if(!q.is_open()){
         log("%s cannot be opened","ex_search_box.csv");
         exit(0);
     }
     q << "search area" << ',' << "find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ',' << "prepare_time(ms)" << endl;
-    for(int i = 0; i < 100; i++){
+    for(int i = 0; i < 3; i++){
         bench->clear_all_keys();
         clear_cache();
         struct timeval prepare_start = get_cur_time();
@@ -333,8 +324,8 @@ void exp4_search_box_single(new_bench *bench){
         bench->bit_find_count = 0;
         double edge_length = 0.01;
         Point mid;
-        mid.x = -87.9 + 0.4 * get_rand_double();
-        mid.y = 41.6 + 0.4 * get_rand_double();
+        mid.x = -87.9 + 0.2;
+        mid.y = 41.6 + 0.2;
         box search_area(mid.x - edge_length/2, mid.y - edge_length/2, mid.x + edge_length/2, mid.y + edge_length/2);
         search_area.print();
         for(uint j = 0; j < min((uint)1215, bench->ctb_count); j++){
@@ -342,7 +333,13 @@ void exp4_search_box_single(new_bench *bench){
         }
         cout << "before multi" << endl;
         double prepare_consume = get_time_elapsed(prepare_start, true);
-        struct timeval multi_thread_start = get_cur_time();
+
+        uint64_t total_MB = 0;
+        for(auto info : bench->box_search_queue){
+            total_MB += bench->ctbs[info.ctb_id].CTF_capacity[info.ctf_id];
+        }
+        cout << "total_MB" << total_MB * sizeof(__uint128_t) / 1024 / 1024 << endl;
+
         pthread_t threads[1];
         query_context tctx;
         tctx.target[0] = (void *)bench;
@@ -353,6 +350,7 @@ void exp4_search_box_single(new_bench *bench){
         for(int j = 0; j < 1; j++){
             pthread_create(&threads[j], NULL, box_search_unit, (void *)&tctx);
         }
+        struct timeval multi_thread_start = get_cur_time();
         for(int j = 0; j < 1; j++ ){
             void *status;
             pthread_join(threads[j], &status);
@@ -415,13 +413,13 @@ void experiment_search_box(new_bench *bench){
 }
 
 void experiment_box_openmp(new_bench *bench){
-    bench->box_search_queue.reserve(bench->ctb_count * bench->config->CTF_count / 20);
+    bench->box_search_queue.reserve(bench->ctb_count * bench->config->CTF_count);
     time_query tq;
     tq.abandon = true;
     ofstream q;
-    q.open("ex_search_box_omp.csv", ios::out|ios::binary|ios::trunc);
+    q.open("ex_search_box_omp" + to_string(bench->config->num_threads) + "threads.csv", ios::out|ios::binary|ios::trunc);
     q << "search area" << ',' << "find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ',' << "prepare_time(ms)" << endl;
-    for(int i = 0; i < 10; i++){
+    for(int i = 0; i < 3; i++){
         bench->clear_all_keys();
         clear_cache();
         struct timeval prepare_start = get_cur_time();
@@ -440,6 +438,12 @@ void experiment_box_openmp(new_bench *bench){
         }
         double prepare_consume = get_time_elapsed(prepare_start, true);
         struct timeval multi_thread_start = get_cur_time();
+
+        uint64_t total_MB = 0;
+        for(auto info : bench->box_search_queue){
+            total_MB += bench->ctbs[info.ctb_id].CTF_capacity[info.ctf_id];
+        }
+        cout << "total_MB" << total_MB * sizeof(__uint128_t) / 1024 / 1024 << endl;
 
 #pragma omp parallel for num_threads(bench->config->num_threads)
         for(auto info : bench->box_search_queue){
@@ -562,6 +566,8 @@ workbench * temp_load_meta(const char *path) {
     generator_configuration * config = new generator_configuration();
     workbench * bench = new workbench(config);
     in.read((char *)config, sizeof(generator_configuration));               //also read meta
+    char new_raid[24] = "/data3/raid0_num";
+    memcpy(config->raid_path, new_raid, sizeof(config->raid_path));
     in.read((char *)bench, sizeof(workbench));      //bench->config = NULL
     bench->config = config;
     bench->ctbs = new CTB[config->big_sorted_run_capacity];
@@ -574,59 +580,59 @@ workbench * temp_load_meta(const char *path) {
     return bench;
 }
 
-void ex_pg_search_box(new_bench *bench){
-    bench->box_search_queue.reserve(bench->ctb_count * bench->config->CTF_count / 20);
-    time_query tq;
-    tq.abandon = true;
-    ofstream q;
-    q.open("ex_search_box.csv", ios::out|ios::binary|ios::trunc);
-    if(!q.is_open()){
-        log("%s cannot be opened","ex_search_box.csv");
-        exit(0);
-    }
-    q << "search area" << ',' << "find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ',' << "prepare_time(ms)" << endl;
-
-    bench->clear_all_keys();
-    clear_cache();
-    struct timeval prepare_start = get_cur_time();
-    bench->search_count = 0;
-    bench->mbr_find_count = 0;
-    bench->intersect_sst_count = 0;
-    bench->bit_find_count = 0;
-    double edge_length = 0.01;
-    Point mid;
-    mid.x = -87.9 + 0.2;
-    mid.y = 41.6 + 0.2;
-    box search_area(mid.x - edge_length/2, mid.y - edge_length/2, mid.x + edge_length/2, mid.y + edge_length/2);
-    search_area.print();
-    for(uint j = 0; j < min((uint)1215, bench->ctb_count); j++){
-        bench->mbr_search_in_disk(search_area, &tq, j);
-    }
-    cout << "before multi" << endl;
-    double prepare_consume = get_time_elapsed(prepare_start, true);
-    struct timeval multi_thread_start = get_cur_time();
-    pthread_t threads[1];
-    query_context tctx;
-    tctx.target[0] = (void *)bench;
-    tctx.target[1] = (void *)&search_area;
-    tctx.num_units = bench->box_search_queue.size();
-    tctx.report_gap = 1;
-    tctx.num_batchs = 1;
-    for(int j = 0; j < 1; j++){
-        pthread_create(&threads[j], NULL, box_search_unit, (void *)&tctx);
-    }
-    for(int j = 0; j < 1; j++ ){
-        void *status;
-        pthread_join(threads[j], &status);
-    }
-    double multi_thread_consume = get_time_elapsed(multi_thread_start, true);
-    q << edge_length*edge_length << ',' << bench->search_count << ',' << multi_thread_consume << ','
-      << bench->intersect_sst_count <<',' << bench->bit_find_count << ',' << prepare_consume << endl;
-    bench->box_search_queue.clear();
-    bench->search_count = 0;
-
-    q.close();
-}
+//void ex_pg_search_box(new_bench *bench){
+//    bench->box_search_queue.reserve(bench->ctb_count * bench->config->CTF_count / 20);
+//    time_query tq;
+//    tq.abandon = true;
+//    ofstream q;
+//    q.open("ex_search_box.csv", ios::out|ios::binary|ios::trunc);
+//    if(!q.is_open()){
+//        log("%s cannot be opened","ex_search_box.csv");
+//        exit(0);
+//    }
+//    q << "search area" << ',' << "find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ',' << "prepare_time(ms)" << endl;
+//
+//    bench->clear_all_keys();
+//    clear_cache();
+//    struct timeval prepare_start = get_cur_time();
+//    bench->search_count = 0;
+//    bench->mbr_find_count = 0;
+//    bench->intersect_sst_count = 0;
+//    bench->bit_find_count = 0;
+//    double edge_length = 0.01;
+//    Point mid;
+//    mid.x = -87.9 + 0.2;
+//    mid.y = 41.6 + 0.2;
+//    box search_area(mid.x - edge_length/2, mid.y - edge_length/2, mid.x + edge_length/2, mid.y + edge_length/2);
+//    search_area.print();
+//    for(uint j = 0; j < min((uint)1215, bench->ctb_count); j++){
+//        bench->mbr_search_in_disk(search_area, &tq, j);
+//    }
+//    cout << "before multi" << endl;
+//    double prepare_consume = get_time_elapsed(prepare_start, true);
+//    struct timeval multi_thread_start = get_cur_time();
+//    pthread_t threads[1];
+//    query_context tctx;
+//    tctx.target[0] = (void *)bench;
+//    tctx.target[1] = (void *)&search_area;
+//    tctx.num_units = bench->box_search_queue.size();
+//    tctx.report_gap = 1;
+//    tctx.num_batchs = 1;
+//    for(int j = 0; j < 1; j++){
+//        pthread_create(&threads[j], NULL, box_search_unit, (void *)&tctx);
+//    }
+//    for(int j = 0; j < 1; j++ ){
+//        void *status;
+//        pthread_join(threads[j], &status);
+//    }
+//    double multi_thread_consume = get_time_elapsed(multi_thread_start, true);
+//    q << edge_length*edge_length << ',' << bench->search_count << ',' << multi_thread_consume << ','
+//      << bench->intersect_sst_count <<',' << bench->bit_find_count << ',' << prepare_consume << endl;
+//    bench->box_search_queue.clear();
+//    bench->search_count = 0;
+//
+//    q.close();
+//}
 
 bool temp_mbr_search_in_CTB(new_bench * nb,box b, uint CTB_id){
     uint i = CTB_id;
@@ -690,150 +696,76 @@ bool temp_mbr_search_in_CTB(new_bench * nb,box b, uint CTB_id){
 }
 
 
-int main(int argc, char **argv){
-    clear_cache();
-    string path = "../data/meta/";
-    workbench * bench = temp_load_meta(path.c_str());
-    new_bench * nb = new new_bench(bench->config);
-    memcpy(nb, bench, sizeof(workbench));
-    cout << nb->ctb_count << endl;
-
-    double edge_length = 0.01;
-    Point mid;
-    mid.x = -87.9 + 0.2;
-    mid.y = 41.6 + 0.2;
-    box search_area(mid.x - edge_length/2, mid.y - edge_length/2, mid.x + edge_length/2, mid.y + edge_length/2);
-    search_area.print();
-    struct timeval start_time = get_cur_time();
-    //nb->old_mbr_search_in_CTB(search_area, 10);
-    temp_mbr_search_in_CTB(nb, search_area, 10);
-    double time_consume = get_time_elapsed(start_time, true);
-    cout << "ctb " << 10 << "time_consume" << time_consume << endl;
-    cout << nb->bit_find_count << " " << nb->mbr_find_count << endl;
-
-
-//    nb->ctbs[10].ctfs = new CTF[100];
-//    struct timeval start_time = get_cur_time();
-//    for(int j = 0; j < 100; j++){
-//        nb->load_CTF_keys(10,j);
-//    }
-//    double time_consume = get_time_elapsed(start_time, true);
-//    cout << "ctb " << 10 << "time_consume" << time_consume << endl;
-//
-//    ex_pg_search_box(nb);
-
-    return 0;
-}
-
-
-
 //int main(int argc, char **argv){
 //    clear_cache();
 //    string path = "../data/meta/";
-//    //workbench * bench = C_load_meta(path.c_str());
-//    workbench * bench = load_meta(path.c_str());
+//    workbench * bench = temp_load_meta(path.c_str());
 //    new_bench * nb = new new_bench(bench->config);
 //    memcpy(nb, bench, sizeof(workbench));
 //    cout << nb->ctb_count << endl;
-////    nb->ctb_count = 10;
-////    nb->ctbs[0].ctfs = NULL;
-////    nb->ctbs[1].ctfs = NULL;
-////    nb->ctbs[2].ctfs = NULL;
-////    nb->ctbs[3].ctfs = NULL;
-////    nb->ctbs[4].ctfs = NULL;
-////    nb->ctbs[5].ctfs = NULL;
-////    nb->ctbs[6].ctfs = NULL;
-////    nb->ctbs[7].ctfs = NULL;
-////    nb->ctbs[8].ctfs = NULL;
-////    nb->ctbs[9].ctfs = NULL;
-//    cout << "search begin" << endl;
 //
+////    double edge_length = 0.01;
+////    Point mid;
+////    mid.x = -87.9 + 0.2;
+////    mid.y = 41.6 + 0.2;
+////    box search_area(mid.x - edge_length/2, mid.y - edge_length/2, mid.x + edge_length/2, mid.y + edge_length/2);
+////    search_area.print();
+////    struct timeval start_time = get_cur_time();
+////    //nb->old_mbr_search_in_CTB(search_area, 10);
+////    temp_mbr_search_in_CTB(nb, search_area, 10);
+////    double time_consume = get_time_elapsed(start_time, true);
+////    cout << "ctb " << 10 << "time_consume" << time_consume << endl;
+////    cout << nb->bit_find_count << " " << nb->mbr_find_count << endl;
 //
-//
-////        for(int i = 0; i < bench->ctb_count; i++){
-////            bench->load_big_sorted_run(i);
-////        }
-////        fprintf(stderr,"\ttotal load keys:\t%.2f\n", bench->pro.load_keys_time);
-//
-//
-//    clear_cache();
-//    nb->clear_all_keys();
-//    cout << "begin test" << endl;
+//    time_query tq;
+//    tq.abandon = true;
+//    nb->ctbs[10].ctfs = new CTF[100];
 //    struct timeval start_time = get_cur_time();
-//
-//    for(int i = 0; i < 84; i++){
-//        nb->ctbs[i].ctfs = new CTF[nb->config->CTF_count];
-//        for(int j = 0; j < 100; j += 8){
-//            nb->load_CTF_keys(i, j);
-//        }
-//        if(i%83==82){
-//            double time_consume = get_time_elapsed(start_time, true);
-//            cout << "ctb " << i << "time_consume" << time_consume << endl;
-//            clear_cache();
-//            nb->clear_all_keys();
-//        }
+//    for(uint i = 0; i < 10; i++){
+//        nb->id_search_in_CTB(i, 10, &tq);
 //    }
-//
-//
-////    start_time = get_cur_time();
-////    for(int i = 0; i < 84; i++){
-////        nb->ctbs[i].ctfs = new CTF[nb->config->CTF_count];
-////#pragma omp parallel for num_threads(128)
-////        for(int j = 0; j < 100; j += 8){
-////            nb->load_CTF_keys(i, j);
-////        }
-////        if(i%83==82){
-////            double time_consume = get_time_elapsed(start_time, true);
-////            cout << "ctb " << i << "time_consume" << time_consume << endl;
-////            clear_cache();
-////            nb->clear_all_keys();
-////        }
-////    }
-//
-//
-//    //experiment_twice(nb);
-//    //exp4_search_oid_single(nb);
-//    //experiment_search_oid(nb);
-//    //exp4_search_box_single(nb);
-//    //experiment_search_box(nb);
-//    //experiment_box_openmp(nb);
-//    //experiment_search_time(bench);
-//    //query_search_id(bench);
-//    //query_search_box(bench);
-//
+////    nb->id_search_in_CTB(5149112, 10, &tq);
+//    cout << "search_count " << nb->search_count << endl;
+//    double time_consume = get_time_elapsed(start_time, true);
+//    cout << "ctb " << 10 << "time_consume" << time_consume << endl;
 //    return 0;
 //}
 
 
-//    char * a = new char[100 * 1024 * 1024];
-//    for(int i = 0; i < 2000; i++){
-//        ofstream q;
-//        string path = "/data3/ssd" + to_string(i%8) + "/testblock" + to_string(i);
-//        q.open(path, ios::out|ios::binary|ios::trunc);
-//        q.write(a, sizeof(char) * 100 * 1024 * 1024);
-//        q.close();
-//    }
 
-//    clear_cache();
-//    uint open_count = 0;
-//    vector<char *> b(2000);
-//    for(int i = 0; i < 2000; i++){
-//        b[i] = new char[100 * 1024 * 1024];
-//    }
-//
-//
-//    struct timeval start_time = get_cur_time();
-//#pragma omp parallel for num_threads(32)
-//    for(int i = 0; i < 960; i+=4){
-//        string path = "/data3/ssd" + to_string(i%8) + "/testblock" + to_string(i);
-//        ifstream in(path, ios::in | ios::binary);
-//        if(in.is_open()){
-//            open_count++;
-//            in.read(b[i], sizeof(char) * 100 * 1024 * 1024);
-//            in.close();
+int main(int argc, char **argv){
+    clear_cache();
+    string path = "../data/meta/";
+    //workbench * bench = C_load_meta(path.c_str());
+    workbench * bench = load_meta(path.c_str());
+    new_bench * nb = new new_bench(bench->config);
+    memcpy(nb, bench, sizeof(workbench));
+    cout << nb->ctb_count << endl;
+    cout << "search begin" << endl;
+
+//        for(int i = 0; i < bench->ctb_count; i++){
+//            bench->load_big_sorted_run(i);
 //        }
-//
+//        fprintf(stderr,"\ttotal load keys:\t%.2f\n", bench->pro.load_keys_time);
+
+
+    //experiment_twice(nb);
+    //exp4_search_oid_single(nb);
+    struct timeval start = get_cur_time();
+    experiment_search_oid(nb);
+    double real_world_time = get_time_elapsed(start, true);
+    cout << "real_world_time " << real_world_time << endl;
+    //exp4_search_box_single(nb);
+    //experiment_search_box(nb);
+    //experiment_box_openmp(nb);
+//    vector<uint> threads_list = {1, 2, 4, 8, 16, 32, 64, 128};
+//    for(auto th : threads_list){
+//        nb->config->num_threads = th;
+//        experiment_box_openmp(nb);
 //    }
-//    double time_consume = get_time_elapsed(start_time, true);
-//    cout << "time_consume" << time_consume << endl;
-//    cout << "open_count " << open_count << endl;
+    //experiment_search_time(bench);
+    //query_search_id(bench);
+    //query_search_box(bench);
+
+    return 0;
+}

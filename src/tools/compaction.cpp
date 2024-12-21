@@ -305,7 +305,7 @@ void * merge_dump(new_bench * bench, uint start_ctb, uint merge_ctb_count){
     for(uint i = 0; i < bench->config->CTF_count; i++){
         box temp_bitbox;
         for(uint j = 0; j < bench->bit_count; j++){
-            if(bench->compacted_ctbs[c_ctb_id].bitmaps[i*(bench->bit_count/8) + j/8] & (1<<(j%8)) ){
+            if(bench->compacted_ctbs[c_ctb_id].bitmaps[i*(bench->bit_count/8) + j/8] & (1<<(j%2)) ){
                 uint x, y;
                 d2xy(SID_BIT / 2, j, x, y);
                 Point temp_p(x, y);
@@ -343,7 +343,7 @@ void * merge_dump(new_bench * bench, uint start_ctb, uint merge_ctb_count){
     dump_args * pargs = new dump_args[bench->config->CTF_count];
     pthread_t threads[bench->config->CTF_count];        //may be larger than config->num_threads
     for(uint i = 0; i < bench->config->CTF_count; i++) {
-        pargs[i].path = bench->config->raid_path + to_string(i%8) + "/C_SSTable_"+to_string(c_ctb_id)+"-"+to_string(i);
+        pargs[i].path = bench->config->raid_path + to_string(i%2) + "/C_SSTable_"+to_string(c_ctb_id)+"-"+to_string(i);
         pargs[i].SIZE = sizeof(__uint128_t) * keys_with_wid[i].size();
         pargs[i].keys = keys_with_wid[i].data();
         pthread_create(&threads[i], NULL, a_parallel_dump, (void *)&pargs[i]);
