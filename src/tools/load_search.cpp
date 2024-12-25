@@ -245,11 +245,14 @@ void experiment_search_oid(new_bench *bench){
     tq.abandon = true;
     ofstream q;
     q.open("ex_search_id.csv", ios::out|ios::binary|ios::trunc);
-    q << "question number" << ',' << "time_consume(ms)" << ',' << "find_id_count" << ',' << "sid_not_zero_count" << endl;
-    for(int i = 0; i < 500; i++){
+    q << "question number" << ',' << "time_consume(ms)" << ',' << "find_id_count" << ',' << "sid_zero_count" << ','
+        << "hit_buffer" << ',' << "hit_ctf" << endl;
+    for(int i = 0; i < 1000; i++){
         bench->clear_all_keys();
         clear_cache();
         bench->search_count = 0;
+        bench->hit_buffer = 0;
+        bench->hit_ctf = 0;
         //bench->wid_filter_count = 0;
         uint pid = get_rand_number(bench->config->num_objects);
         bench->search_multi = false;
@@ -261,7 +264,8 @@ void experiment_search_oid(new_bench *bench){
         }
         double prepare_consume = get_time_elapsed(prepare_start, true);
         bench->search_multi = false;
-        q << pid << ',' << prepare_consume << ',' << bench->search_count << ',' << the_min - bench->wid_filter_count << endl;
+        q << pid << ',' << prepare_consume << ',' << bench->search_count << ',' << the_min - bench->hit_buffer - bench->hit_ctf
+            << ',' << bench->hit_buffer << ',' << bench->hit_ctf << endl;
     }
     q.close();
 }
@@ -416,65 +420,86 @@ void experiment_box_openmp(new_bench *bench){
     bench->box_search_queue.reserve(bench->ctb_count * bench->config->CTF_count);
     time_query tq;
     tq.abandon = true;
-    ofstream q;
-    q.open("ex_search_box_omp" + to_string(bench->config->num_threads) + "threads.csv", ios::out|ios::binary|ios::trunc);
-    q << "search area" << ',' << "find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ',' << "prepare_time(ms)" << endl;
-    for(int i = 0; i < 3; i++){
-        bench->clear_all_keys();
-        clear_cache();
-        struct timeval prepare_start = get_cur_time();
-        bench->search_count = 0;
-        bench->mbr_find_count = 0;
-        bench->intersect_sst_count = 0;
-        bench->bit_find_count = 0;
-        double edge_length = 0.01;
-        Point mid;
-        mid.x = -87.9 + 0.2;
-        mid.y = 41.6 + 0.2;
-        box search_area(mid.x - edge_length/2, mid.y - edge_length/2, mid.x + edge_length/2, mid.y + edge_length/2);
-        search_area.print();
-        for(uint j = 0; j < min((uint)1215, bench->ctb_count); j++){
-            bench->mbr_search_in_disk(search_area, &tq, j);
-        }
-        double prepare_consume = get_time_elapsed(prepare_start, true);
-        struct timeval multi_thread_start = get_cur_time();
+    double edge_length = 0.001;
+    for(uint selectivity = 1; selectivity <= 4; selectivity++) {
+        ofstream q;
+        q.open("ex_search_box_omp" + to_string(selectivity) + ".csv", ios::out|ios::binary|ios::trunc);
+        q << "search edge_length" << ',' << "_total_find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ','
+            << "total_MB" << ',' << "prepare_time(ms)" << ',' << "mid x" << ',' << "mid y" << ',' << "buffer_find" << ','  << "buffer_time" << endl;
+        for (int i = 0; i < 1600 / selectivity / selectivity; i++) {
+            bench->clear_all_keys();
+            clear_cache();
+            struct timeval prepare_start = get_cur_time();
+            bench->search_count = 0;
+            bench->mbr_find_count = 0;
+            bench->intersect_sst_count = 0;
+            bench->bit_find_count = 0;
+            double margin = edge_length / 2;
+            Point mid;
+            mid.x = -87.9 + margin + (0.36 - margin) * get_rand_double();
+            mid.y = 41.65 + margin + (0.36 - margin) * get_rand_double();
+            box search_area(mid.x - edge_length / 2, mid.y - edge_length / 2, mid.x + edge_length / 2,
+                            mid.y + edge_length / 2);
 
-        uint64_t total_MB = 0;
-        for(auto info : bench->box_search_queue){
-            total_MB += bench->ctbs[info.ctb_id].CTF_capacity[info.ctf_id];
-        }
-        cout << "total_MB" << total_MB * sizeof(__uint128_t) / 1024 / 1024 << endl;
-
-#pragma omp parallel for num_threads(bench->config->num_threads)
-        for(auto info : bench->box_search_queue){
-            uint mbr_find_count = 0;
-            if(!bench->ctbs[info.ctb_id].ctfs[info.ctf_id].keys){
-                bench->load_CTF_keys(info.ctb_id, info.ctf_id);
+            for (uint j = 0; j < min((uint) 1215, bench->ctb_count); j++) {
+                bench->mbr_search_in_disk(search_area, &tq, j);
             }
-            for(uint q = 0; q < bench->ctbs[info.ctb_id].CTF_capacity[info.ctf_id]; q++){
-                __uint128_t temp_key = bench->ctbs[info.ctb_id].ctfs[info.ctf_id].keys[q];
-                if(info.tq.abandon || info.tq.check_key_time(temp_key)){
-                    uint pid = get_key_oid(temp_key);
-                    box key_box;
-                    parse_mbr(temp_key, key_box, *info.bmap_mbr);
-                    if(search_area.intersect(key_box)){
-                        mbr_find_count++;
-                        //cout<<"box find!"<<endl;
-                        //key_box.print();
+            double prepare_consume = get_time_elapsed(prepare_start, true);
+
+            //search_area.print();
+#pragma omp parallel for num_threads(bench->config->num_threads)
+            for (uint j = 0; j < min((uint) 1215, bench->ctb_count); j++) {
+                uint temp_buffer_count = 0;
+                for (uint q = 0; q < bench->ctbs[j].o_buffer.oversize_kv_count; q++) {
+                    //tq
+                    if (bench->ctbs[j].o_buffer.boxes[q].intersect(search_area)) {
+                        temp_buffer_count++;
                     }
                 }
+                bench->search_count.fetch_add(temp_buffer_count, std::memory_order_relaxed);
             }
-            delete[] bench->ctbs[info.ctb_id].ctfs[info.ctf_id].keys;
-            bench->ctbs[info.ctb_id].ctfs[info.ctf_id].keys = nullptr;
-            bench->search_count.fetch_add(mbr_find_count, std::memory_order_relaxed);
-        }
+            double buffer_time = get_time_elapsed(prepare_start, true);
+            uint buffer_find_count = bench->search_count;
 
-        double multi_thread_consume = get_time_elapsed(multi_thread_start, true);
-        q << edge_length*edge_length << ',' << bench->search_count << ',' << multi_thread_consume << ','
-          << bench->intersect_sst_count <<',' << bench->bit_find_count << ',' << prepare_consume << endl;
-        bench->box_search_queue.clear();
+            uint64_t total_MB = 0;
+            for (auto info: bench->box_search_queue) {
+                total_MB += bench->ctbs[info.ctb_id].CTF_capacity[info.ctf_id];
+            }
+            //cout << "total_MB" << total_MB * sizeof(__uint128_t) / 1024 / 1024 << endl;
+            struct timeval multi_thread_start = get_cur_time();
+#pragma omp parallel for num_threads(bench->config->num_threads)
+            for (auto info: bench->box_search_queue) {
+                uint mbr_find_count = 0;
+                if (!bench->ctbs[info.ctb_id].ctfs[info.ctf_id].keys) {
+                    bench->load_CTF_keys(info.ctb_id, info.ctf_id);
+                }
+                for (uint q = 0; q < bench->ctbs[info.ctb_id].CTF_capacity[info.ctf_id]; q++) {
+                    __uint128_t temp_key = bench->ctbs[info.ctb_id].ctfs[info.ctf_id].keys[q];
+                    if (info.tq.abandon || info.tq.check_key_time(temp_key)) {
+                        uint pid = get_key_oid(temp_key);
+                        box key_box;
+                        parse_mbr(temp_key, key_box, *info.bmap_mbr);
+                        if (search_area.intersect(key_box)) {
+                            mbr_find_count++;
+                            //cout<<"box find!"<<endl;
+                            //key_box.print();
+                        }
+                    }
+                }
+                delete[] bench->ctbs[info.ctb_id].ctfs[info.ctf_id].keys;
+                bench->ctbs[info.ctb_id].ctfs[info.ctf_id].keys = nullptr;
+                bench->search_count.fetch_add(mbr_find_count, std::memory_order_relaxed);
+            }
+
+            double multi_thread_consume = get_time_elapsed(multi_thread_start, true);
+            q << edge_length << ',' << bench->search_count << ',' << multi_thread_consume << ','
+              << bench->intersect_sst_count << ',' << bench->bit_find_count << ','
+              << total_MB * sizeof(__uint128_t) / 1024 / 1024 << ',' << prepare_consume << ',' << mid.x << ',' << mid.y << endl;
+            bench->box_search_queue.clear();
+        }
+        q.close();
+        edge_length *= 3.16;
     }
-    q.close();
 }
 
 void experiment_search_time(workbench *bench){
@@ -751,13 +776,13 @@ int main(int argc, char **argv){
 
     //experiment_twice(nb);
     //exp4_search_oid_single(nb);
-    struct timeval start = get_cur_time();
-    experiment_search_oid(nb);
-    double real_world_time = get_time_elapsed(start, true);
-    cout << "real_world_time " << real_world_time << endl;
+//    struct timeval start = get_cur_time();
+    //experiment_search_oid(nb);
+//    double real_world_time = get_time_elapsed(start, true);
+//    cout << "real_world_time(s) " << real_world_time / 1000 << endl;
     //exp4_search_box_single(nb);
     //experiment_search_box(nb);
-    //experiment_box_openmp(nb);
+    experiment_box_openmp(nb);
 //    vector<uint> threads_list = {1, 2, 4, 8, 16, 32, 64, 128};
 //    for(auto th : threads_list){
 //        nb->config->num_threads = th;
