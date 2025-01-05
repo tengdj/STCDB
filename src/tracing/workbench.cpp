@@ -497,16 +497,13 @@ bool new_bench::mbr_search_in_disk(box b, time_query * tq, uint CTB_id){
 
 void workbench::dump_meta(const char *path) {
     struct timeval start_time = get_cur_time();
-    string bench_path = string(path) + "workbench";
+    string bench_path = string(path) + "N_workbench";
     ofstream wf(bench_path, ios::out|ios::binary|ios::trunc);
     wf.write((char *)config, sizeof(generator_configuration));        //the config of pipeline is generator_configuration
-    cout << "sizeof(*config)" << sizeof(*config) << endl;
-    cout << "sizeof(configuration)" << sizeof(configuration) << endl;
-    cout << "sizeof(generator_configuration)" << sizeof(generator_configuration) << endl;
     wf.write((char *)this, sizeof(workbench));
     for(int i = 0; i < ctb_count; i++){
         if(ctbs[i].sids){
-            string CTB_path = string(path) + "CTB" + to_string(i);
+            string CTB_path = string(path) + "N_CTB" + to_string(i);
             dump_CTB_meta(CTB_path.c_str(), i);
         }
     }
@@ -518,11 +515,11 @@ void workbench::dump_CTB_meta(const char *path, int i) {
     struct timeval start_time = get_cur_time();
     ofstream wf(path, ios::out|ios::binary|ios::trunc);
     wf.write((char *)&ctbs[i], sizeof(CTB));
-    wf.write((char *)ctbs[i].first_widpid, config->CTF_count * sizeof(uint64_t));
+    //wf.write((char *)ctbs[i].first_widpid, config->CTF_count * sizeof(uint64_t));
     wf.write((char *)ctbs[i].sids, config->num_objects * sizeof(unsigned short));
-    wf.write((char *)ctbs[i].bitmaps, bitmaps_size * sizeof(unsigned char));
-    wf.write((char *)ctbs[i].bitmap_mbrs, config->CTF_count * sizeof(box));
-    wf.write((char *)ctbs[i].CTF_capacity, config->CTF_count * sizeof(uint));
+    //wf.write((char *)ctbs[i].bitmaps, bitmaps_size * sizeof(unsigned char));
+    //wf.write((char *)ctbs[i].bitmap_mbrs, config->CTF_count * sizeof(box));
+    //wf.write((char *)ctbs[i].CTF_capacity, config->CTF_count * sizeof(uint));
     wf.write((char *)ctbs[i].o_buffer.keys, ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t));
     wf.write((char *)ctbs[i].o_buffer.boxes, ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box));
     //RTree
@@ -593,4 +590,13 @@ void workbench::load_CTB_meta(const char *path, int i) {
     logt("CTB meta %d load from %s",start_time, i, path);
 }
 
-
+void workbench::load_CTF_meta(const char *path, int i, int j) {
+    struct timeval start_time = get_cur_time();
+    ifstream in(path, ios::in | ios::binary);
+    if (!in.is_open()) {
+        std::cerr << "Error opening file: " << path << std::endl;
+    }
+    in.read((char *)&h_ctfs[i][j], sizeof(CTF));
+    ctbs[i].bitmaps = new unsigned char[bitmaps_size];
+    logt("CTF meta load from %s",start_time, path);
+}

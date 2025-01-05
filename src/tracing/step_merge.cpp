@@ -214,6 +214,14 @@ void CTF::print_ctf_meta() {
 
 }
 
+void CTF:: dump(const string& path){
+    struct timeval start_time = get_cur_time();
+    ofstream wf(path.c_str(), ios::out|ios::binary|ios::trunc);
+    wf.write((char *)this, sizeof(CTF));
+    wf.write((char *)bitmap, ctf_bitmap_size);
+    wf.close();
+}
+
 CTB::~CTB(){
     if(ctfs)
         delete []ctfs;

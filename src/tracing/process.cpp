@@ -225,24 +225,6 @@ inline bool BloomFilter_Check(workbench *bench, uint sst, uint pid){
     return true;
 }
 
-struct dump_args {
-    string path;
-    __uint128_t * keys;
-    uint SIZE;
-};
-
-void *parallel_dump(void *arg){
-    dump_args *pargs = (dump_args *)arg;
-    ofstream SSTable_of;
-    SSTable_of.open(pargs->path.c_str() , ios::out|ios::binary|ios::trunc);
-    //cout << pargs->path << endl;
-    assert(SSTable_of.is_open());
-    SSTable_of.write((char *)pargs->keys, pargs->SIZE);
-    SSTable_of.flush();
-    SSTable_of.close();
-    return NULL;
-}
-
 void *straight_dump(void *arg){
     struct timeval bg_start = get_cur_time();
     cout<<"step into the sst_dump"<<endl;
@@ -292,20 +274,26 @@ void *straight_dump(void *arg){
 
     logt("CPU organization time",bg_start);
 
-    uint total_index = 0;
-    uint sst_count = 0;
+    uint * key_index = new uint[bench->config->CTF_count];          //prefix
+    uint * bytes_index = new uint[bench->config->CTF_count];          //prefix
+    key_index[0] = 0;
+    bytes_index[0] = 0;
+    for(uint i = 1; i < bench->config->CTF_count; i++){
+        key_index[i] = key_index[i - 1] + bench->h_CTF_capacity[offset][i - 1];
+        bytes_index[i] = bytes_index[i - 1] + bench->h_CTF_capacity[offset][i - 1] * bench->h_ctfs[offset][i - 1].key_bit / 8;
+    }
+
+    uint8_t * h_ctf_keys = reinterpret_cast<uint8_t *>(bench->h_keys[offset]);
 #pragma omp parallel for num_threads(bench->config->CTF_count)          //there is little improvement when 100->128 threads
-    for(sst_count=0; sst_count < bench->config->CTF_count; sst_count++){
-        string sst_path = bench->config->raid_path + to_string(sst_count%2) + "/C_SSTable_"+to_string(old_big)+"-"+to_string(sst_count);
+    for(uint sst_count=0; sst_count < bench->config->CTF_count; sst_count++){
+        string sst_path = bench->config->raid_path + to_string(sst_count%2) + "/N_SSTable_"+to_string(old_big)+"-"+to_string(sst_count);
         ofstream SSTable_of;
         SSTable_of.open(sst_path , ios::out|ios::binary|ios::trunc);
         assert(SSTable_of.is_open());
-        SSTable_of.write((char *)(bench->h_keys[offset] + total_index), sizeof(__uint128_t)*bench->h_CTF_capacity[offset][sst_count]);
+        SSTable_of.write((char *)(h_ctf_keys + bytes_index[sst_count]), bench->h_ctfs[offset][sst_count].key_bit / 8 * bench->h_CTF_capacity[offset][sst_count]);
         SSTable_of.flush();
         SSTable_of.close();
-        total_index += bench->h_CTF_capacity[offset][sst_count];
     }
-    cout << "total_index" << total_index << " 2G:" <<bench->config->kv_restriction << endl;
     bench->pro.bg_merge_time += get_time_elapsed(bg_start,false);
     logt("dumped keys for CTB %d",bg_start, old_big);
 
@@ -314,9 +302,17 @@ void *straight_dump(void *arg){
     //delete[] bit_points;
     bench->dumping = false;
 
-    string CTB_path = string(bench->config->CTB_meta_path) + "C_CTB" + to_string(old_big);
+    string CTB_path = string(bench->config->CTB_meta_path) + "N_CTB" + to_string(old_big);
     bench->dump_CTB_meta(CTB_path.c_str(), old_big);
     logt("dumped meta for CTB %d",bg_start, old_big);
+
+#pragma omp parallel for num_threads(bench->config->CTF_count)
+    for(uint i = 0; i < bench->config->CTF_count; i++){
+        string ctf_path = string(bench->config->CTB_meta_path) + "STcL" + to_string(old_big)+"-"+to_string(i);
+        bench->h_ctfs[offset][i].bitmap = &bench->h_bitmaps[offset][bench->bitmaps_size * i];
+        bench->h_ctfs[offset][i].dump(ctf_path);
+    }
+    logt("dumped meta for CTF %d",bg_start, old_big);
     return NULL;
 }
 
@@ -584,9 +580,9 @@ void tracer::process(){
                 bench->dump_meetings(st);
             }
 
-//            if(st+t+1 == config->start_time+config->duration - 5  || (st+t+1) % 100000 == 0){
-//                bench->dump_meta(config->CTB_meta_path);
-//            }
+            if(st+t+1 == config->start_time+config->duration - 5  || (st+t+1) % 100000 == 0){
+                bench->dump_meta(config->CTB_meta_path);
+            }
 		}
 	}
 	bench->print_profile();

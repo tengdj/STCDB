@@ -55,6 +55,7 @@ public:
     __uint128_t serial_key(uint64_t pid, uint64_t target, uint64_t duration, uint64_t end, __uint128_t value_mbr);
     void parse_key(__uint128_t key);
     void print_ctf_meta();
+    void dump(const string& path);
 };
 
 //class CTB {             //contact tracing block
