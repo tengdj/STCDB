@@ -14,7 +14,7 @@
 #include "../geometry/geometry.h"
 #include "../index/QTree.h"
 #include "../index/RTree.h"
-#include "../cuda/cuda_util.cuh"
+//#include "../cuda/cuda_util.cuh"
 
 class oversize_buffer {             //contact tracing block
 public:
@@ -28,13 +28,46 @@ public:
 
 class CTF{                          //contact tracing file
 public:
-    __uint128_t * keys = NULL;
-    //uint SSTable_kv_capacity = 327680;              //67108864 * 5 / 1024 = 327,680 (Round up)
+    f_box ctf_mbr;
+    __uint128_t * keys = nullptr;
+    unsigned char * bitmap = nullptr;
+    uint CTF_kv_capacity = 0;
+    uint start_time_min = 0;
+    uint start_time_max = 0;
+    uint end_time_min = 0;
+    uint end_time_max = 0;
+    uint16_t key_bit = 0;
+    uint16_t id_bit = 0;
+    uint16_t duration_bit = 0;
+    uint16_t end_bit = 0;
+    uint16_t low_x_bit = 0;
+    uint16_t low_y_bit = 0;
+    uint16_t edge_bit = 0;
+    uint16_t mbr_bit = 0;
+    uint16_t x_grid = 0;
+    uint16_t y_grid = 0;
+    uint16_t ctf_bitmap_size = 0;          //bytes
+//    ~CTF();
 
-    ~CTF();
+    void eight_parallel();
+    void get_ctf_bits(box map_mbr, configuration * config);
     uint search_SSTable(uint pid, time_query * tq, bool search_multi, uint SSTable_kv_capacity, atomic<long long> &search_count, uint *search_multi_pid);
-    //uint search_SSTable(uint64_t wp, uint SSTable_kv_capacity, vector<__uint128_t> & v_keys, vector<uint> & v_indices);
+    __uint128_t serial_key(uint64_t pid, uint64_t target, uint64_t duration, uint64_t end, __uint128_t value_mbr);
+    void parse_key(__uint128_t key);
+    void print_ctf_meta();
 };
+
+//class CTB {             //contact tracing block
+//public:
+//    CTF * ctfs = NULL;
+//    uint CTF_count = 0;
+//    unsigned short * sids = NULL;
+//
+//    oversize_buffer o_buffer;
+//    RTree<short *, double, 2, double> *box_rtree = NULL;
+//
+//    ~CTB();
+//};
 
 class CTB {             //contact tracing block
 public:

@@ -44,11 +44,11 @@ namespace{
 #define __MGAIC_CODE__          (0x01464C42)
 #define MIX_UINT64(v)       ((uint32_t)((v>>32)^(v)))
 
-#define SID_BIT 16
-#define OID_BIT 26
+//#define SID_BIT 16
+#define OID_BIT 32
 #define MBR_BIT 36
-#define DURATION_BIT 12
-#define END_BIT 12
+#define DURATION_BIT 32
+#define END_BIT 32
 //26 + 26 + 12 = 64
 
 const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
@@ -521,6 +521,14 @@ const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
         if(system(cmd.c_str()) != 0){
             fprintf(stderr, "Error when disabling buffer cache\n");
         }
+    }
+
+    template <typename T>
+    constexpr uint min_bits_to_store(T max_value) {
+        static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value,
+                      "Input must be an unsigned integer type.");
+        if (max_value == 0) return 1;
+        return static_cast<uint>(std::log2(max_value)) + 1; // ⌊log2(value)⌋ + 1
     }
 }
 #endif

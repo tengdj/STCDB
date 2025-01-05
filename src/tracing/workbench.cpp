@@ -162,7 +162,6 @@ void workbench::claim_space(){
     size = config->num_objects* sizeof(float);
     h_longer_edges = (float *)allocate(size);
 
-
     size = config->big_sorted_run_capacity*sizeof(CTB);
     ctbs = (CTB *)allocate(size);
 
@@ -184,10 +183,10 @@ void workbench::claim_space(){
         h_sids = (unsigned short **)allocate(size);
         size = config->MemTable_capacity * sizeof(uint *);
         h_CTF_capacity = (uint **)allocate(size);
-
         size = config->MemTable_capacity * sizeof(oversize_buffer);
         h_oversize_buffers = (oversize_buffer *)allocate(size);
-
+        size = config->MemTable_capacity * sizeof(CTF *);
+        h_ctfs = (CTF **)allocate(size);
 
         for(int i=0;i<config->MemTable_capacity; i++){
             size = bitmaps_size;
@@ -202,6 +201,9 @@ void workbench::claim_space(){
             size = config->CTF_count * sizeof(uint);
             h_CTF_capacity[i] = (uint *) allocate(size);
             log("\t%.2f MB\t h_CTF_capacity", size / 1024.0 / 1024.0);
+            size = config->CTF_count*sizeof(CTF);
+            h_ctfs[i] = (CTF *)allocate(size);
+            log("\t%.2f MB\t h_ctfs",size/1024.0/1024.0);
 
             size = config->oversize_buffer_capacity*sizeof(__uint128_t);
             h_oversize_buffers[i].keys = (__uint128_t *)allocate(size);
@@ -215,10 +217,10 @@ void workbench::claim_space(){
 
 box workbench::make_bit_box(box b){
     box new_b;
-    new_b.low[0] = (b.low[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * (1ULL << (SID_BIT/2));
-    new_b.low[1] = (b.low[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * (1ULL << (SID_BIT/2));
-    new_b.high[0] = (b.high[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * (1ULL << (SID_BIT/2));
-    new_b.high[1] = (b.high[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * (1ULL << (SID_BIT/2));
+//    new_b.low[0] = (b.low[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * (1ULL << (SID_BIT/2));
+//    new_b.low[1] = (b.low[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * (1ULL << (SID_BIT/2));
+//    new_b.high[0] = (b.high[0] - mbr.low[0])/(mbr.high[0] - mbr.low[0]) * (1ULL << (SID_BIT/2));
+//    new_b.high[1] = (b.high[1] - mbr.low[1])/(mbr.high[1] - mbr.low[1]) * (1ULL << (SID_BIT/2));
     return new_b;
 }
 
@@ -295,64 +297,6 @@ void workbench::clear_all_keys(){
     }
 }
 
-bool workbench::search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vector<uint> & v_indices){
-    cout<<"memtable search "<<pid<<endl;
-    uint offset = 0;
-    if(ctb_count % 2 == 1){
-        offset = config->MemTable_capacity/2;
-    }
-    bool ret = false;
-    for(int i=0;i<MemTable_count;i++) {                                         //i<MemTable_count
-        uint64_t wp = ((uint64_t)h_sids[offset+i][pid] << OID_BIT) + pid;
-        cout << "wp " << wp << endl;
-        int find = -1;
-        int low = 0;
-        int high = config->kv_restriction - 1;
-        int mid;
-        uint64_t temp_wp;
-        //box temp_box;
-        while (low <= high) {
-            mid = (low + high) / 2;
-            temp_wp = (h_keys[offset+i][mid] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT)) ;
-            cout << "temp_wp" << temp_wp <<endl;
-            if (temp_wp == wp) {
-                find = mid;
-                ret = true;
-                break;
-            } else if (temp_wp > wp) {
-                high = mid - 1;
-            } else {
-                low = mid + 1;
-            }
-        }
-        if (find == -1) {
-            cout << "cannot find" << endl;
-            break;
-        }
-        cout << "exactly find" << endl;
-        uint cursor = find;
-        while (temp_wp == wp && cursor >= 1) {
-            ret = true;
-            cursor--;
-            temp_wp = (h_keys[offset+i][cursor] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT)) ;
-        }
-        if (temp_wp == wp && cursor == 0) {
-            v_keys.push_back(h_keys[offset+i][cursor]);
-            v_indices.push_back(cursor);
-
-        }
-        while (cursor + 1 < config->kv_restriction) {
-            cursor++;
-            temp_wp = (h_keys[offset+i][cursor] >> 23) & ((1ULL << 25) - 1);
-            if (temp_wp == wp) {
-                v_keys.push_back(h_keys[offset+i][cursor]);
-                v_indices.push_back(cursor);
-            }
-        }
-    }
-    return ret;
-}
-
 void workbench::load_CTF_keys(uint CTB_id, uint CTF_id){
     ifstream read_sst;
     string filename = config->raid_path + to_string(CTF_id%2) + "/SSTable_"+to_string(CTB_id)+"-"+to_string(CTF_id);
@@ -387,9 +331,9 @@ uint workbench::search_time_in_disk(time_query * tq){          //not finish
                     load_CTF_keys(i, j);
                 }
                 for(uint q = 0; q < ctbs[i].CTF_capacity[j]; q++){
-                    if( tq_temp.check_key_time(ctbs[i].ctfs[j].keys[q]) ){
-                        count++;
-                    }
+//                    if( tq_temp.check_key_time(ctbs[i].ctfs[j].keys[q]) ){
+//                        count++;
+//                    }
                 }
             }
         }
@@ -481,70 +425,6 @@ bool PolygonSearchCallback(short * i, box poly_mbr,void* arg){
     return true;
 }
 
-bool new_bench::old_mbr_search_in_CTB(box b, uint CTB_id){
-    uint i = CTB_id;
-    bool ret = false, find = false;
-    box bit_b = make_bit_box(b);
-    uint bit_pos = 0;
-    if(!ctbs[i].ctfs){
-        ctbs[i].ctfs = new CTF[config->CTF_count];
-    }
-    //cout << "in bg_run" << i << endl;
-
-    uint buffer_find = 0;
-//    for(uint q = 0; q < ctbs[i].o_buffer.oversize_kv_count; q++){
-//        if(ctbs[i].o_buffer.boxes[q].intersect(b)){
-//            //uni.insert(get_key_oid(ctbs[i].o_buffer.keys[i]));
-//            buffer_find++;
-//            mbr_find_count++;
-//            //cout<<"box find!"<<endl;
-//            //ctbs[i].o_buffer.boxes[q].print();
-//        }
-//    }
-
-    vector<pair<short, box>> intersect_mbrs;
-    ctbs[i].box_rtree->Search(b.low, b.high, PolygonSearchCallback, (void *)&intersect_mbrs);
-    intersect_sst_count += intersect_mbrs.size();
-    for (uint j = 0; j < intersect_mbrs.size(); j++) {
-        uint CTF_id = intersect_mbrs[j].first;
-        find = false;
-        for (uint p = bit_b.low[0]-1; (p <= bit_b.high[0]+1) && (!find); p++) {
-            for (uint q = bit_b.low[1]-1; (q <= bit_b.high[1]+1) && (!find); q++) {
-                bit_pos = xy2d(SID_BIT / 2, p, q);
-                if (ctbs[i].bitmaps[CTF_id * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
-                    //cerr << "SSTable_" << CTF_id << "bit_pos" << bit_pos << endl;
-                    find = true;
-                    ret = true;
-                    break;
-                }
-            }
-        }
-        if(find){
-            bit_find_count++;
-            if(!ctbs[i].ctfs[CTF_id].keys){
-                load_CTF_keys(i, CTF_id);
-            }
-            uint this_find = 0;
-            for(uint q = 0; q < ctbs[i].CTF_capacity[CTF_id]; q++){
-                uint pid = get_key_oid(ctbs[i].ctfs[CTF_id].keys[q]);
-                box key_box;
-                parse_mbr(ctbs[i].ctfs[CTF_id].keys[q], key_box, intersect_mbrs[j].second);
-                if(b.intersect(key_box)){
-                    //uni.insert(pid);
-                    this_find++;
-                    mbr_find_count++;
-                    //cout<<"box find!"<<endl;
-                    //key_box.print();
-
-                }
-            }
-            //cerr<<this_find<<"finds in sst "<<CTF_id<<endl;
-
-        }
-    }
-    return ret;
-}
-
 bool new_bench::mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq){
     uint i = CTB_id;
     bool ret = false, find = false;
@@ -573,7 +453,7 @@ bool new_bench::mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, 
         find = false;
         for (uint p = bit_b.low[0]-1; (p <= bit_b.high[0]+1) && (!find); p++) {
             for (uint q = bit_b.low[1]-1; (q <= bit_b.high[1]+1) && (!find); q++) {
-                bit_pos = xy2d(SID_BIT / 2, p, q);
+                //bit_pos = xy2d(SID_BIT / 2, p, q);
                 if (ctbs[i].bitmaps[CTF_id * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
                     //cerr << "SSTable_" << CTF_id << "bit_pos" << bit_pos << endl;
                     find = true;

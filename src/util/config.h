@@ -37,7 +37,7 @@ public:
     bool unroll = true;
     uint schema_update_delay = 1; //
     uint min_meet_time = 5;
-    uint max_meet_time = 1ULL << DURATION_BIT ;    //4096
+    uint max_meet_time = 4096 ;    //4096
     double reach_distance = 2;          //2
     double x_buffer = 0;
     double y_buffer = 0;
@@ -77,7 +77,7 @@ public:
     void update(){
         //cout << "into update" << endl;
         assert(MemTable_capacity%2==0);
-        kv_restriction = G_bytes * 33554432;            //67108864 = 1G
+        kv_restriction = G_bytes * 33554432 / 10;            //33554432 = 1G, now 256 bit
         kv_capacity = kv_restriction + 1000000;
         oversize_buffer_capacity = kv_restriction / 100;
         split_num = sqrt(CTF_count);
@@ -284,7 +284,6 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
         exit(0);
     }
     po::notify(vm);
-
 
     if(vm.count("gpu")){
         config.gpu = true;
