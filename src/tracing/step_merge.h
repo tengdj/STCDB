@@ -53,9 +53,11 @@ public:
     void get_ctf_bits(box map_mbr, configuration * config);
     uint search_SSTable(uint pid, time_query * tq, bool search_multi, uint SSTable_kv_capacity, atomic<long long> &search_count, uint *search_multi_pid);
     __uint128_t serial_key(uint64_t pid, uint64_t target, uint64_t duration, uint64_t end, __uint128_t value_mbr);
-    void parse_key(__uint128_t key);
+    void print_key(__uint128_t key);
+    void parse_key(__uint128_t key, uint &pid, uint &target, uint &duration, uint &end, uint64_t value_mbr);
     void print_ctf_meta();
     void dump(const string& path);
+    box new_parse_mbr(uint64_t value_mbr);
 };
 
 //class CTB {             //contact tracing block

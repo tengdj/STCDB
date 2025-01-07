@@ -72,7 +72,6 @@ void workbench::clear(){
     //ctbs.clear();
 }
 
-
 void *workbench::allocate(size_t size){
 	lock();
 	uint cur_idx = data_index++;
@@ -341,7 +340,7 @@ uint workbench::search_time_in_disk(time_query * tq){          //not finish
     return count;
 }
 
-bool new_bench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
+bool workbench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
     uint i = CTB_id;
     time_query tq_temp;
     tq_temp.t_start = tq->t_start - ctbs[i].start_time_min;
@@ -382,7 +381,7 @@ bool new_bench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
     }
 }
 
-bool new_bench::id_search_in_disk(uint pid, time_query * tq){
+bool workbench::id_search_in_disk(uint pid, time_query * tq){
     //cout<<"oid disk search "<<pid<<endl;
     bool ret = false;
     for(int i=0; i < ctb_count; i++) {
@@ -425,7 +424,7 @@ bool PolygonSearchCallback(short * i, box poly_mbr,void* arg){
     return true;
 }
 
-bool new_bench::mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq){
+bool workbench::mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq){
     uint i = CTB_id;
     bool ret = false, find = false;
     box bit_b = make_bit_box(b);
@@ -481,7 +480,7 @@ bool new_bench::mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, 
     return ret;
 }
 
-bool new_bench::mbr_search_in_disk(box b, time_query * tq, uint CTB_id){
+bool workbench::mbr_search_in_disk(box b, time_query * tq, uint CTB_id){
     uint i = CTB_id;
     //assert(mbr.contain(b));
     //cout << "mbr disk search" << endl;
@@ -596,7 +595,82 @@ void workbench::load_CTF_meta(const char *path, int i, int j) {
     if (!in.is_open()) {
         std::cerr << "Error opening file: " << path << std::endl;
     }
-    in.read((char *)&h_ctfs[i][j], sizeof(CTF));
-    ctbs[i].bitmaps = new unsigned char[bitmaps_size];
+    CTF * ctf = &h_ctfs[i][j];
+    in.read((char *)ctf, sizeof(CTF));
+    ctf->bitmap = new unsigned char[ctf->ctf_bitmap_size];
+    in.read((char *)ctf->bitmap, sizeof(ctf->ctf_bitmap_size));
     logt("CTF meta load from %s",start_time, path);
+}
+
+void old_workbench::old_load_CTB_meta(const char *path, int i) {
+    struct timeval start_time = get_cur_time();
+    ifstream in(path, ios::in | ios::binary);
+
+    if (!in.is_open()) {
+        std::cerr << "Error opening file: " << path << std::endl;
+    }
+    in.read((char *)&ctbs[i], sizeof(CTB));
+    ctbs[i].first_widpid = new uint64_t[config->CTF_count];
+    ctbs[i].sids = new unsigned short[config->num_objects];
+    ctbs[i].bitmaps = new unsigned char[bitmaps_size];
+    ctbs[i].bitmap_mbrs = new box[config->CTF_count];
+    ctbs[i].CTF_capacity = new uint[config->CTF_count];
+    ctbs[i].o_buffer.keys = new __uint128_t[ctbs[i].o_buffer.oversize_kv_count];
+    ctbs[i].o_buffer.boxes = new f_box[ctbs[i].o_buffer.oversize_kv_count];
+    in.read((char *)ctbs[i].first_widpid, config->CTF_count * sizeof(uint64_t));
+    in.read((char *)ctbs[i].sids, config->num_objects * sizeof(unsigned short));
+    in.read((char *)ctbs[i].bitmaps, bitmaps_size * sizeof(unsigned char));
+    in.read((char *)ctbs[i].bitmap_mbrs, config->CTF_count * sizeof(box));
+    in.read((char *)ctbs[i].CTF_capacity, config->CTF_count * sizeof(uint));
+    in.read((char *)ctbs[i].o_buffer.keys, ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t));
+    in.read((char *)ctbs[i].o_buffer.boxes, ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box));
+    in.close();
+    //RTree
+    ctbs[i].box_rtree = new RTree<short *, double, 2, double>();        //size nearly equals to bitmap_mbrs
+    std::cerr << "Size of ctbs[i].first_widpid: "
+              << bytes_to_MB(config->CTF_count * sizeof(uint64_t)) << " MB" << std::endl;
+
+    std::cerr << "Size of ctbs[i].sids: "
+              << bytes_to_MB(config->num_objects * sizeof(unsigned short)) << " MB" << std::endl;
+
+    std::cerr << "Size of ctbs[i].bitmaps: "
+              << bytes_to_MB(bitmaps_size * sizeof(unsigned char)) << " MB" << std::endl;
+
+    std::cerr << "Size of ctbs[i].bitmap_mbrs: "
+              << bytes_to_MB(config->CTF_count * sizeof(box)) << " MB" << std::endl;
+
+    std::cerr << "Size of ctbs[i].CTF_capacity: "
+              << bytes_to_MB(config->CTF_count * sizeof(uint)) << " MB" << std::endl;
+
+    std::cerr << "Size of ctbs[i].o_buffer.keys: "
+              << bytes_to_MB(ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t)) << " MB" << std::endl;
+
+    std::cerr << "Size of ctbs[i].o_buffer.boxes: "
+              << bytes_to_MB(ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box)) << " MB" << std::endl;
+
+    uint byte_of_CTB_meta = config->CTF_count * sizeof(uint64_t) + config->num_objects * sizeof(unsigned short) + bitmaps_size * sizeof(unsigned char)
+                            + config->CTF_count * sizeof(box) * 2 + config->CTF_count * sizeof(uint) + ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t)
+                            + ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box);
+    cerr << "byte_of_CTB_meta: " << byte_of_CTB_meta << endl;
+    for(uint j = 0; j < config->CTF_count; ++j){
+        ctbs[i].box_rtree->Insert(ctbs[i].bitmap_mbrs[j].low, ctbs[i].bitmap_mbrs[j].high, new short(j));
+    }
+    logt("CTB meta %d load from %s",start_time, i, path);
+}
+
+void workbench::build_trees(uint max_ctb){
+    total_rtree = new RTree<uint *, double, 2, double>();
+    for(uint i = 0; i < max_ctb; i++){
+        for(uint j = 0; j < config->CTF_count; j++){
+            f_box m = h_ctfs[i][j].ctf_mbr;
+            box b;
+            b.low[0] = m.low[0];
+            b.low[1] = m.low[1];
+            b.high[0] = m.high[0];
+            b.high[1] = m.high[1];
+            total_rtree->Insert(b.low, b.high, new uint(i * config->CTF_count +j));
+        }
+    }
+
+    //total_btree =
 }

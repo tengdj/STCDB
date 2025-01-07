@@ -1953,7 +1953,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 //        }
 
         for(uint i = 0; i < 100; i++){
-            bench->h_ctfs[offset][0].parse_key(bench->h_keys[offset][i]);
+            bench->h_ctfs[offset][0].print_key(bench->h_keys[offset][i]);
         }
 
 

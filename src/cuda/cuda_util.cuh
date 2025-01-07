@@ -160,20 +160,6 @@ inline void print_parse_key(__uint128_t key){
     cout<<"end offset:"<<get_key_end(key)<<endl;
 }
 
-//__host__
-//inline void parse_mbr(__uint128_t key, box &b, box bitmap_mbr){
-//    //uint64_t mbr_code = get_key_mbr_code(key);
-//    uint64_t low0 = mbr_code >> (MBR_BIT/4*3);
-//    uint64_t low1 = (mbr_code >> (MBR_BIT/2)) & ((1ULL << (MBR_BIT/4)) - 1);
-//    uint64_t high0 = (mbr_code >> (MBR_BIT/4)) & ((1ULL << (MBR_BIT/4)) - 1);
-//    uint64_t high1 = mbr_code & ((1ULL << (MBR_BIT/4)) - 1);
-//
-//    b.low[0] = (double)low0/((1ULL << (MBR_BIT/4)) - 1) * (bitmap_mbr.high[0] - bitmap_mbr.low[0]) + bitmap_mbr.low[0];
-//    b.low[1] = (double)low1/((1ULL << (MBR_BIT/4)) - 1) * (bitmap_mbr.high[1] - bitmap_mbr.low[1]) + bitmap_mbr.low[1];
-//    b.high[0] = (double)high0/((1ULL << (MBR_BIT/4)) - 1) * (bitmap_mbr.high[0] - bitmap_mbr.low[0]) + bitmap_mbr.low[0];
-//    b.high[1] = (double)high1/((1ULL << (MBR_BIT/4)) - 1) * (bitmap_mbr.high[1] - bitmap_mbr.low[1]) + bitmap_mbr.low[1];
-//}
-
 __host__ __device__
 inline void extract_fields(__uint128_t combined_value, __uint128_t &pid, __uint128_t &target, __uint128_t &duration, __uint128_t &end) {
     // 提取 end_time_min (最低位 END_BIT)

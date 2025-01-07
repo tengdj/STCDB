@@ -256,6 +256,16 @@ public:
     uint merge_sstable_count = 100;
     uint merge_kv_capacity = 0;
 
+    //search
+    vector<box_search_info> box_search_queue;
+    atomic<long long> search_count;
+    atomic<uint> hit_buffer;
+    atomic<uint> hit_ctf;
+    //vector<id_search_info> id_search_queue;
+    CTB * compacted_ctbs = nullptr;
+    uint raid_count = 2;
+    RTree<uint *, double, 2, double> *total_rtree = NULL;
+
     //s
     //uint s_of_all_mbr = 0;
 
@@ -349,6 +359,16 @@ public:
     void dump_meta(const char *path);
     void dump_CTB_meta(const char *path, int i);
     void load_CTB_meta(const char *path, int i);
+
+    bool mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq);
+    bool mbr_search_in_disk(box b, time_query * tq, uint CTB_id);
+    bool id_search_in_CTB(uint pid, uint CTB_id, time_query * tq);
+    bool id_search_in_disk(uint pid, time_query * tq);
+
+    bool old_mbr_search_in_CTB(box b, uint CTB_id);
+    void load_CTF_meta(const char *path, int i, int j);
+    void build_trees(uint max_ctb);
+
 };
 extern void lookup_rec(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);
 extern void lookup_stack(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);
@@ -535,164 +555,104 @@ public:
 //    workbench(workbench *bench);
 //    workbench(configuration *conf);
 //    ~workbench(){};
-    void clear();
-
-    // insert point pid to grid gid
-    bool insert(uint gid, uint pid);
-    bool batch_insert(uint gid, uint num_objects, uint *pids);
-
-    // generate pid-gid-offset pairs for processing
-    bool check(uint gid, uint pid);
-    bool batch_check(checking_unit *cu, uint num);
-    bool batch_meet(meeting_unit *m, uint num);
-
-    void merge_node(uint cur_node);
-    void split_node(uint cur_node);
-    void filter();
-    void update_schema();
-    void reachability();
-
-    void claim_space();
-    size_t space_claimed(){
-        size_t total = 0;
-        for(int i=0;i<100;i++){
-            total += data_size[i];
-        }
-        return total;
-    }
-    void reset(){
-        // reset the number of objects in each grid
-        for(int i=0;i<grids_stack_capacity;i++){
-            grid_counter[i] = 0;
-        }
-        grid_check_counter = 0;
-    }
-    inline uint get_grid_size(uint gid){
-        assert(gid<grids_stack_capacity);
-        return min(grid_counter[gid],grid_capacity);
-    }
-    inline uint *get_grid(uint gid){
-        assert(gid<grids_stack_capacity);
-        return grids + gid*grid_capacity;
-    }
-
-    void update_meetings();
-
-    void analyze_grids();
-    void analyze_reaches();
-    void print_profile();
-
-    void lock(uint key = 0){
-        pthread_mutex_lock(&insert_lk[key%MAX_LOCK_NUM]);
-    }
-    void unlock(uint key = 0){
-        pthread_mutex_unlock(&insert_lk[key%MAX_LOCK_NUM]);
-    }
-
-    box make_bit_box(box b);
-
-    bool search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vector<uint> & v_indices);
-    //bool id_search_in_disk(uint pid, time_query * tq);
-    //bool mbr_search_in_disk(box b, time_query * tq);
-    uint search_time_in_disk(time_query * tq);
-    //bool id_search_in_CTB(uint pid, uint CTB_id, time_query * tq);
-    //bool mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq);
-
-    void load_CTF_keys(uint CTB_id, uint CTF_id);
-    void load_big_sorted_run(uint b);
-    void clear_all_keys();
-    //box parse_to_real_mbr(unsigned short first_low, unsigned short first_high, uint64_t value);
-
-    void dump_meetings(uint st);
-    void load_meetings(uint st);
-    void dump_meta(const char *path);
-    void dump_CTB_meta(const char *path, int i);
-    void load_CTB_meta(const char *path, int i);
+//    void clear();
+//
+//    // insert point pid to grid gid
+//    bool insert(uint gid, uint pid);
+//    bool batch_insert(uint gid, uint num_objects, uint *pids);
+//
+//    // generate pid-gid-offset pairs for processing
+//    bool check(uint gid, uint pid);
+//    bool batch_check(checking_unit *cu, uint num);
+//    bool batch_meet(meeting_unit *m, uint num);
+//
+//    void merge_node(uint cur_node);
+//    void split_node(uint cur_node);
+//    void filter();
+//    void update_schema();
+//    void reachability();
+//
+//    void claim_space();
+//    size_t space_claimed(){
+//        size_t total = 0;
+//        for(int i=0;i<100;i++){
+//            total += data_size[i];
+//        }
+//        return total;
+//    }
+//    void reset(){
+//        // reset the number of objects in each grid
+//        for(int i=0;i<grids_stack_capacity;i++){
+//            grid_counter[i] = 0;
+//        }
+//        grid_check_counter = 0;
+//    }
+//    inline uint get_grid_size(uint gid){
+//        assert(gid<grids_stack_capacity);
+//        return min(grid_counter[gid],grid_capacity);
+//    }
+//    inline uint *get_grid(uint gid){
+//        assert(gid<grids_stack_capacity);
+//        return grids + gid*grid_capacity;
+//    }
+//
+//    void update_meetings();
+//
+//    void analyze_grids();
+//    void analyze_reaches();
+//    void print_profile();
+//
+//    void lock(uint key = 0){
+//        pthread_mutex_lock(&insert_lk[key%MAX_LOCK_NUM]);
+//    }
+//    void unlock(uint key = 0){
+//        pthread_mutex_unlock(&insert_lk[key%MAX_LOCK_NUM]);
+//    }
+//
+//    box make_bit_box(box b);
+//
+//    bool search_memtable(uint64_t pid, vector<__uint128_t> & v_keys, vector<uint> & v_indices);
+//    //bool id_search_in_disk(uint pid, time_query * tq);
+//    //bool mbr_search_in_disk(box b, time_query * tq);
+//    uint search_time_in_disk(time_query * tq);
+//    //bool id_search_in_CTB(uint pid, uint CTB_id, time_query * tq);
+//    //bool mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq);
+//
+//    void load_CTF_keys(uint CTB_id, uint CTF_id);
+//    void load_big_sorted_run(uint b);
+//    void clear_all_keys();
+//    //box parse_to_real_mbr(unsigned short first_low, unsigned short first_high, uint64_t value);
+//
+//    void dump_meetings(uint st);
+//    void load_meetings(uint st);
+//    void dump_meta(const char *path);
+//    void dump_CTB_meta(const char *path, int i);
+//    void load_CTB_meta(const char *path, int i);
+    void old_load_CTB_meta(const char *path, int i);
 };
 
-class new_bench : public workbench{
-public:
-    vector<box_search_info> box_search_queue;
-    atomic<long long> search_count;
-    atomic<uint> hit_buffer;
-    atomic<uint> hit_ctf;
-    //vector<id_search_info> id_search_queue;
-    CTB * compacted_ctbs = nullptr;
-    uint raid_count = 2;
+//class new_bench : public workbench{
+//public:
+//    vector<box_search_info> box_search_queue;
+//    atomic<long long> search_count;
+//    atomic<uint> hit_buffer;
+//    atomic<uint> hit_ctf;
+//    //vector<id_search_info> id_search_queue;
+//    CTB * compacted_ctbs = nullptr;
+//    uint raid_count = 2;
+//
+//    new_bench(configuration * config) : workbench(config){}
+//    bool mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq);
+//    bool mbr_search_in_disk(box b, time_query * tq, uint CTB_id);
+//    bool id_search_in_CTB(uint pid, uint CTB_id, time_query * tq);
+//    bool id_search_in_disk(uint pid, time_query * tq);
+//
+//    bool old_mbr_search_in_CTB(box b, uint CTB_id);
+//};
 
-    new_bench(configuration * config) : workbench(config){}
-    bool mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq);
-    bool mbr_search_in_disk(box b, time_query * tq, uint CTB_id);
-    bool id_search_in_CTB(uint pid, uint CTB_id, time_query * tq);
-    bool id_search_in_disk(uint pid, time_query * tq);
-
-    bool old_mbr_search_in_CTB(box b, uint CTB_id);
-};
-
-
-old_workbench * old_load_meta(const char *path, uint max_ctb) {
-    log("loading meta from %s", path);
-    string bench_path = string(path) + "workbench";
-    struct timeval start_time = get_cur_time();
-    ifstream in(bench_path, ios::in | ios::binary);
-    if(!in.is_open()){
-        log("%s cannot be opened",bench_path.c_str());
-        exit(0);
-    }
-    generator_configuration * config = new generator_configuration();
-    old_workbench * bench = new old_workbench();
-    bench->config = config;
-    in.read((char *)config, sizeof(generator_configuration));               //also read meta
-    char new_raid[24] = "/data3/raid0_num";
-    memcpy(config->raid_path, new_raid, sizeof(config->raid_path));
-    //std::copy(new_raid, new_raid + 24, config->raid_path);
-    in.read((char *)bench, sizeof(old_workbench));      //bench->config = NULL
-    bench->config = config;
-    bench->ctbs = new CTB[config->big_sorted_run_capacity];
-    for(int i = 0; i < min(max_ctb, bench->ctb_count); i++){
-        //CTB temp_ctb;
-        string CTB_path = string(path) + "CTB" + to_string(i);
-        bench->load_CTB_meta(CTB_path.c_str(), i);
-    }
-    logt("bench meta load from %s",start_time, bench_path.c_str());
-    return bench;
-}
-
-workbench * load_meta(const char *path, uint max_ctb) {
-    log("loading meta from %s", path);
-    string bench_path = string(path) + "N_workbench";
-    struct timeval start_time = get_cur_time();
-    ifstream in(bench_path, ios::in | ios::binary);
-    if(!in.is_open()){
-        log("%s cannot be opened",bench_path.c_str());
-        exit(0);
-    }
-    generator_configuration * config = new generator_configuration();
-    workbench * bench = new workbench(config);
-    in.read((char *)config, sizeof(generator_configuration));               //also read meta
-    char new_raid[24] = "/data3/raid0_num";
-    memcpy(config->raid_path, new_raid, sizeof(config->raid_path));
-    //std::copy(new_raid, new_raid + 24, config->raid_path);
-    in.read((char *)bench, sizeof(workbench));      //bench->config = NULL
-    bench->config = config;
-    bench->ctbs = new CTB[config->big_sorted_run_capacity];
-    for(int i = 0; i < min(max_ctb, bench->ctb_count); i++){
-        //CTB temp_ctb;
-        string CTB_path = string(path) + "CTB" + to_string(i);
-        bench->load_CTB_meta(CTB_path.c_str(), i);
-    }
-    logt("bench meta load from %s",start_time, bench_path.c_str());
-    return bench;
-}
-
-workbench * transfer(old_workbench * old_bench){
-    workbench * new_bench = new workbench(old_bench->config);
-    new_bench->mbr = old_bench->mbr;
-    new_bench->bit_count = old_bench->bit_count;
-    new_bench->bitmaps_size = old_bench->bitmaps_size;
-    new_bench->ctbs = old_bench->ctbs;
-    return new_bench;
-}
+old_workbench * old_load_meta(const char *path, uint max_ctb);
+workbench * load_meta(const char *path, uint max_ctb);
+workbench * transfer(old_workbench * old_bench);
 
 
 #endif /* SRC_TRACING_WORKBENCH_H_ */

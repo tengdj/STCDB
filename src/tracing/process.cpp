@@ -85,9 +85,9 @@ tracer::~tracer(){
 //        delete config;
 //    }
 #ifdef USE_GPU
-	if(gpu){
-		delete gpu;
-	}
+//	if(gpu){
+//		delete gpu;
+//	}
 #endif
 }
 
@@ -312,7 +312,7 @@ void *straight_dump(void *arg){
         bench->h_ctfs[offset][i].bitmap = &bench->h_bitmaps[offset][bench->bitmaps_size * i];
         bench->h_ctfs[offset][i].dump(ctf_path);
     }
-    logt("dumped meta for CTF %d",bg_start, old_big);
+    logt("dumped meta for CTF",bg_start);
     return NULL;
 }
 
@@ -585,6 +585,7 @@ void tracer::process(){
             }
 		}
 	}
+    //bench->clear();
 	bench->print_profile();
 }
 

@@ -109,29 +109,56 @@ __uint128_t CTF::serial_key(uint64_t pid, uint64_t target, uint64_t duration, ui
     return temp_key;
 }
 
-void CTF::parse_key(__uint128_t key){
-    // 提取各个字段
-    __uint128_t value_mbr = key & ((__uint128_t(1) << mbr_bit) - 1); // mbr_bit 位掩码
+void CTF::print_key(__uint128_t key){
+    __uint128_t value_mbr = key & ((__uint128_t(1) << mbr_bit) - 1);
     key >>= mbr_bit;
-
-    uint64_t end = key & ((1ULL << end_bit) - 1); // end_bit 位掩码
+    uint64_t end = key & ((1ULL << end_bit) - 1);
     key >>= end_bit;
-
-    uint64_t duration = key & ((1ULL << duration_bit) - 1); // duration_bit 位掩码
+    uint64_t duration = key & ((1ULL << duration_bit) - 1);
     key >>= duration_bit;
-
-    uint64_t target = key & ((1ULL << id_bit) - 1); // id_bit 位掩码
+    uint64_t target = key & ((1ULL << id_bit) - 1);
     key >>= id_bit;
+    uint64_t pid = key;
 
-    uint64_t pid = key; // 剩下的位为 pid
-
-    // 输出解析结果
     std::cout << "Parsed Key: " << std::endl;
     std::cout << "  PID: " << pid << std::endl;
     std::cout << "  Target: " << target << std::endl;
     std::cout << "  Duration: " << duration << std::endl;
     std::cout << "  End: " << end << std::endl;
     //std::cout << "  Value MBR: " << value_mbr << std::endl;
+}
+
+void CTF::parse_key(__uint128_t key, uint &pid, uint &target, uint &duration, uint &end, uint64_t value_mbr){
+    value_mbr = key & ((uint64_t(1) << mbr_bit) - 1);
+    key >>= mbr_bit;
+    end = key & ((1ULL << end_bit) - 1);
+    key >>= end_bit;
+    duration = key & ((1ULL << duration_bit) - 1);
+    key >>= duration_bit;
+    target = key & ((1ULL << id_bit) - 1);
+    key >>= id_bit;
+    pid = key;
+}
+
+box CTF::new_parse_mbr(uint64_t value_mbr){
+    uint64_t mask_edge = (1ULL << edge_bit) - 1;
+    uint64_t mask_low_y = (1ULL << low_y_bit) - 1;
+    uint64_t mask_low_x = (1ULL << low_x_bit) - 1;
+
+    uint64_t y = value_mbr & mask_edge;  
+    value_mbr >>= edge_bit;
+    uint64_t x = value_mbr & mask_edge;  
+    value_mbr >>= edge_bit;
+    uint64_t low1 = value_mbr & mask_low_y; 
+    value_mbr >>= low_y_bit;
+    uint64_t low0 = value_mbr & mask_low_x;
+
+    box b;
+    b.low[0] = ctf_mbr.low[0] + (double)low0 / mask_low_x * (ctf_mbr.high[0] - ctf_mbr.low[0]);
+    b.low[1] = ctf_mbr.low[1] + (double)low1 / mask_low_y * (ctf_mbr.high[1] - ctf_mbr.low[1]);
+    b.high[0] = ctf_mbr.low[0] + (double)x / mask_edge * (ctf_mbr.high[0] - ctf_mbr.low[0]);
+    b.high[1] = ctf_mbr.low[1] + (double)y / mask_edge * (ctf_mbr.high[1] - ctf_mbr.low[1]);
+    return b;
 }
 
 //range query
@@ -180,7 +207,7 @@ uint CTF::search_SSTable(uint pid, time_query * tq, bool search_multi, uint SSTa
 //    }
 //    //cout<<"find !"<<endl;
 //    return count;
-return 0;
+    return 0;
 }
 
 

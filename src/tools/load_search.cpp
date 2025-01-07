@@ -1,14 +1,76 @@
 #include "../geometry/Map.h"
-int main(){
-    return 0;
+#include "../tracing/generator.h"
+#include "../tracing/trace.h"
+
+
+using namespace std;
+
+
+old_workbench * old_load_meta(const char *path, uint max_ctb) {
+    log("loading meta from %s", path);
+    string bench_path = string(path) + "workbench";
+    struct timeval start_time = get_cur_time();
+    ifstream in(bench_path, ios::in | ios::binary);
+    if(!in.is_open()){
+        log("%s cannot be opened",bench_path.c_str());
+        exit(0);
+    }
+    generator_configuration * config = new generator_configuration();
+    old_workbench * bench = new old_workbench();
+    bench->config = config;
+    in.read((char *)config, sizeof(generator_configuration));               //also read meta
+    char new_raid[24] = "/data3/raid0_num";
+    memcpy(config->raid_path, new_raid, sizeof(config->raid_path));
+    //std::copy(new_raid, new_raid + 24, config->raid_path);
+    in.read((char *)bench, sizeof(old_workbench));      //bench->config = NULL
+    bench->config = config;
+    bench->ctbs = new CTB[config->big_sorted_run_capacity];
+    for(int i = 0; i < min(max_ctb, bench->ctb_count); i++){
+        //CTB temp_ctb;
+        string CTB_path = string(path) + "CTB" + to_string(i);
+        bench->old_load_CTB_meta(CTB_path.c_str(), i);
+    }
+    logt("bench meta load from %s",start_time, bench_path.c_str());
+    return bench;
 }
 
-//#include "../geometry/Map.h"
-//#include "../tracing/generator.h"
-//#include "../tracing/trace.h"
-//
-//using namespace std;
-//
+workbench * load_meta(const char *path, uint max_ctb) {
+    log("loading meta from %s", path);
+    string bench_path = string(path) + "N_workbench";
+    struct timeval start_time = get_cur_time();
+    ifstream in(bench_path, ios::in | ios::binary);
+    if(!in.is_open()){
+        log("%s cannot be opened",bench_path.c_str());
+        exit(0);
+    }
+    generator_configuration * config = new generator_configuration();
+    workbench * bench = new workbench(config);
+    in.read((char *)config, sizeof(generator_configuration));               //also read meta
+    char new_raid[24] = "/data3/raid0_num";
+    memcpy(config->raid_path, new_raid, sizeof(config->raid_path));
+    //std::copy(new_raid, new_raid + 24, config->raid_path);
+    in.read((char *)bench, sizeof(workbench));      //bench->config = NULL
+    bench->config = config;
+    bench->ctbs = new CTB[config->big_sorted_run_capacity];
+    for(int i = 0; i < min(max_ctb, bench->ctb_count); i++){
+        //CTB temp_ctb;
+        string CTB_path = string(path) + "CTB" + to_string(i);
+        bench->load_CTB_meta(CTB_path.c_str(), i);
+    }
+    logt("bench meta load from %s",start_time, bench_path.c_str());
+    return bench;
+}
+
+workbench * transfer(old_workbench * old_bench){
+    workbench * new_bench = new workbench(old_bench->config);
+    new_bench->mbr = old_bench->mbr;
+    new_bench->bit_count = old_bench->bit_count;
+    new_bench->bitmaps_size = old_bench->bitmaps_size;
+    new_bench->ctbs = old_bench->ctbs;
+    return new_bench;
+}
+
+
 //workbench * load_meta(const char *path) {
 //    log("loading meta from %s", path);
 //    string bench_path = string(path) + "workbench";
@@ -763,39 +825,46 @@ int main(){
 //
 //
 //
-//int main(int argc, char **argv){
-//    clear_cache();
-//    string path = "../data/meta/";
-//    //workbench * bench = C_load_meta(path.c_str());
-//    workbench * bench = load_meta(path.c_str());
-//    new_bench * nb = new new_bench(bench->config);
-//    memcpy(nb, bench, sizeof(workbench));
-//    cout << nb->ctb_count << endl;
-//    cout << "search begin" << endl;
-//
-////        for(int i = 0; i < bench->ctb_count; i++){
-////            bench->load_big_sorted_run(i);
-////        }
-////        fprintf(stderr,"\ttotal load keys:\t%.2f\n", bench->pro.load_keys_time);
-//
-//
-//    //experiment_twice(nb);
-//    //exp4_search_oid_single(nb);
-////    struct timeval start = get_cur_time();
-//    //experiment_search_oid(nb);
-////    double real_world_time = get_time_elapsed(start, true);
-////    cout << "real_world_time(s) " << real_world_time / 1000 << endl;
-//    //exp4_search_box_single(nb);
-//    //experiment_search_box(nb);
-//    experiment_box_openmp(nb);
-////    vector<uint> threads_list = {1, 2, 4, 8, 16, 32, 64, 128};
-////    for(auto th : threads_list){
-////        nb->config->num_threads = th;
-////        experiment_box_openmp(nb);
-////    }
-//    //experiment_search_time(bench);
-//    //query_search_id(bench);
-//    //query_search_box(bench);
-//
-//    return 0;
-//}
+
+int main(int argc, char **argv){
+    clear_cache();
+    string path = "../data/meta/";
+    //workbench * bench = C_load_meta(path.c_str());
+    uint max_ctb = 1215;
+    old_workbench * ob = old_load_meta(path.c_str(), max_ctb);
+    cout << ob->ctb_count << endl;
+    workbench * bench = transfer(ob);
+    cout << "search begin" << endl;
+    //load ctfs
+
+
+    //build rtree btree
+
+
+
+//        for(int i = 0; i < bench->ctb_count; i++){
+//            bench->load_big_sorted_run(i);
+//        }
+//        fprintf(stderr,"\ttotal load keys:\t%.2f\n", bench->pro.load_keys_time);
+
+
+    //experiment_twice(nb);
+    //exp4_search_oid_single(nb);
+//    struct timeval start = get_cur_time();
+    //experiment_search_oid(nb);
+//    double real_world_time = get_time_elapsed(start, true);
+//    cout << "real_world_time(s) " << real_world_time / 1000 << endl;
+    //exp4_search_box_single(nb);
+    //experiment_search_box(nb);
+    //experiment_box_openmp(nb);
+//    vector<uint> threads_list = {1, 2, 4, 8, 16, 32, 64, 128};
+//    for(auto th : threads_list){
+//        nb->config->num_threads = th;
+//        experiment_box_openmp(nb);
+//    }
+    //experiment_search_time(bench);
+    //query_search_id(bench);
+    //query_search_box(bench);
+
+    return 0;
+}
