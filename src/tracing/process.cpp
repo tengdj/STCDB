@@ -245,7 +245,8 @@ void *straight_dump(void *arg){
     bench->end_time_min = bench->end_time_max;              //new min = old max
     bench->ctbs[old_big].sids = new unsigned short[bench->config->num_objects];
     copy(bench->h_sids[offset], bench->h_sids[offset] + bench->config->num_objects, bench->ctbs[old_big].sids);
-    bench->ctbs[old_big].o_buffer.oversize_kv_count = bench->h_oversize_buffers[offset].oversize_kv_count;
+    bench->ctbs[old_big].o_buffer = bench->h_oversize_buffers[offset];
+    //bench->ctbs[old_big].o_buffer.oversize_kv_count = bench->h_oversize_buffers[offset].oversize_kv_count;
     bench->ctbs[old_big].o_buffer.keys = new __uint128_t[bench->ctbs[old_big].o_buffer.oversize_kv_count];
     copy(bench->h_oversize_buffers[offset].keys, bench->h_oversize_buffers[offset].keys + bench->ctbs[old_big].o_buffer.oversize_kv_count, bench->ctbs[old_big].o_buffer.keys);
     bench->ctbs[old_big].o_buffer.boxes = new f_box[bench->ctbs[old_big].o_buffer.oversize_kv_count];
@@ -258,10 +259,10 @@ void *straight_dump(void *arg){
 //        cout << "sid" << bench->ctbs[old_big].sids[get_key_oid(bench->ctbs[old_big].o_buffer.keys[i]) ] << endl;
 //    }
 
-    bench->ctbs[old_big].box_rtree = new RTree<short *, double, 2, double>();
-    for(uint i = 0; i < bench->config->CTF_count; ++i){
-        bench->ctbs[old_big].box_rtree->Insert(bench->h_bitmap_mbrs[offset][i].low, bench->h_bitmap_mbrs[offset][i].high, new short(i));
-    }
+//    bench->ctbs[old_big].box_rtree = new RTree<short *, double, 2, double>();
+//    for(uint i = 0; i < bench->config->CTF_count; ++i){
+//        bench->ctbs[old_big].box_rtree->Insert(bench->h_bitmap_mbrs[offset][i].low, bench->h_bitmap_mbrs[offset][i].high, new short(i));
+//    }
 
 //    cout << "CTF_capacitys:" << endl;
 //    for(uint i = 0; i < bench->config->CTF_count; i++){
@@ -511,7 +512,6 @@ void tracer::process(){
                 bench->end_time_max = bench->cur_time;              //old max
                 cout<<"meeting_cut_count:"<<bench->meeting_cut_count<<endl;
                 cout<<"start_time_min:"<<bench->start_time_min<<"start_time_max:"<<bench->start_time_max<<"bench->end_time_min:"<<bench->end_time_min<<"bench->end_time_max:"<<bench->end_time_max<<endl;
-
                 cout << "dump begin time: " << bench->cur_time << endl;
 //                pthread_t bg_thread;
 //                int ret;

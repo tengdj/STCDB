@@ -190,7 +190,6 @@ inline configuration get_parameters(int argc, char **argv){
         config.dynamic_schema = false;
     }
 
-
     config.print();
     return config;
 }

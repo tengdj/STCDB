@@ -256,6 +256,15 @@ public:
         high[1] = b->high[1];
     }
 
+    void get_fb(box * b){
+        low[0] = b->low[0];
+        low[1] = b->low[1];
+        high[0] = b->high[0];
+        high[1] = b->high[1];
+        assert(low[0] < high[0]);
+        assert(low[1] < high[1]);
+    }
+
     void print_vertices(){
         fprintf(stderr,"%f %f, %f %f, %f %f, %f %f, %f %f",
                 low[0],low[1],
@@ -274,6 +283,21 @@ public:
         fprintf(stderr,"POLYGON((");
         print_vertices();
         fprintf(stderr,"))\n");
+    }
+    void update(box &b){
+        if(low[0] > b.low[0]){
+            low[0] = b.low[0];
+        }
+        if(high[0] < b.high[0]){
+            high[0] = b.high[0];
+        }
+
+        if(low[1] > b.low[1]){
+            low[1] = b.low[1];
+        }
+        if(high[1] < b.high[1]){
+            high[1] = b.high[1];
+        }
     }
 };
 

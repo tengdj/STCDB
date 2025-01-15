@@ -210,6 +210,9 @@ void workbench::claim_space(){
             size = config->oversize_buffer_capacity*sizeof(f_box);
             h_oversize_buffers[i].boxes = (f_box *)allocate(size);
             log("\t%.2f MB\t h_oversize_buffers boxes",size/1024.0/1024.0);
+            size = bit_count / 8;
+            h_oversize_buffers[i].o_bitmaps = (unsigned char *)allocate(size);
+            log("\t%.2f MB\t h_oversize_buffers o_bitmaps",size/1024.0/1024.0);
         }
     }
 }
@@ -241,46 +244,46 @@ void *parallel_load(void *arg){
 }
 
 void workbench::load_big_sorted_run(uint b){
-    if(!ctbs[b].ctfs){
-        ctbs[b].ctfs = new CTF[config->CTF_count];
-    }
-    for(int i = 0; i < config->CTF_count; i++) {
-        //if(!ctbs[b].ctfs[i].keys){
-        ctbs[b].ctfs[i].keys = new __uint128_t[ctbs[b].CTF_capacity[i]];
-    }
-
-    struct timeval start_time = get_cur_time();
-    load_args *pargs = new load_args[config->CTF_count];
-    pthread_t threads[config->CTF_count];
-    for(int i = 0; i < config->CTF_count; i++){
-        threads[i] = 0;
-    }
-    for(int i = 0; i < config->CTF_count; i++){
-        //if(!ctbs[b].ctfs[i].keys){
-            ctbs[b].ctfs[i].keys = new __uint128_t[ctbs[b].CTF_capacity[i]];
-            pargs[i].path = config->raid_path + to_string(i % 8) + "/SSTable_" + to_string(b) + "-" + to_string(i);
-            pargs[i].SIZE = sizeof(__uint128_t) * ctbs[b].CTF_capacity[i];
-            pargs[i].keys = ctbs[b].ctfs[i].keys;
-            int ret = pthread_create(&threads[i], NULL, parallel_load, (void *)&pargs[i]);
-            if(ret != 0) {
-                std::cerr << "Failed to create thread " << i << " with error code: " << ret << std::endl;
-                threads[i] = 0;
-                continue;
-            }
-        //}
-    }
-    for(int i = 0; i < config->CTF_count; i++ ){
-        if (threads[i] != 0) {
-            void *status;
-            int ret = pthread_join(threads[i], &status);
-            if (ret != 0) {
-                std::cerr << "Error joining thread " << i << " with error code: " << ret << std::endl;
-            }
-        }
-    }
-    pro.load_keys_time += get_time_elapsed(start_time,false);
-    logt("load CTB keys %d", start_time, b);
-    delete[] pargs;
+//    if(!ctbs[b].ctfs){
+//        ctbs[b].ctfs = new CTF[config->CTF_count];
+//    }
+//    for(int i = 0; i < config->CTF_count; i++) {
+//        //if(!ctbs[b].ctfs[i].keys){
+//        ctbs[b].ctfs[i].keys = new __uint128_t[ctbs[b].CTF_capacity[i]];
+//    }
+//
+//    struct timeval start_time = get_cur_time();
+//    load_args *pargs = new load_args[config->CTF_count];
+//    pthread_t threads[config->CTF_count];
+//    for(int i = 0; i < config->CTF_count; i++){
+//        threads[i] = 0;
+//    }
+//    for(int i = 0; i < config->CTF_count; i++){
+//        //if(!ctbs[b].ctfs[i].keys){
+//            ctbs[b].ctfs[i].keys = new __uint128_t[ctbs[b].CTF_capacity[i]];
+//            pargs[i].path = config->raid_path + to_string(i % 2) + "/SSTable_" + to_string(b) + "-" + to_string(i);
+//            pargs[i].SIZE = sizeof(__uint128_t) * ctbs[b].CTF_capacity[i];
+//            pargs[i].keys = ctbs[b].ctfs[i].keys;
+//            int ret = pthread_create(&threads[i], NULL, parallel_load, (void *)&pargs[i]);
+//            if(ret != 0) {
+//                std::cerr << "Failed to create thread " << i << " with error code: " << ret << std::endl;
+//                threads[i] = 0;
+//                continue;
+//            }
+//        //}
+//    }
+//    for(int i = 0; i < config->CTF_count; i++ ){
+//        if (threads[i] != 0) {
+//            void *status;
+//            int ret = pthread_join(threads[i], &status);
+//            if (ret != 0) {
+//                std::cerr << "Error joining thread " << i << " with error code: " << ret << std::endl;
+//            }
+//        }
+//    }
+//    pro.load_keys_time += get_time_elapsed(start_time,false);
+//    logt("load CTB keys %d", start_time, b);
+//    delete[] pargs;
 }
 
 void workbench::clear_all_keys(){
@@ -298,46 +301,72 @@ void workbench::clear_all_keys(){
 
 void workbench::load_CTF_keys(uint CTB_id, uint CTF_id){
     ifstream read_sst;
-    string filename = config->raid_path + to_string(CTF_id%2) + "/SSTable_"+to_string(CTB_id)+"-"+to_string(CTF_id);
+    string filename = config->raid_path + to_string(CTF_id%2) + "/N_SSTable_"+to_string(CTB_id)+"-"+to_string(CTF_id);
     read_sst.open(filename, ios::in|ios::binary);
     if(!read_sst.is_open()){
         cout << filename << endl;
     }
     //assert(read_sst.is_open());
-    ctbs[CTB_id].ctfs[CTF_id].keys = new __uint128_t[ctbs[CTB_id].CTF_capacity[CTF_id]];
-    read_sst.read((char *)ctbs[CTB_id].ctfs[CTF_id].keys, sizeof(__uint128_t) * ctbs[CTB_id].CTF_capacity[CTF_id]);
+    CTF * ctf = &ctbs[CTB_id].ctfs[CTF_id];
+    uint8_t * data = new uint8_t[ctf->CTF_kv_capacity * ctf->key_bit];
+    read_sst.read((char *)data, ctf->CTF_kv_capacity * ctf->key_bit);
     read_sst.close();
+    ctf->keys = reinterpret_cast<__uint128_t *>(data);
+}
+
+vector<Interval> query_intervals(const vector<Interval>& start_sorted, const vector<Interval>& end_sorted, int query_start, int query_end) {
+    vector<Interval> result;
+    unordered_set<const Interval*> excluded_intervals;
+
+    // Exclude intervals with start > query_end
+    auto it_start = upper_bound(start_sorted.begin(), start_sorted.end(), query_end,
+                                [](int value, const Interval& interval) {
+                                    return value < interval.start;
+                                });
+
+    for (auto it = it_start; it != start_sorted.end(); ++it) {
+        excluded_intervals.insert(&(*it));
+    }
+
+    // Add intervals with start <= query_end and not excluded
+    for (const auto& interval : start_sorted) {
+        if (interval.start > query_end) break;
+        if (interval.end >= query_start && excluded_intervals.find(&interval) == excluded_intervals.end()) {
+            result.push_back(interval);
+        }
+    }
+
+    return result;
 }
 
 uint workbench::search_time_in_disk(time_query * tq){          //not finish
-    uint count = 0;
-    for(int i=0; i < ctb_count; i++) {
-        if (tq->abandon || (ctbs[i].start_time_min < tq->t_end) && (tq->t_start < ctbs[i].end_time_max)) {      //intersect
-            if((tq->t_start < ctbs[i].end_time_min) && (ctbs[i].end_time_max < tq->t_end)){       //all accepted
-                for(int j = 0; j < config->CTF_count; j++){
-                    count += ctbs[i].CTF_capacity[j];
-                }
+    vector<Interval> result = query_intervals(start_sorted, end_sorted, tq->t_start, tq->t_end);
+    cout << "result.size()" << result.size() << endl;
+#pragma omp parallel for num_threads(config->num_threads)
+    for(uint j = 0; j < result.size(); j++){
+        //cout << "start " << result[j].start << " end " << result[j].end << " value " << result[j].value << endl;
+        uint count = 0;
+        if(result[j].value >= 0){
+            uint ctb_id = result[j].value / config->CTF_count;
+            if(ctb_id > ctb_count) continue;
+            uint ctf_id = result[j].value % config->CTF_count;
+            CTF * ctf = &ctbs[ctb_id].ctfs[ctf_id];
+            if (!ctf->keys) {
+                load_CTF_keys(ctb_id, ctf_id);
             }
-            time_query tq_temp;
-            tq_temp.t_start = tq->t_start - ctbs[i].start_time_min;
-            tq_temp.t_end = tq->t_end - ctbs[i].start_time_min;
-            tq_temp.abandon = tq->abandon;
-            if(!ctbs[i].ctfs){
-                ctbs[i].ctfs = new CTF[config->CTF_count];
-            }
-            for(int j = 0; j < config->CTF_count; j++){
-                if(!ctbs[i].ctfs[j].keys){
-                    load_CTF_keys(i, j);
-                }
-                for(uint q = 0; q < ctbs[i].CTF_capacity[j]; q++){
-//                    if( tq_temp.check_key_time(ctbs[i].ctfs[j].keys[q]) ){
-//                        count++;
-//                    }
-                }
-            }
+            count += ctf->time_search(tq);
+            delete []ctbs[ctb_id].ctfs[ctf_id].keys;
+            ctbs[ctb_id].ctfs[ctf_id].keys = nullptr;
         }
+        else{   //hit buffer
+            int ctb_id = -1 - result[j].value;
+            count += ctbs[ctb_id].o_buffer.o_time_search(tq);
+        }
+        search_count.fetch_add(count, std::memory_order_relaxed);
     }
-    return count;
+    uint ret = search_count;
+    search_count = 0;
+    return ret;
 }
 
 bool workbench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
@@ -358,15 +387,12 @@ bool workbench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
         hit_buffer.fetch_add(1, std::memory_order_relaxed);
         return true;
     }
-    if(!ctbs[i].ctfs){
-        //cout<<"new SSTables"<<endl;
-        ctbs[i].ctfs = new CTF[config->CTF_count];                   //maybe useful later, should not delete after this func , if(!NULL)
-    }
+
     uint ctf_id = ctbs[i].sids[pid] - 2;
-    if(!ctbs[i].ctfs[ctf_id].keys){
+    if(!ctbs[i].ctfs[ctf_id].keys) {
         load_CTF_keys(i, ctf_id);
     }
-    uint target_count = ctbs[i].ctfs[ctf_id].search_SSTable(pid, tq, search_multi, ctbs[i].CTF_capacity[ctf_id], search_count, search_multi_pid);
+    uint target_count = ctbs[i].ctfs[ctf_id].search_SSTable(pid, tq, search_multi, search_count, search_multi_pid);
     if(!search_multi)
         search_count.fetch_add(target_count, std::memory_order_relaxed);
     hit_ctf.fetch_add(1, std::memory_order_relaxed);
@@ -418,79 +444,98 @@ void workbench::load_meetings(uint st) {
     logt("loaded %d objects last for 100 seconds start from %d time from %s",start_time, config->num_objects, st, filename.c_str());
 }
 
-bool PolygonSearchCallback(short * i, box poly_mbr,void* arg){
-    vector<pair<short, box>> * ret = (vector<pair<short, box>> *)arg;
+bool PolygonSearchCallback(int * i, box poly_mbr,void* arg){
+    vector<pair<int, box>> * ret = (vector<pair<int, box>> *)arg;
     ret->push_back(make_pair(*i, poly_mbr));
     return true;
 }
 
-bool workbench::mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq){
+bool workbench::mbr_search_in_obuffer(box b, uint CTB_id, time_query * tq){
     uint i = CTB_id;
-    bool ret = false, find = false;
-    box bit_b = make_bit_box(b);
-    uint bit_pos = 0;
+    bool ret = false;
     if(!ctbs[i].ctfs){
         ctbs[i].ctfs = new CTF[config->CTF_count];
     }
-    //cout << "in bg_run" << i << endl;
-
-    uint buffer_find = 0;
-    for(uint q = 0; q < ctbs[i].o_buffer.oversize_kv_count; q++){
-        if(ctbs[i].o_buffer.boxes[q].intersect(b)){
-            //uni.insert(get_key_oid(ctbs[i].o_buffer.keys[i]));
-            buffer_find++;
-            //cout<<"box find!"<<endl;
-            //ctbs[i].o_buffer.boxes[q].print();
+    for(uint bid=0; bid < bit_count; bid++){
+        if(ctbs[CTB_id].o_buffer.o_bitmaps[bid / 8] & (1 << (bid % 8))){
+            Point bit_p;
+            uint x=0,y=0;
+            x = bid % DEFAULT_bitmap_edge;
+            y = bid / DEFAULT_bitmap_edge;
+            bit_p.x = (double)x/DEFAULT_bitmap_edge*(mbr.high[0] - mbr.low[0]) + mbr.low[0];
+            bit_p.y = (double)y/DEFAULT_bitmap_edge*(mbr.high[1] - mbr.low[1]) + mbr.low[1];
+            if(b.contain(bit_p)){
+                ret = true;
+                break;
+            }
         }
     }
-    search_count.fetch_add(mbr_find_count, std::memory_order_relaxed);
-    vector<pair<short, box>> intersect_mbrs;
-    ctbs[i].box_rtree->Search(b.low, b.high, PolygonSearchCallback, (void *)&intersect_mbrs);
+    if(ret){
+        uint buffer_find = 0;
+        for(uint q = 0; q < ctbs[i].o_buffer.oversize_kv_count; q++){
+            if(ctbs[i].o_buffer.boxes[q].intersect(b)){
+                buffer_find++;
+            }
+        }
+        search_count.fetch_add(buffer_find, std::memory_order_relaxed);      //!!!!!!!!!
+    }
+    return ret;
+}
+
+bool workbench::mbr_search_in_disk(box b, time_query * tq){
+
+    //assert(mbr.contain(b));
+    //cout << "mbr disk search" << endl;
+
+    bool ret = false;
+    vector<pair<int, box>> intersect_mbrs;
+    total_rtree->Search(b.low, b.high, PolygonSearchCallback, (void *)&intersect_mbrs);
     intersect_sst_count += intersect_mbrs.size();
     for (uint j = 0; j < intersect_mbrs.size(); j++) {
-        uint CTF_id = intersect_mbrs[j].first;
-        find = false;
-        for (uint p = bit_b.low[0]-1; (p <= bit_b.high[0]+1) && (!find); p++) {
-            for (uint q = bit_b.low[1]-1; (q <= bit_b.high[1]+1) && (!find); q++) {
-                //bit_pos = xy2d(SID_BIT / 2, p, q);
-                if (ctbs[i].bitmaps[CTF_id * (bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
-                    //cerr << "SSTable_" << CTF_id << "bit_pos" << bit_pos << endl;
+        uint CTB_id = intersect_mbrs[j].first / config->CTF_count;
+        uint CTF_id = intersect_mbrs[j].first % config->CTF_count;
+        CTF *ctf = &ctbs[CTB_id].ctfs[CTF_id];
+        bool find = false;
+        for(uint bid=0; bid < ctf->ctf_bitmap_size * 8; bid++){
+            if(ctf->bitmap[bid / 8] & (1 << (bid % 8))){
+                Point bit_p;
+                uint x=0,y=0;
+                x = bid % ctf->x_grid;
+                y = bid / ctf->x_grid;
+                bit_p.x = (double) x / ctf->x_grid * (ctf->ctf_mbr.high[0] - ctf->ctf_mbr.low[0]) +
+                          ctf->ctf_mbr.low[0];
+                bit_p.y = (double) y / ctf->y_grid * (ctf->ctf_mbr.high[1] - ctf->ctf_mbr.low[1]) +
+                          ctf->ctf_mbr.low[1];
+                if(b.contain(bit_p)){
                     find = true;
                     ret = true;
                     break;
                 }
+
             }
         }
+
         if(find){
             bit_find_count++;
             uint this_find = 0;
             time_query tq_temp;
-            tq_temp.t_start = tq->t_start - ctbs[i].start_time_min;
-            tq_temp.t_end = tq->t_end - ctbs[i].start_time_min;
+            tq_temp.t_start = tq->t_start - ctbs[CTB_id].start_time_min;
+            tq_temp.t_end = tq->t_end - ctbs[CTB_id].start_time_min;
             tq_temp.abandon = tq->abandon;
             box_search_info bs_uint;
-            bs_uint.ctb_id = i;
+            bs_uint.ctb_id = CTB_id;
             bs_uint.ctf_id = CTF_id;
-            bs_uint.bmap_mbr = &ctbs[i].bitmap_mbrs[CTF_id];
+            box * temp_b = new box;
+            temp_b->low[0] = ctf->ctf_mbr.low[0];
+            temp_b->low[1] = ctf->ctf_mbr.low[1];
+            temp_b->high[0] = ctf->ctf_mbr.high[0];
+            temp_b->high[1] = ctf->ctf_mbr.high[1];
+            bs_uint.bmap_mbr = temp_b;
             bs_uint.tq = tq_temp;
             box_search_queue.push_back(bs_uint);
             //cerr<<this_find<<"finds in sst "<<CTF_id<<endl;
         }
     }
-    return ret;
-}
-
-bool workbench::mbr_search_in_disk(box b, time_query * tq, uint CTB_id){
-    uint i = CTB_id;
-    //assert(mbr.contain(b));
-    //cout << "mbr disk search" << endl;
-    unordered_set<uint> uni;
-    bool ret = false;
-    if (tq->abandon || (ctbs[i].start_time_min < tq->t_end) && (tq->t_start < ctbs[i].end_time_max)) {
-        ret |= mbr_search_in_CTB(b, i, uni, tq);
-    }
-    mbr_unique_find += uni.size();
-    uni.clear();
     return ret;
 }
 
@@ -500,10 +545,16 @@ void workbench::dump_meta(const char *path) {
     ofstream wf(bench_path, ios::out|ios::binary|ios::trunc);
     wf.write((char *)config, sizeof(generator_configuration));        //the config of pipeline is generator_configuration
     wf.write((char *)this, sizeof(workbench));
+#pragma omp parallel for num_threads(config->num_threads)
     for(int i = 0; i < ctb_count; i++){
         if(ctbs[i].sids){
+            cout << "N_CTB" << i << endl;
             string CTB_path = string(path) + "N_CTB" + to_string(i);
             dump_CTB_meta(CTB_path.c_str(), i);
+            for(uint j = 0; j < config->CTF_count; j++){
+                string ctf_path = string(config->CTB_meta_path) + "STcL" + to_string(i)+"-"+to_string(j);
+                ctbs[i].ctfs[j].dump(ctf_path);
+            }
         }
     }
     wf.close();
@@ -521,7 +572,8 @@ void workbench::dump_CTB_meta(const char *path, int i) {
     //wf.write((char *)ctbs[i].CTF_capacity, config->CTF_count * sizeof(uint));
     wf.write((char *)ctbs[i].o_buffer.keys, ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t));
     wf.write((char *)ctbs[i].o_buffer.boxes, ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box));
-    //RTree
+    wf.write((char *)ctbs[i].o_buffer.o_bitmaps, bit_count / 8 * sizeof(unsigned char));
+    //ctbs[i].o_buffer.print_buffer();
     wf.close();
     //logt("CTB meta %d dump to %s",start_time, i, path);
 
@@ -534,44 +586,25 @@ double bytes_to_MB(size_t bytes) {
 }
 
 void workbench::load_CTB_meta(const char *path, int i) {
+    string CTB_path = string(path) + "N_CTB" + to_string(i);
     struct timeval start_time = get_cur_time();
-    ifstream in(path, ios::in | ios::binary);
-
+    ifstream in(CTB_path.c_str(), ios::in | ios::binary);
     if (!in.is_open()) {
-        std::cerr << "Error opening file: " << path << std::endl;
+        std::cerr << "Error opening file: " << CTB_path << std::endl;
     }
     in.read((char *)&ctbs[i], sizeof(CTB));
-    ctbs[i].first_widpid = new uint64_t[config->CTF_count];
     ctbs[i].sids = new unsigned short[config->num_objects];
-    ctbs[i].bitmaps = new unsigned char[bitmaps_size];
-    ctbs[i].bitmap_mbrs = new box[config->CTF_count];
-    ctbs[i].CTF_capacity = new uint[config->CTF_count];
     ctbs[i].o_buffer.keys = new __uint128_t[ctbs[i].o_buffer.oversize_kv_count];
     ctbs[i].o_buffer.boxes = new f_box[ctbs[i].o_buffer.oversize_kv_count];
-    in.read((char *)ctbs[i].first_widpid, config->CTF_count * sizeof(uint64_t));
+    ctbs[i].o_buffer.o_bitmaps = new unsigned char[bit_count / 8 * sizeof(unsigned char)];
     in.read((char *)ctbs[i].sids, config->num_objects * sizeof(unsigned short));
-    in.read((char *)ctbs[i].bitmaps, bitmaps_size * sizeof(unsigned char));
-    in.read((char *)ctbs[i].bitmap_mbrs, config->CTF_count * sizeof(box));
-    in.read((char *)ctbs[i].CTF_capacity, config->CTF_count * sizeof(uint));
     in.read((char *)ctbs[i].o_buffer.keys, ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t));
     in.read((char *)ctbs[i].o_buffer.boxes, ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box));
+    in.read((char *)ctbs[i].o_buffer.o_bitmaps, bit_count / 8);
     in.close();
-    //RTree
-    ctbs[i].box_rtree = new RTree<short *, double, 2, double>();        //size nearly equals to bitmap_mbrs
-    std::cerr << "Size of ctbs[i].first_widpid: "
-              << bytes_to_MB(config->CTF_count * sizeof(uint64_t)) << " MB" << std::endl;
 
     std::cerr << "Size of ctbs[i].sids: "
               << bytes_to_MB(config->num_objects * sizeof(unsigned short)) << " MB" << std::endl;
-
-    std::cerr << "Size of ctbs[i].bitmaps: "
-              << bytes_to_MB(bitmaps_size * sizeof(unsigned char)) << " MB" << std::endl;
-
-    std::cerr << "Size of ctbs[i].bitmap_mbrs: "
-              << bytes_to_MB(config->CTF_count * sizeof(box)) << " MB" << std::endl;
-
-    std::cerr << "Size of ctbs[i].CTF_capacity: "
-              << bytes_to_MB(config->CTF_count * sizeof(uint)) << " MB" << std::endl;
 
     std::cerr << "Size of ctbs[i].o_buffer.keys: "
               << bytes_to_MB(ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t)) << " MB" << std::endl;
@@ -579,98 +612,162 @@ void workbench::load_CTB_meta(const char *path, int i) {
     std::cerr << "Size of ctbs[i].o_buffer.boxes: "
               << bytes_to_MB(ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box)) << " MB" << std::endl;
 
-    uint byte_of_CTB_meta = config->CTF_count * sizeof(uint64_t) + config->num_objects * sizeof(unsigned short) + bitmaps_size * sizeof(unsigned char)
-                            + config->CTF_count * sizeof(box) * 2 + config->CTF_count * sizeof(uint) + ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t)
-                            + ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box);
+    std::cerr << "Size of ctbs[i].o_buffer.o_bitmaps: "
+              << bytes_to_MB(bit_count / 8) << " MB" << std::endl;
+
+    uint byte_of_CTB_meta = config->num_objects * sizeof(unsigned short) +  ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t)
+                            + ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box) + bit_count / 8;
     cerr << "byte_of_CTB_meta: " << byte_of_CTB_meta << endl;
-    for(uint j = 0; j < config->CTF_count; ++j){
-        ctbs[i].box_rtree->Insert(ctbs[i].bitmap_mbrs[j].low, ctbs[i].bitmap_mbrs[j].high, new short(j));
-    }
     logt("CTB meta %d load from %s",start_time, i, path);
+
+    //ctbs[i].ctfs is a pointer but no malloc
+    ctbs[i].ctfs = new CTF[config->CTF_count];
+    for(uint j = 0; j < 100; j++){
+        string CTF_path = string(path) + "STcL" + to_string(i)+"-"+to_string(j);
+        load_CTF_meta(CTF_path.c_str(), i, j);
+    }
+    logt("CTF meta %d load from %s",start_time, i, path);
 }
 
 void workbench::load_CTF_meta(const char *path, int i, int j) {
-    struct timeval start_time = get_cur_time();
+    //struct timeval start_time = get_cur_time();
     ifstream in(path, ios::in | ios::binary);
     if (!in.is_open()) {
         std::cerr << "Error opening file: " << path << std::endl;
     }
-    CTF * ctf = &h_ctfs[i][j];
+    CTF * ctf = &ctbs[i].ctfs[j];
     in.read((char *)ctf, sizeof(CTF));
     ctf->bitmap = new unsigned char[ctf->ctf_bitmap_size];
-    in.read((char *)ctf->bitmap, sizeof(ctf->ctf_bitmap_size));
-    logt("CTF meta load from %s",start_time, path);
+    in.read((char *)ctf->bitmap, ctf->ctf_bitmap_size);
+    //logt("CTF meta load from %s",start_time, path);
 }
 
 void old_workbench::old_load_CTB_meta(const char *path, int i) {
-    struct timeval start_time = get_cur_time();
-    ifstream in(path, ios::in | ios::binary);
-
-    if (!in.is_open()) {
-        std::cerr << "Error opening file: " << path << std::endl;
-    }
-    in.read((char *)&ctbs[i], sizeof(CTB));
-    ctbs[i].first_widpid = new uint64_t[config->CTF_count];
-    ctbs[i].sids = new unsigned short[config->num_objects];
-    ctbs[i].bitmaps = new unsigned char[bitmaps_size];
-    ctbs[i].bitmap_mbrs = new box[config->CTF_count];
-    ctbs[i].CTF_capacity = new uint[config->CTF_count];
-    ctbs[i].o_buffer.keys = new __uint128_t[ctbs[i].o_buffer.oversize_kv_count];
-    ctbs[i].o_buffer.boxes = new f_box[ctbs[i].o_buffer.oversize_kv_count];
-    in.read((char *)ctbs[i].first_widpid, config->CTF_count * sizeof(uint64_t));
-    in.read((char *)ctbs[i].sids, config->num_objects * sizeof(unsigned short));
-    in.read((char *)ctbs[i].bitmaps, bitmaps_size * sizeof(unsigned char));
-    in.read((char *)ctbs[i].bitmap_mbrs, config->CTF_count * sizeof(box));
-    in.read((char *)ctbs[i].CTF_capacity, config->CTF_count * sizeof(uint));
-    in.read((char *)ctbs[i].o_buffer.keys, ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t));
-    in.read((char *)ctbs[i].o_buffer.boxes, ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box));
-    in.close();
-    //RTree
-    ctbs[i].box_rtree = new RTree<short *, double, 2, double>();        //size nearly equals to bitmap_mbrs
-    std::cerr << "Size of ctbs[i].first_widpid: "
-              << bytes_to_MB(config->CTF_count * sizeof(uint64_t)) << " MB" << std::endl;
-
-    std::cerr << "Size of ctbs[i].sids: "
-              << bytes_to_MB(config->num_objects * sizeof(unsigned short)) << " MB" << std::endl;
-
-    std::cerr << "Size of ctbs[i].bitmaps: "
-              << bytes_to_MB(bitmaps_size * sizeof(unsigned char)) << " MB" << std::endl;
-
-    std::cerr << "Size of ctbs[i].bitmap_mbrs: "
-              << bytes_to_MB(config->CTF_count * sizeof(box)) << " MB" << std::endl;
-
-    std::cerr << "Size of ctbs[i].CTF_capacity: "
-              << bytes_to_MB(config->CTF_count * sizeof(uint)) << " MB" << std::endl;
-
-    std::cerr << "Size of ctbs[i].o_buffer.keys: "
-              << bytes_to_MB(ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t)) << " MB" << std::endl;
-
-    std::cerr << "Size of ctbs[i].o_buffer.boxes: "
-              << bytes_to_MB(ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box)) << " MB" << std::endl;
-
-    uint byte_of_CTB_meta = config->CTF_count * sizeof(uint64_t) + config->num_objects * sizeof(unsigned short) + bitmaps_size * sizeof(unsigned char)
-                            + config->CTF_count * sizeof(box) * 2 + config->CTF_count * sizeof(uint) + ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t)
-                            + ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box);
-    cerr << "byte_of_CTB_meta: " << byte_of_CTB_meta << endl;
-    for(uint j = 0; j < config->CTF_count; ++j){
-        ctbs[i].box_rtree->Insert(ctbs[i].bitmap_mbrs[j].low, ctbs[i].bitmap_mbrs[j].high, new short(j));
-    }
-    logt("CTB meta %d load from %s",start_time, i, path);
+//    struct timeval start_time = get_cur_time();
+//    ifstream in(path, ios::in | ios::binary);
+//
+//    if (!in.is_open()) {
+//        std::cerr << "Error opening file: " << path << std::endl;
+//    }
+//    in.read((char *)&ctbs[i], sizeof(CTB) - sizeof(oversize_buffer) - 8);
+//    in.read((char *)&ctbs[i].o_buffer, sizeof(old_oversize_buffer));
+//    in.read((char *)&ctbs[i].box_rtree, 8);
+//    ctbs[i].first_widpid = new uint64_t[config->CTF_count];
+//    ctbs[i].sids = new unsigned short[config->num_objects];
+//    ctbs[i].bitmaps = new unsigned char[bitmaps_size];
+//    ctbs[i].bitmap_mbrs = new box[config->CTF_count];
+//    ctbs[i].CTF_capacity = new uint[config->CTF_count];
+//    ctbs[i].o_buffer.keys = new __uint128_t[ctbs[i].o_buffer.oversize_kv_count];
+//    ctbs[i].o_buffer.boxes = new f_box[ctbs[i].o_buffer.oversize_kv_count];
+//    in.read((char *)ctbs[i].first_widpid, config->CTF_count * sizeof(uint64_t));
+//    in.read((char *)ctbs[i].sids, config->num_objects * sizeof(unsigned short));
+//    in.read((char *)ctbs[i].bitmaps, bitmaps_size * sizeof(unsigned char));
+//    in.read((char *)ctbs[i].bitmap_mbrs, config->CTF_count * sizeof(box));
+//    in.read((char *)ctbs[i].CTF_capacity, config->CTF_count * sizeof(uint));
+//    in.read((char *)ctbs[i].o_buffer.keys, ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t));
+//    in.read((char *)ctbs[i].o_buffer.boxes, ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box));
+//    in.close();
+//    //RTree
+//    ctbs[i].box_rtree = new RTree<short *, double, 2, double>();        //size nearly equals to bitmap_mbrs
+//    std::cerr << "Size of ctbs[i].first_widpid: "
+//              << bytes_to_MB(config->CTF_count * sizeof(uint64_t)) << " MB" << std::endl;
+//
+//    std::cerr << "Size of ctbs[i].sids: "
+//              << bytes_to_MB(config->num_objects * sizeof(unsigned short)) << " MB" << std::endl;
+//
+//    std::cerr << "Size of ctbs[i].bitmaps: "
+//              << bytes_to_MB(bitmaps_size * sizeof(unsigned char)) << " MB" << std::endl;
+//
+//    std::cerr << "Size of ctbs[i].bitmap_mbrs: "
+//              << bytes_to_MB(config->CTF_count * sizeof(box)) << " MB" << std::endl;
+//
+//    std::cerr << "Size of ctbs[i].CTF_capacity: "
+//              << bytes_to_MB(config->CTF_count * sizeof(uint)) << " MB" << std::endl;
+//
+//    std::cerr << "Size of ctbs[i].o_buffer.keys: "
+//              << bytes_to_MB(ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t)) << " MB" << std::endl;
+//
+//    std::cerr << "Size of ctbs[i].o_buffer.boxes: "
+//              << bytes_to_MB(ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box)) << " MB" << std::endl;
+//
+//    uint byte_of_CTB_meta = config->CTF_count * sizeof(uint64_t) + config->num_objects * sizeof(unsigned short) + bitmaps_size * sizeof(unsigned char)
+//                            + config->CTF_count * sizeof(box) * 2 + config->CTF_count * sizeof(uint) + ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t)
+//                            + ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box);
+//    cerr << "byte_of_CTB_meta: " << byte_of_CTB_meta << endl;
+//    for(uint j = 0; j < config->CTF_count; ++j){
+//        ctbs[i].box_rtree->Insert(ctbs[i].bitmap_mbrs[j].low, ctbs[i].bitmap_mbrs[j].high, new short(j));
+//    }
+//    logt("CTB meta %d load from %s",start_time, i, path);
 }
 
+
 void workbench::build_trees(uint max_ctb){
-    total_rtree = new RTree<uint *, double, 2, double>();
+    total_rtree = new RTree<int *, double, 2, double>();
     for(uint i = 0; i < max_ctb; i++){
         for(uint j = 0; j < config->CTF_count; j++){
-            f_box m = h_ctfs[i][j].ctf_mbr;
+            f_box & m = ctbs[i].ctfs[j].ctf_mbr;
             box b;
             b.low[0] = m.low[0];
             b.low[1] = m.low[1];
             b.high[0] = m.high[0];
             b.high[1] = m.high[1];
-            total_rtree->Insert(b.low, b.high, new uint(i * config->CTF_count +j));
+            total_rtree->Insert(b.low, b.high, new int(i * config->CTF_count +j));
         }
     }
+    //buffer mbr is map mbr, which is definitely searched
 
-    //total_btree =
+    vector<Interval> temp;
+    temp.reserve(max_ctb * (config->CTF_count + 1));
+    for(int i = 0; i < max_ctb; i++){
+        for(int j = 0; j < config->CTF_count; j++) {
+            Interval temp_in(ctbs[i].ctfs[j].start_time_min, ctbs[i].ctfs[j].end_time_max, (int)(i * config->CTF_count +j));
+            temp.push_back(temp_in);
+        }
+        Interval temp_in(ctbs[i].o_buffer.start_time_min, ctbs[i].o_buffer.end_time_max, (int)(-1-i));
+        temp.push_back(temp_in);
+    }
+    start_sorted.swap(temp);
+    sort(start_sorted.begin(), start_sorted.end(), [](const Interval& a, const Interval& b) {
+        return a.start < b.start;
+    });
+    end_sorted = start_sorted;
+    sort(end_sorted.begin(), end_sorted.end(), [](const Interval& a, const Interval& b) {
+        return a.end < b.end;
+    });
+
+//    total_btree = new BPlusTree<int>(4);
+//    for(uint i = 0; i < max_ctb; i++){
+//        for(uint j = 0; j < config->CTF_count; j++) {
+//            total_btree->insert(Interval(ctbs[i].ctfs[j].start_time_min, ctbs[i].ctfs[j].end_time_max), i * config->CTF_count +j);
+//        }
+//        total_btree->insert(Interval(ctbs[i].o_buffer.start_time_min, ctbs[i].o_buffer.end_time_max), -i);
+//    }
+}
+
+void workbench::make_new_ctf_with_old_ctb(uint max_ctb){
+//    for(uint i = 0; i < max_ctb; i++){
+//        load_big_sorted_run(i);
+//#pragma omp parallel for num_threads(config->CTF_count)
+//        for(uint j = 0; j < config->CTF_count; j++){
+//            ctbs[i].ctfs[j].ctf_mbr.get_fb(&ctbs[i].bitmap_mbrs[j]);
+//            //tbs[i].ctfs[j].ctf_mbr.print();
+//            //load keys
+//            //ctbs[i].ctfs[j].bitmap = &ctbs[i].bitmaps[j * (bit_count / 8)];
+//            ctbs[i].ctfs[j].CTF_kv_capacity = ctbs[i].CTF_capacity[j];
+//            ctbs[i].ctfs[j].end_time_min = ctbs[i].end_time_min;
+//            ctbs[i].ctfs[j].end_time_max = ctbs[i].end_time_max;
+//            ctbs[i].ctfs[j].get_ctf_bits(mbr, config);
+//            ctbs[i].ctfs[j].transfer_all_in_one();
+//            string sst_path = config->raid_path + to_string(j%2) + "/N_SSTable_"+to_string(i)+"-"+to_string(j);
+//            ofstream SSTable_of;
+//            SSTable_of.open(sst_path , ios::out|ios::binary|ios::trunc);
+//            assert(SSTable_of.is_open());
+//            SSTable_of.write((char *)ctbs[i].ctfs[j].keys, ctbs[i].ctfs[j].key_bit / 8 * ctbs[i].ctfs[j].CTF_kv_capacity);
+//            SSTable_of.close();
+//            delete[] ctbs[i].ctfs[j].keys;
+//        }
+//        ctbs[i].o_buffer.end_time_min = ctbs[i].end_time_min;
+//        ctbs[i].o_buffer.end_time_max = ctbs[i].end_time_max;
+//        ctbs[i].o_buffer.write_o_buffer(mbr, bit_count);
+//    }
 }

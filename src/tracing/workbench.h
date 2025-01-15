@@ -264,7 +264,10 @@ public:
     //vector<id_search_info> id_search_queue;
     CTB * compacted_ctbs = nullptr;
     uint raid_count = 2;
-    RTree<uint *, double, 2, double> *total_rtree = NULL;
+    RTree<int *, double, 2, double> *total_rtree = NULL;
+    vector<Interval> start_sorted;
+    vector<Interval> end_sorted;
+    //BPlusTree<int> * total_btree = NULL;
 
     //s
     //uint s_of_all_mbr = 0;
@@ -360,14 +363,15 @@ public:
     void dump_CTB_meta(const char *path, int i);
     void load_CTB_meta(const char *path, int i);
 
-    bool mbr_search_in_CTB(box b, uint CTB_id, unordered_set<uint> &uni, time_query * tq);
-    bool mbr_search_in_disk(box b, time_query * tq, uint CTB_id);
+    bool mbr_search_in_obuffer(box b, uint CTB_id, time_query * tq);
+    bool mbr_search_in_disk(box b, time_query * tq);
     bool id_search_in_CTB(uint pid, uint CTB_id, time_query * tq);
     bool id_search_in_disk(uint pid, time_query * tq);
 
     bool old_mbr_search_in_CTB(box b, uint CTB_id);
     void load_CTF_meta(const char *path, int i, int j);
     void build_trees(uint max_ctb);
+    void make_new_ctf_with_old_ctb(uint max_ctb);
 
 };
 extern void lookup_rec(QTSchema *schema, Point *p, uint curnode, vector<uint> &gids, double max_dist, bool include_owner = false);
@@ -652,7 +656,8 @@ public:
 
 old_workbench * old_load_meta(const char *path, uint max_ctb);
 workbench * load_meta(const char *path, uint max_ctb);
-workbench * transfer(old_workbench * old_bench);
+workbench * bench_transfer(old_workbench * old_bench);
+
 
 
 #endif /* SRC_TRACING_WORKBENCH_H_ */

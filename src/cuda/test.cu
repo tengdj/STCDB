@@ -55,7 +55,7 @@ void bar()
   logt("generate random numbers",start);
   // transfer data to the device
   thrust::device_vector<int> d_vec = h_vec;
-  logt("transfer to device",start);
+  logt("bench_transfer to device",start);
 
   // sort data on the device (846M keys per second on GeForce GTX 480)
   thrust::sort(d_vec.begin(), d_vec.end());

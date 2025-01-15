@@ -125,22 +125,22 @@ inline float uint_to_float(uint f){
 }
 
 __host__ __device__
-uint get_key_sid(__uint128_t key);
+uint cuda_get_key_sid(__uint128_t key);
 
 __host__ __device__
-uint get_key_oid(__uint128_t key);
+uint cuda_get_key_oid(__uint128_t key);
 
 __host__ __device__
-uint get_key_target(__uint128_t key);
+uint cuda_get_key_target(__uint128_t key);
 
 //__host__ __device__
 //uint64_t get_key_mbr_code(__uint128_t key);
 
 __host__ __device__
-uint get_key_duration(__uint128_t key);
+uint cuda_get_key_duration(__uint128_t key);
 
 __host__ __device__
-uint get_key_end(__uint128_t key);
+uint cuda_get_key_end(__uint128_t key);
 
 __host__ __device__
 uint64_t serialize_mbr(f_box* b, f_box* bitmap_mbr, CTF * ctf);
@@ -152,12 +152,12 @@ __host__
 inline void print_parse_key(__uint128_t key){
     print_128(key);
     cout<<endl;
-    cout<<"sid:"<< get_key_sid(key)<<endl;
-    cout << "pid:" << get_key_oid(key) << endl;
+    cout << "sid:" << cuda_get_key_sid(key) << endl;
+    cout << "pid:" << cuda_get_key_oid(key) << endl;
     //mbr
-    cout<<"target:"<<get_key_target(key)<<endl;
-    cout<<"duration:"<<get_key_duration(key)<<endl;
-    cout<<"end offset:"<<get_key_end(key)<<endl;
+    cout << "target:" << cuda_get_key_target(key) << endl;
+    cout << "duration:" << cuda_get_key_duration(key) << endl;
+    cout << "end offset:" << cuda_get_key_end(key) << endl;
 }
 
 __host__ __device__

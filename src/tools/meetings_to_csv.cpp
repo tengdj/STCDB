@@ -102,10 +102,10 @@ int main(){
 //        nb->load_CTF_keys(10,j);
 ////        for (int i = 0; i < nb->ctbs[10].CTF_capacity[j]; i++) {
 ////            __uint128_t & temp_key = nb->ctbs[10].ctfs[j].keys[i];
-////            uint id = get_key_oid(temp_key);
+////            uint id = cuda_get_key_oid(temp_key);
 ////            uint end = 546;
 ////            uint start = 235;
-////            uint person2_id = get_key_target(temp_key);
+////            uint person2_id = cuda_get_key_target(temp_key);
 ////            pg_outFile << j << ','
 ////                    << id << ','
 ////                    << person2_id << ','

@@ -34,7 +34,7 @@ endif
 %.o:	%.cpp
 	$(CXX) -c $(CPPFLAGS) $(INCLUDES) -o $@ $<
 
-all:	 pipeline datagen load_search compaction points_to_csv meetings_to_csv trace rocksdb raid_test
+all:	 pipeline datagen load_search compaction points_to_csv meetings_to_csv trace rocksdb raid_test transfer
 
 
 # for macro queries
@@ -63,6 +63,9 @@ rocksdb:		tools/rocksdb.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
 	$(CXX) -o ../build/$@ $^ $(LIBS)
 
 raid_test:		tools/ssd_test.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
+	$(CXX) -o ../build/$@ $^ $(LIBS)
+
+transfer:		tools/transfer.o $(GEOMETRY_OBJS) $(TRACING_OBJS)
 	$(CXX) -o ../build/$@ $^ $(LIBS)
 
 #searchsst:	tools/searchsst.o $(GEOMETRY_OBJS) $(TRACING_OBJS)

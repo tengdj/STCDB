@@ -134,22 +134,27 @@ void write_kv_box(f_box * kv_b, f_box * meeting_b){
 }
 
 __host__ __device__
-uint get_key_oid(__uint128_t key){
+uint cuda_get_key_sid(__uint128_t key){
+    return (uint)((key >> (OID_BIT * 2 + DURATION_BIT + END_BIT)) & ((1ULL << SID_BIT) - 1));
+}
+
+__host__ __device__
+uint cuda_get_key_oid(__uint128_t key){
     return (uint)((key >> (OID_BIT + DURATION_BIT + END_BIT)) & ((1ULL << OID_BIT) - 1));
 }
 
 __host__ __device__
-uint get_key_target(__uint128_t key){
+uint cuda_get_key_target(__uint128_t key){
     return (uint)((key >> ( DURATION_BIT + END_BIT)) & ((1ULL << OID_BIT) - 1));
 }
 
 __host__ __device__
-uint get_key_duration(__uint128_t key){
+uint cuda_get_key_duration(__uint128_t key){
     return (uint)((key >> END_BIT) & ((1ULL << DURATION_BIT) - 1));
 }
 
 __host__ __device__
-uint get_key_end(__uint128_t key){
+uint cuda_get_key_end(__uint128_t key){
     return (uint)(key & ((1ULL << END_BIT) - 1));
 }
 
@@ -787,16 +792,16 @@ void make_sid(workbench *bench) {
     //printf("%d %d\n", sid, oid);
 }
 
-//__global__
-//void write_sid_in_key(workbench *bench) {
-//    uint kid = blockIdx.x * blockDim.x + threadIdx.x;
-//    if (kid >= bench->kv_count) {
-//        return;
-//    }
-//    uint oid = get_key_oid(bench->d_keys[kid]);
-//    bench->d_keys[kid] = (bench->d_keys[kid] & (((__uint128_t)1 << (OID_BIT*2 + MBR_BIT + DURATION_BIT + END_BIT)) - 1))
-//                         + ((__uint128_t)bench->d_sids[oid] << (OID_BIT*2 + MBR_BIT + DURATION_BIT + END_BIT));
-//}
+__global__
+void write_sid_in_key(workbench *bench) {
+    uint kid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (kid >= bench->kv_count) {
+        return;
+    }
+    uint oid = cuda_get_key_oid(bench->d_keys[kid]);
+    bench->d_keys[kid] = (bench->d_keys[kid] & (((__uint128_t)1 << (OID_BIT*2 + DURATION_BIT + END_BIT)) - 1))
+                         + ((__uint128_t)bench->d_sids[oid] << (OID_BIT*2 + DURATION_BIT + END_BIT));
+}
 
 __global__
 void get_CTF_capacity(workbench *bench) {
@@ -811,7 +816,7 @@ void get_CTF_capacity(workbench *bench) {
 }
 
 __global__
-void get_the_limit(workbench *bench) {
+void cuda_get_limit(workbench *bench) {
     uint ctf_id = blockIdx.x;
     if (ctf_id >= bench->config->CTF_count) {
         return;
@@ -838,8 +843,8 @@ void get_the_limit(workbench *bench) {
         key_low1 = min(key_low1, bench->kv_boxs[kid].low[1]);
         key_high0 = max(key_high0, bench->kv_boxs[kid].high[0]);
         key_high1 = max(key_high1, bench->kv_boxs[kid].high[1]);
-        duration = get_key_duration(bench->d_keys[kid]);
-        end = get_key_end(bench->d_keys[kid]) + bench->end_time_min;
+        duration = cuda_get_key_duration(bench->d_keys[kid]);
+        end = cuda_get_key_end(bench->d_keys[kid]) + bench->end_time_min;
         assert(end >= duration);
         start_tim_min = min(start_tim_min, end - duration);
         start_tim_max = max(start_tim_max, end - duration);
@@ -895,7 +900,89 @@ void get_the_limit(workbench *bench) {
 }
 
 __global__
-void write_bitmap(workbench *bench){
+void cuda_write_o_bitmap(workbench *bench, uint oversize_key_count){
+    uint kid = blockIdx.x * blockDim.x + threadIdx.x;
+    if(kid >= oversize_key_count){
+        return;
+    }
+    kid += bench->kv_count;
+
+    uint low0 = (bench->kv_boxs[kid].low[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * DEFAULT_bitmap_edge;
+    uint low1 = (bench->kv_boxs[kid].low[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * DEFAULT_bitmap_edge;
+    uint high0 = (bench->kv_boxs[kid].high[0] - bench->mbr.low[0])/(bench->mbr.high[0] - bench->mbr.low[0]) * DEFAULT_bitmap_edge;
+    uint high1 = (bench->kv_boxs[kid].high[1] - bench->mbr.low[1])/(bench->mbr.high[1] - bench->mbr.low[1]) * DEFAULT_bitmap_edge;
+    uint bit_pos = 0;
+    for(uint i=low0;i<=high0;i++){
+        for(uint j=low1;j<=high1;j++){
+            bit_pos = i + j * DEFAULT_bitmap_edge;
+            unsigned int *bitmap_ptr = reinterpret_cast<unsigned int *>(bench->d_bitmaps);
+            atomicOr(&bitmap_ptr[0 + bit_pos / 32], (1 << (bit_pos % 32)));
+        }
+    }
+}
+
+__global__
+void get_o_limit(workbench *bench, uint oversize_key_count) {
+    uint ctf_id = 0;
+    __shared__ volatile int local_start_time_min[BLOCK_DIM];
+    __shared__ volatile int local_start_time_max[BLOCK_DIM];
+    __shared__ volatile int local_end_time_min[BLOCK_DIM];
+    __shared__ volatile int local_end_time_max[BLOCK_DIM];
+    __syncthreads();
+    uint kid;
+    uint duration = 0, end = 0, start_tim_min = 1 << 30, start_tim_max = 0, end_min = 1 << 30, end_max = 0;
+    for (uint i = threadIdx.x; i < oversize_key_count; i += BLOCK_DIM) {
+        kid = bench->kv_count + i;
+        duration = cuda_get_key_duration(bench->d_keys[kid]);
+        end = cuda_get_key_end(bench->d_keys[kid]) + bench->end_time_min;
+        assert(end >= duration);
+        end_min = min(end_min, end);
+        end_max = max(end_max, end);
+        start_tim_min = min(start_tim_min, end - duration);
+        start_tim_max = max(start_tim_max, end - duration);
+    }
+
+    // Load data into shared memory
+    local_end_time_min[threadIdx.x] = end_min;
+    local_end_time_max[threadIdx.x] = end_max;
+    local_start_time_min[threadIdx.x] = start_tim_min;
+    local_start_time_max[threadIdx.x] = start_tim_max;
+    __syncthreads();
+
+    // Reduction in shared memory
+    for (int offset = BLOCK_DIM / 2; offset > 32; offset /= 2) {
+        if (threadIdx.x < offset) {
+            local_end_time_min[threadIdx.x] = min(local_end_time_min[threadIdx.x], local_end_time_min[threadIdx.x + offset]);
+            local_end_time_max[threadIdx.x] = max(local_end_time_max[threadIdx.x], local_end_time_max[threadIdx.x + offset]);
+            local_start_time_min[threadIdx.x] = min(local_start_time_min[threadIdx.x], local_start_time_min[threadIdx.x + offset]);
+            local_start_time_max[threadIdx.x] = max(local_start_time_max[threadIdx.x], local_start_time_max[threadIdx.x + offset]);
+        }
+        __syncthreads();
+    }
+
+    if (threadIdx.x < 32) {
+        unsigned int mask = __ballot_sync(0xFFFFFFFF, true); // 确保所有 warp 线程参与
+        // 使用 __shfl_down_sync 实现 warp 归约
+        for (int offset = 16; offset > 0; offset /= 2) {
+            local_end_time_min[threadIdx.x] = min(local_end_time_min[threadIdx.x], __shfl_down_sync(mask, local_end_time_min[threadIdx.x], offset));
+            local_end_time_max[threadIdx.x] = max(local_end_time_max[threadIdx.x], __shfl_down_sync(mask, local_end_time_max[threadIdx.x], offset));
+            local_start_time_min[threadIdx.x] = min(local_start_time_min[threadIdx.x], __shfl_down_sync(mask, local_start_time_min[threadIdx.x], offset));
+            local_start_time_max[threadIdx.x] = max(local_start_time_max[threadIdx.x], __shfl_down_sync(mask, local_start_time_max[threadIdx.x], offset));
+        }
+    }
+    __syncthreads();
+    // Write results back to global memory
+    if (threadIdx.x == 0) {
+        bench->d_ctfs[ctf_id].CTF_kv_capacity = bench->d_CTF_capacity[ctf_id];
+        bench->d_ctfs[ctf_id].start_time_min = local_start_time_min[0];
+        bench->d_ctfs[ctf_id].start_time_max = local_start_time_max[0];
+        bench->d_ctfs[ctf_id].end_time_min = bench->end_time_min;
+        bench->d_ctfs[ctf_id].end_time_max = bench->cur_time;
+    }
+}
+
+__global__
+void cuda_write_bitmap(workbench *bench){
     uint ctf_id = blockIdx.x;
     if(ctf_id >= bench->config->CTF_count){
         return;
@@ -1686,7 +1773,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 
         // predicate fuction
         auto predicate = [d_ptr_sids] __device__ (__uint128_t key) {
-            uint oid = get_key_oid(key);
+            uint oid = cuda_get_key_oid(key);
             return d_ptr_sids[oid] != 1;
         };
 
@@ -1718,6 +1805,49 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         cudaDeviceSynchronize();
         check_execution();
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+
+        get_o_limit<<<1, 1024>>>(d_bench, oversize_key_count);
+        cudaDeviceSynchronize();
+        check_execution();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_ctfs[offset], h_bench.d_ctfs, sizeof(CTF), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start, false);
+        logt("o_limit: ",start);
+        bench->h_oversize_buffers[offset].start_time_min = bench->h_ctfs[offset][0].start_time_min;
+        bench->h_oversize_buffers[offset].start_time_max = bench->h_ctfs[offset][0].start_time_max;
+        bench->h_oversize_buffers[offset].end_time_min = bench->h_ctfs[offset][0].end_time_min;
+        bench->h_oversize_buffers[offset].end_time_max = bench->h_ctfs[offset][0].end_time_max;
+
+        cuda_write_o_bitmap<<<oversize_key_count / 1024 + 1, 1024>>>(d_bench, oversize_key_count);
+        cudaDeviceSynchronize();
+        check_execution();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        CUDA_SAFE_CALL(cudaMemcpy(bench->h_oversize_buffers[offset].o_bitmaps, h_bench.d_bitmaps, bench->bit_count / 8, cudaMemcpyDeviceToHost));
+        cudaMemset(h_bench.d_bitmaps, 0, bench->bit_count / 8);
+        bench->pro.cuda_sort_time += get_time_elapsed(start, false);
+        logt("cuda_write_o_bitmap_time: ",start);
+
+//        cerr << "output picked o bitmap" << endl;
+//        Point * bit_points = new Point[bench->bit_count];
+//        uint count_p;
+//        cerr<<endl;
+//        count_p = 0;
+//        for(uint i=0;i<bench->bit_count;i++){
+//            if(bench->h_oversize_buffers[offset].o_bitmaps[0 + i/8] & (1<<(i%8))){
+//                Point bit_p;
+//                uint x=0,y=0;
+//                x = i % DEFAULT_bitmap_edge;
+//                y = i / DEFAULT_bitmap_edge;
+//                bit_p.x = (double)x/DEFAULT_bitmap_edge*(bench->mbr.high[0] - bench->mbr.low[0]) + bench->mbr.low[0];
+//                bit_p.y = (double)y/DEFAULT_bitmap_edge*(bench->mbr.high[1] - bench->mbr.low[1]) + bench->mbr.low[1];
+//                bit_points[count_p] = bit_p;
+//                count_p++;
+//            }
+//        }
+//        cout<<"bit_points.size():"<<count_p<<endl;
+//        print_points(bit_points,count_p);
+//        //cerr << "process output bitmap finish" << endl;
+//        delete[] bit_points;
 
         thrust::device_ptr<uint64_t> d_vector_xys = thrust::device_pointer_cast(h_bench.mid_xys);
         thrust::device_ptr<uint> d_vector_oids = thrust::device_pointer_cast(h_bench.d_oids);
@@ -1761,12 +1891,12 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("make_sid: ",start);
 
-//        write_sid_in_key<<<h_bench.kv_count / 1024 + 1, 1024>>>(d_bench);
-//        check_execution();
-//        cudaDeviceSynchronize();
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-//        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
-//        logt("write_sid_in_key: ",start);
+        write_sid_in_key<<<h_bench.kv_count / 1024 + 1, 1024>>>(d_bench);
+        check_execution();
+        cudaDeviceSynchronize();
+        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
+        logt("write_sid_in_key: ",start);
 
         get_CTF_capacity<<<bench->config->num_objects / 1024 + 1, 1024>>>(d_bench);
         check_execution();
@@ -1781,31 +1911,8 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 //            cout << bench->h_CTF_capacity[offset][i] << endl;
 //        }
 
+        thrust::sort_by_key(d_ptr_keys, d_ptr_keys + h_bench.kv_count, d_ptr_boxes);
         uint partition_index = 0;
-        for(uint i = 0; i < bench->config->CTF_count; i++){
-            // predicate fuction
-            auto predicate = [d_ptr_sids, i] __device__ (__uint128_t key) {
-                uint oid = get_key_oid(key);
-                return d_ptr_sids[oid] == i + 2;
-            };
-            // zip_iterator
-            auto first = thrust::make_zip_iterator(thrust::make_tuple(d_ptr_keys + partition_index, d_ptr_boxes + partition_index));
-            auto last = thrust::make_zip_iterator(thrust::make_tuple(d_ptr_keys + h_bench.kv_count,
-                                                                     d_ptr_boxes + h_bench.kv_count));
-            partition_index += bench->h_CTF_capacity[offset][i];
-            // remove_if is wrong, use partition
-            auto this_end = thrust::partition(first, last, [predicate] __device__ (thrust::tuple<__uint128_t, __uint128_t> t) {
-                return predicate(thrust::get<0>(t));
-            });
-            cudaDeviceSynchronize();
-            check_execution();
-            //cout << bench->h_CTF_capacity[offset][i] << "==?" << thrust::distance(first, this_end) << endl;
-        }
-        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-        bench->pro.cuda_sort_time += get_time_elapsed(start,false);
-        logt("partition keys: ",start);
-
-        partition_index = 0;
         for(uint i = 0; i < bench->config->CTF_count; i++){
             thrust::sort_by_key(d_ptr_keys + partition_index, d_ptr_keys + partition_index + bench->h_CTF_capacity[offset][i],
                                 d_ptr_boxes + partition_index);
@@ -1837,11 +1944,11 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 //        }
 
         //reduce
-        get_the_limit<<<bench->config->CTF_count, 1024>>>(d_bench);
+        cuda_get_limit<<<bench->config->CTF_count, 1024>>>(d_bench);
         cudaDeviceSynchronize();
         check_execution();
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-        logt("get_the_limit: ",start);
+        logt("cuda_get_limit: ",start);
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_ctfs[offset], h_bench.d_ctfs, bench->config->CTF_count * sizeof(CTF), cudaMemcpyDeviceToHost));
 
 //        for(uint j = 0;j<bench->config->CTF_count; j++){
@@ -1851,7 +1958,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 #pragma omp parallel for num_threads(bench->config->CTF_count)
         for(uint i = 0; i < bench->config->CTF_count; i++){
             bench->h_ctfs[offset][i].get_ctf_bits(bench->mbr, bench->config);
-            bench->h_ctfs[offset][i].print_ctf_meta();
+            //bench->h_ctfs[offset][i].print_ctf_meta();
         }
         CUDA_SAFE_CALL(cudaMemcpy(h_bench.d_ctfs, bench->h_ctfs[offset], bench->config->CTF_count * sizeof(CTF), cudaMemcpyHostToDevice));
         bench->h_ctfs[offset][65].print_ctf_meta();
@@ -1859,11 +1966,11 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         //bitmap
         cout<<"h_bench.bit_count:"<<h_bench.bit_count<<endl;
         cout<<"h_bench.bitmaps_size:"<<h_bench.bitmaps_size<<endl;
-        write_bitmap<<<bench->config->CTF_count, 1024>>>(d_bench);
+        cuda_write_bitmap<<<bench->config->CTF_count, 1024>>>(d_bench);
         check_execution();
         cudaDeviceSynchronize();
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-        logt("write_bitmap: ",start);
+        logt("cuda_write_bitmap: ",start);
 
 //            //    //output bitmap
 //        CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps[offset], h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));
@@ -1952,9 +2059,9 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 //            cout << bench->h_CTF_capacity[offset][i] << endl;
 //        }
 
-        for(uint i = 0; i < 100; i++){
-            bench->h_ctfs[offset][0].print_key(bench->h_keys[offset][i]);
-        }
+//        for(uint i = 0; i < 100; i++){
+//            bench->h_ctfs[offset][0].print_key(bench->h_keys[offset][i]);
+//        }
 
 
 

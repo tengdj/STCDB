@@ -44,12 +44,14 @@ namespace{
 #define __MGAIC_CODE__          (0x01464C42)
 #define MIX_UINT64(v)       ((uint32_t)((v>>32)^(v)))
 
-//#define SID_BIT 16
-#define OID_BIT 32
+#define DEFAULT_bitmap_edge 256
+#define SID_BIT 12
+#define OID_BIT 26
 #define MBR_BIT 36
 #define DURATION_BIT 32
 #define END_BIT 32
 //26 + 26 + 12 = 64
+
 
 const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
 
@@ -530,6 +532,27 @@ const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
         if (max_value == 0) return 1;
         return static_cast<uint>(std::log2(max_value)) + 1; // ⌊log2(value)⌋ + 1
     }
+
+    uint get_key_sid(__uint128_t key){
+        return (uint)((key >> (OID_BIT * 2 + DURATION_BIT + END_BIT)) & ((1ULL << SID_BIT) - 1));
+    }
+
+    uint get_key_oid(__uint128_t key){
+        return (uint)((key >> (OID_BIT + DURATION_BIT + END_BIT)) & ((1ULL << OID_BIT) - 1));
+    }
+
+    uint get_key_target(__uint128_t key){
+        return (uint)((key >> ( DURATION_BIT + END_BIT)) & ((1ULL << OID_BIT) - 1));
+    }
+
+    uint get_key_duration(__uint128_t key){
+        return (uint)((key >> END_BIT) & ((1ULL << DURATION_BIT) - 1));
+    }
+
+    uint get_key_end(__uint128_t key){
+        return (uint)(key & ((1ULL << END_BIT) - 1));
+    }
+
 }
 #endif
 
