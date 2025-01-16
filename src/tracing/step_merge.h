@@ -80,6 +80,7 @@ public:
     void print_ctf_meta();
     void dump(const string& path);
     box new_parse_mbr(uint64_t value_mbr);
+    f_box new_parse_mbr_f_box(uint64_t value_mbr);
     void transfer_all_in_one();
     int binary_search(uint oid);
     uint ctf_get_key_oid(__uint128_t temp_128);

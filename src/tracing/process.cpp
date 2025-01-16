@@ -538,7 +538,7 @@ void tracer::process(){
 
 
                 if(config->MemTable_capacity==2){
-                    straight_dump((void *)bench);
+                    //straight_dump((void *)bench);
                 }
 //                else{
 //                    merge_dump((void *)bench);
@@ -580,9 +580,9 @@ void tracer::process(){
                 bench->dump_meetings(st);
             }
 
-            if(st+t+1 == config->start_time+config->duration - 5  || (st+t+1) % 100000 == 0){
-                bench->dump_meta(config->CTB_meta_path);
-            }
+//            if(st+t+1 == config->start_time+config->duration - 5  || (st+t+1) % 100000 == 0){
+//                bench->dump_meta(config->CTB_meta_path);
+//            }
 		}
 	}
     //bench->clear();

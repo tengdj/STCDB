@@ -1912,15 +1912,15 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 //        }
 
         thrust::sort_by_key(d_ptr_keys, d_ptr_keys + h_bench.kv_count, d_ptr_boxes);
-        uint partition_index = 0;
-        for(uint i = 0; i < bench->config->CTF_count; i++){
-            thrust::sort_by_key(d_ptr_keys + partition_index, d_ptr_keys + partition_index + bench->h_CTF_capacity[offset][i],
-                                d_ptr_boxes + partition_index);
-            partition_index += bench->h_CTF_capacity[offset][i];
-        }
-        cudaDeviceSynchronize();
-        check_execution();
-        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
+//        uint partition_index = 0;
+//        for(uint i = 0; i < bench->config->CTF_count; i++){
+//            thrust::sort_by_key(d_ptr_keys + partition_index, d_ptr_keys + partition_index + bench->h_CTF_capacity[offset][i],
+//                                d_ptr_boxes + partition_index);
+//            partition_index += bench->h_CTF_capacity[offset][i];
+//        }
+//        cudaDeviceSynchronize();
+//        check_execution();
+//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
         logt("all ctf sort: ",start);
 
 //        f_box * h_kv_box = new f_box[h_bench.kv_count];
@@ -2062,7 +2062,6 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 //        for(uint i = 0; i < 100; i++){
 //            bench->h_ctfs[offset][0].print_key(bench->h_keys[offset][i]);
 //        }
-
 
 
 //        box b;

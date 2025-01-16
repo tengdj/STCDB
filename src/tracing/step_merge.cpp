@@ -233,6 +233,27 @@ box CTF::new_parse_mbr(uint64_t value_mbr){
     return b;
 }
 
+f_box CTF::new_parse_mbr_f_box(uint64_t value_mbr){
+    uint64_t mask_edge = (1ULL << edge_bit) - 1;
+    uint64_t mask_low_y = (1ULL << low_y_bit) - 1;
+    uint64_t mask_low_x = (1ULL << low_x_bit) - 1;
+
+    uint64_t y = value_mbr & mask_edge;
+    value_mbr >>= edge_bit;
+    uint64_t x = value_mbr & mask_edge;
+    value_mbr >>= edge_bit;
+    uint64_t low1 = value_mbr & mask_low_y;
+    value_mbr >>= low_y_bit;
+    uint64_t low0 = value_mbr & mask_low_x;
+
+    f_box b;
+    b.low[0] = ctf_mbr.low[0] + (double)low0 / mask_low_x * (ctf_mbr.high[0] - ctf_mbr.low[0]);
+    b.low[1] = ctf_mbr.low[1] + (double)low1 / mask_low_y * (ctf_mbr.high[1] - ctf_mbr.low[1]);
+    b.high[0] = ctf_mbr.low[0] + (double)x / mask_edge * (ctf_mbr.high[0] - ctf_mbr.low[0]);
+    b.high[1] = ctf_mbr.low[1] + (double)y / mask_edge * (ctf_mbr.high[1] - ctf_mbr.low[1]);
+    return b;
+}
+
 uint old_get_key_oid(__uint128_t key){
     return (uint)((key >> (26 + 36 + 12 + 12)) & ((1ULL << 26) - 1));
 }

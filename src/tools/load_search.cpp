@@ -527,9 +527,12 @@ void experiment_box_openmp(workbench *bench){
 }
 
 void experiment_search_time(workbench *bench){
+    ofstream q;
+    q.open("search_time.csv", ios::out|ios::binary|ios::trunc);
+    q << "start_second" << ',' << "find count" << ',' << "time_consume(ms)" << endl;
     time_query tq;
     tq.abandon = false;
-    for(uint i = 36000; i < 3600 * 24; i+= 3600){
+    for(uint i = 3600 * 24 * 6; i < 3600 * 24 * 7; i+= 3600){
         tq.t_start = i;
         tq.t_end = i + 3600;
         bench->clear_all_keys();
@@ -538,6 +541,7 @@ void experiment_search_time(workbench *bench){
         uint find_count = bench->search_time_in_disk(&tq);
         double time_consume = get_time_elapsed(disk_search_time);
         cout << "find_count" << find_count << "time_consume" << time_consume << endl;
+        q << i << ',' << find_count << ',' << time_consume << endl;
     }
 }
 
@@ -785,11 +789,77 @@ void experiment_search_time(workbench *bench){
 //
 //
 
+
+
+void compress_rate(workbench * bench){
+    ofstream q;
+    q.open("compress_rate.csv", ios::out|ios::binary|ios::trunc);
+    q << "ctf" << ',' << "CTF_kv_capacity" << ',' << "time_consume(ms)" << endl;
+    struct timeval compress_time = get_cur_time();
+
+
+    for(uint i = 0; i < bench->config->CTF_count; i++){
+        compress_time = get_cur_time();
+        bench->load_CTF_keys(0, i);
+        double code_load = get_time_elapsed(compress_time, true);
+        CTF * ctf = &bench->ctbs[0].ctfs[i];
+        uint8_t * data = reinterpret_cast<uint8_t *>(ctf->keys);
+
+        uint * pid = new uint[ctf->CTF_kv_capacity];
+        uint * target = new uint[ctf->CTF_kv_capacity];
+        uint * duration = new uint[ctf->CTF_kv_capacity];
+        uint * end = new uint[ctf->CTF_kv_capacity];
+        f_box * b = new f_box[ctf->CTF_kv_capacity];
+        compress_time = get_cur_time();
+
+//#pragma omp parallel for num_threads(bench->config->num_threads)
+        for(uint j = 0; j < ctf->CTF_kv_capacity; j++){
+            uint64_t value_mbr = 0;
+            __uint128_t temp_128 = 0;
+            memcpy(&temp_128, data + j * ctf->key_bit / 8, ctf->key_bit / 8);
+            ctf->parse_key(ctf->keys[j], pid[j], target[j], duration[j], end[j], value_mbr);
+            b[j] = ctf->new_parse_mbr_f_box(value_mbr);
+        }
+        double parse_consume = get_time_elapsed(compress_time, true);
+
+
+        ofstream s;
+        s.open("ctf0_" + to_string(i), ios::out|ios::binary|ios::trunc);
+        s.write((char *)pid, ctf->CTF_kv_capacity * sizeof(uint));
+        s.write((char *)target, ctf->CTF_kv_capacity * sizeof(uint));
+        s.write((char *)duration, ctf->CTF_kv_capacity * sizeof(uint));
+        s.write((char *)end, ctf->CTF_kv_capacity * sizeof(uint));
+        s.write((char *)b, ctf->CTF_kv_capacity * sizeof(f_box));
+        s.close();
+
+        delete ctf->keys;
+        clear_cache();
+
+        ifstream in("ctf0_" + to_string(i), ios::in | ios::binary);
+        if(!in.is_open()){
+            cerr << " can't open " << endl;
+            exit(0);
+        }
+        compress_time = get_cur_time();
+        in.read((char *)pid, ctf->CTF_kv_capacity * sizeof(uint));
+        in.read((char *)target, ctf->CTF_kv_capacity * sizeof(uint));
+        in.read((char *)duration, ctf->CTF_kv_capacity * sizeof(uint));
+        in.read((char *)end, ctf->CTF_kv_capacity * sizeof(uint));
+        in.read((char *)b, ctf->CTF_kv_capacity * sizeof(f_box));
+        in.close();
+        double full_load = get_time_elapsed(compress_time, true);
+
+        q << i << ',' << bench->ctbs[0].ctfs[i].CTF_kv_capacity << ',' << code_load << ',' << parse_consume << ',' << full_load << endl;
+
+    }
+
+}
+
 int main(int argc, char **argv){
     clear_cache();
     string path = "../data/meta/";
     //workbench * bench = C_load_meta(path.c_str());
-    uint max_ctb = 1215;
+    uint max_ctb = 1;
     workbench * bench = load_meta(path.c_str(), max_ctb);
     cout << "bench->ctb_count " << bench->ctb_count << endl;
     cout << "max_ctb " << max_ctb << endl;
@@ -800,6 +870,10 @@ int main(int argc, char **argv){
             bench->ctbs[i].ctfs[j].keys = nullptr;
         }
     }
+
+    //compress_rate(bench);
+
+    return 0;
 
     bench->build_trees(max_ctb);
 
