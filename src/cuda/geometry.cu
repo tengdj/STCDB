@@ -1758,6 +1758,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         }
         offset += bench->MemTable_count;
 
+        struct timeval STR_start = get_cur_time();
         set_oid<<<bench->config->num_objects / 1024 + 1, 1024>>>(d_bench);                  //thrust::sequence
         cudaDeviceSynchronize();
         check_execution();
@@ -1898,6 +1899,13 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         bench->pro.cuda_sort_time += get_time_elapsed(start,false);
         logt("write_sid_in_key: ",start);
 
+        thrust::sort_by_key(d_ptr_keys, d_ptr_keys + h_bench.kv_count, d_ptr_boxes);
+        logt("all ctf sort: ",start);
+
+        double STR_time = get_time_elapsed(STR_start);
+        cerr << "STR_time " << STR_time << endl;
+        struct timeval encoding_start = get_cur_time();
+
         get_CTF_capacity<<<bench->config->num_objects / 1024 + 1, 1024>>>(d_bench);
         check_execution();
         cudaDeviceSynchronize();
@@ -1911,17 +1919,6 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 //            cout << bench->h_CTF_capacity[offset][i] << endl;
 //        }
 
-        thrust::sort_by_key(d_ptr_keys, d_ptr_keys + h_bench.kv_count, d_ptr_boxes);
-//        uint partition_index = 0;
-//        for(uint i = 0; i < bench->config->CTF_count; i++){
-//            thrust::sort_by_key(d_ptr_keys + partition_index, d_ptr_keys + partition_index + bench->h_CTF_capacity[offset][i],
-//                                d_ptr_boxes + partition_index);
-//            partition_index += bench->h_CTF_capacity[offset][i];
-//        }
-//        cudaDeviceSynchronize();
-//        check_execution();
-//        CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
-        logt("all ctf sort: ",start);
 
 //        f_box * h_kv_box = new f_box[h_bench.kv_count];
 //        CUDA_SAFE_CALL(cudaMemcpy(h_kv_box, h_bench.kv_boxs, h_bench.kv_count * sizeof(f_box), cudaMemcpyDeviceToHost));
@@ -2010,6 +2007,9 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
         cudaDeviceSynchronize();
         CUDA_SAFE_CALL(cudaMemcpy(&h_bench, d_bench, sizeof(workbench), cudaMemcpyDeviceToHost));
         logt("write_value_mbr: ",start);
+
+        double encoding_time = get_time_elapsed(encoding_start);
+        cerr << "encoding_time " << encoding_time << endl;
 
         //CUDA_SAFE_CALL(cudaMemcpy(bench->h_keys[offset], h_bench.d_keys, h_bench.kv_count * sizeof(__uint128_t), cudaMemcpyDeviceToHost));
         CUDA_SAFE_CALL(cudaMemcpy(bench->h_keys[offset], h_bench.d_ctf_keys, h_bench.kv_count * sizeof(__uint128_t), cudaMemcpyDeviceToHost));

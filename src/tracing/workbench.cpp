@@ -545,6 +545,7 @@ void workbench::dump_meta(const char *path) {
     ofstream wf(bench_path, ios::out|ios::binary|ios::trunc);
     wf.write((char *)config, sizeof(generator_configuration));        //the config of pipeline is generator_configuration
     wf.write((char *)this, sizeof(workbench));
+    wf.close();
 #pragma omp parallel for num_threads(config->num_threads)
     for(int i = 0; i < ctb_count; i++){
         if(ctbs[i].sids){
@@ -557,12 +558,11 @@ void workbench::dump_meta(const char *path) {
             }
         }
     }
-    wf.close();
+
     logt("bench meta dumped to %s",start_time,path);
 }
 
 void workbench::dump_CTB_meta(const char *path, int i) {
-    struct timeval start_time = get_cur_time();
     ofstream wf(path, ios::out|ios::binary|ios::trunc);
     wf.write((char *)&ctbs[i], sizeof(CTB));
     //wf.write((char *)ctbs[i].first_widpid, config->CTF_count * sizeof(uint64_t));
@@ -579,6 +579,25 @@ void workbench::dump_CTB_meta(const char *path, int i) {
 
     delete[] ctbs[i].sids;
     ctbs[i].sids = NULL;
+}
+
+void workbench::dump_CTB_meta(const char *path, CTB * ctb) {
+    ofstream wf(path, ios::out|ios::binary|ios::trunc);
+    wf.write((char *)ctb, sizeof(CTB));
+    //wf.write((char *)ctb->first_widpid, config->CTF_count * sizeof(uint64_t));
+    wf.write((char *)ctb->sids, config->num_objects * sizeof(unsigned short));
+    //wf.write((char *)ctb->bitmaps, bitmaps_size * sizeof(unsigned char));
+    //wf.write((char *)ctb->bitmap_mbrs, config->CTF_count * sizeof(box));
+    //wf.write((char *)ctb->CTF_capacity, config->CTF_count * sizeof(uint));
+    wf.write((char *)ctb->o_buffer.keys, ctb->o_buffer.oversize_kv_count * sizeof(__uint128_t));
+    wf.write((char *)ctb->o_buffer.boxes, ctb->o_buffer.oversize_kv_count * sizeof(f_box));
+    wf.write((char *)ctb->o_buffer.o_bitmaps, bit_count / 8 * sizeof(unsigned char));
+    //ctb->o_buffer.print_buffer();
+    wf.close();
+    //logt("CTB meta %d dump to %s",start_time, i, path);
+
+    delete[] ctb->sids;
+    ctb->sids = NULL;
 }
 
 double bytes_to_MB(size_t bytes) {

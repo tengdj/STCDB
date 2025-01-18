@@ -210,6 +210,31 @@ void tracer::print_traces(){
 	points.clear();
 }
 
+workbench * load_meta(const char *path, uint max_ctb) {
+    log("loading meta from %s", path);
+    string bench_path = string(path) + "N_workbench";
+    struct timeval start_time = get_cur_time();
+    ifstream in(bench_path, ios::in | ios::binary);
+    if(!in.is_open()){
+        log("%s cannot be opened",bench_path.c_str());
+        exit(0);
+    }
+    generator_configuration * config = new generator_configuration();
+    workbench * bench = new workbench(config);
+    in.read((char *)config, sizeof(generator_configuration));               //also read meta
+    cout << bench->ctb_count << "bench->ctb_count" << endl;
+    in.read((char *)bench, sizeof(workbench));      //bench->config = NULL
+    bench->config = config;
+    bench->ctbs = new CTB[config->big_sorted_run_capacity];
+#pragma omp parallel for num_threads(bench->config->num_threads)
+    for(int i = 0; i < min(max_ctb, bench->ctb_count); i++){
+        //N_CTB
+        bench->load_CTB_meta(path, i);
+    }
+    logt("bench meta load from %s",start_time, bench_path.c_str());
+    return bench;
+}
+
 inline bool BloomFilter_Check(workbench *bench, uint sst, uint pid){
     uint pdwHashPos;
     uint64_t hash1, hash2;
@@ -287,7 +312,7 @@ void *straight_dump(void *arg){
     uint8_t * h_ctf_keys = reinterpret_cast<uint8_t *>(bench->h_keys[offset]);
 #pragma omp parallel for num_threads(bench->config->CTF_count)          //there is little improvement when 100->128 threads
     for(uint sst_count=0; sst_count < bench->config->CTF_count; sst_count++){
-        string sst_path = bench->config->raid_path + to_string(sst_count%2) + "/N_SSTable_"+to_string(old_big)+"-"+to_string(sst_count);
+        string sst_path = bench->config->raid_path + to_string(sst_count%2) + "/test_SSTable_"+to_string(old_big)+"-"+to_string(sst_count);
         ofstream SSTable_of;
         SSTable_of.open(sst_path , ios::out|ios::binary|ios::trunc);
         assert(SSTable_of.is_open());
@@ -303,13 +328,13 @@ void *straight_dump(void *arg){
     //delete[] bit_points;
     bench->dumping = false;
 
-    string CTB_path = string(bench->config->CTB_meta_path) + "N_CTB" + to_string(old_big);
+    string CTB_path = string(bench->config->CTB_meta_path) + "test_CTB" + to_string(old_big);
     bench->dump_CTB_meta(CTB_path.c_str(), old_big);
     logt("dumped meta for CTB %d",bg_start, old_big);
 
 #pragma omp parallel for num_threads(bench->config->CTF_count)
     for(uint i = 0; i < bench->config->CTF_count; i++){
-        string ctf_path = string(bench->config->CTB_meta_path) + "STcL" + to_string(old_big)+"-"+to_string(i);
+        string ctf_path = string(bench->config->CTB_meta_path) + "test_STcL" + to_string(old_big)+"-"+to_string(i);
         bench->h_ctfs[offset][i].bitmap = &bench->h_bitmaps[offset][bench->bitmaps_size * i];
         bench->h_ctfs[offset][i].dump(ctf_path);
     }
@@ -538,7 +563,8 @@ void tracer::process(){
 
 
                 if(config->MemTable_capacity==2){
-                    //straight_dump((void *)bench);
+                    straight_dump((void *)bench);
+                    return;
                 }
 //                else{
 //                    merge_dump((void *)bench);

@@ -361,6 +361,7 @@ public:
     void load_meetings(uint st);
     void dump_meta(const char *path);
     void dump_CTB_meta(const char *path, int i);
+    void dump_CTB_meta(const char *path, CTB * ctb);
     void load_CTB_meta(const char *path, int i);
 
     bool mbr_search_in_obuffer(box b, uint CTB_id, time_query * tq);

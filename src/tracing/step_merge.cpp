@@ -200,7 +200,7 @@ uint CTF::ctf_get_key_oid(__uint128_t temp_128){
     return (uint)((temp_128 >> (id_bit + duration_bit + end_bit + mbr_bit)) & ((1ULL << id_bit) - 1));
 }
 
-void CTF::parse_key(__uint128_t key, uint &pid, uint &target, uint &duration, uint &end, uint64_t value_mbr){
+void CTF::parse_key(__uint128_t key, uint &pid, uint &target, uint &duration, uint &end, uint64_t &value_mbr){
     value_mbr = key & ((uint64_t(1) << mbr_bit) - 1);
     key >>= mbr_bit;
     end = key & ((1ULL << end_bit) - 1);
@@ -210,6 +210,18 @@ void CTF::parse_key(__uint128_t key, uint &pid, uint &target, uint &duration, ui
     target = key & ((1ULL << id_bit) - 1);
     key >>= id_bit;
     pid = key;
+}
+
+void CTF::parse_key(__uint128_t key, key_info &ki, uint64_t &value_mbr){
+    value_mbr = key & ((uint64_t(1) << mbr_bit) - 1);
+    key >>= mbr_bit;
+    ki.end = key & ((1ULL << end_bit) - 1);
+    key >>= end_bit;
+    ki.duration = key & ((1ULL << duration_bit) - 1);
+    key >>= duration_bit;
+    ki.target = key & ((1ULL << id_bit) - 1);
+    key >>= id_bit;
+    ki.oid = key;
 }
 
 box CTF::new_parse_mbr(uint64_t value_mbr){

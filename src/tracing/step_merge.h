@@ -17,6 +17,13 @@
 #include "../index/bplustree.h"
 //#include "../cuda/cuda_util.cuh"
 
+struct key_info{
+    uint oid;
+    uint target;
+    uint duration;
+    uint end;
+};
+
 class old_oversize_buffer {             //contact tracing block
 public:
     uint oversize_kv_count = 0;
@@ -76,7 +83,8 @@ public:
     uint time_search(time_query * tq);
     __uint128_t serial_key(uint64_t pid, uint64_t target, uint64_t duration, uint64_t end, __uint128_t value_mbr);
     void print_key(__uint128_t key);
-    void parse_key(__uint128_t key, uint &pid, uint &target, uint &duration, uint &end, uint64_t value_mbr);
+    void parse_key(__uint128_t key, uint &pid, uint &target, uint &duration, uint &end, uint64_t &value_mbr);
+    void parse_key(__uint128_t key, key_info &ki, uint64_t &value_mbr);
     void print_ctf_meta();
     void dump(const string& path);
     box new_parse_mbr(uint64_t value_mbr);

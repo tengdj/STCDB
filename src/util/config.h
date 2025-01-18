@@ -77,7 +77,7 @@ public:
     void update(){
         //cout << "into update" << endl;
         assert(MemTable_capacity%2==0);
-        kv_restriction = G_bytes * 33554432;            //33554432 = 1G, now 256 bit
+        kv_restriction = G_bytes * 16777216;            //33554432 = 1G, now 256 bit
         kv_capacity = kv_restriction + 1000000;
         oversize_buffer_capacity = kv_restriction / 100;
         split_num = sqrt(CTF_count);
