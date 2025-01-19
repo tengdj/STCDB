@@ -159,7 +159,7 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
         for (int j = 0; j < bench->config->CTF_count; j++) {
             CTF * ctf = &bench->ctbs[start_ctb + i].ctfs[j];
             uint8_t * data = reinterpret_cast<uint8_t *>(ctf->keys);
-            for (int k = 0; k < bench->ctbs[start_ctb + i].CTF_capacity[j]; k++) {
+            for (int k = 0; k < bench->ctbs[start_ctb + i].ctfs[j].CTF_kv_capacity; k++) {
                 key_info temp_ki;
                 __uint128_t temp_128 = 0;
                 memcpy(&temp_128, data + k * ctf->key_bit / 8, ctf->key_bit / 8);
@@ -237,7 +237,7 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
             local_low[0] = min(local_low[0], mbrs_with_sid[i][j].low[0]);
             local_low[1] = min(local_low[1], mbrs_with_sid[i][j].low[1]);
             local_high[0] = max(local_high[0], mbrs_with_sid[i][j].high[0]);
-            local_high[1] = max(local_high[0], mbrs_with_sid[i][j].high[1]);
+            local_high[1] = max(local_high[1], mbrs_with_sid[i][j].high[1]);
 
             uint this_start = keys_with_sid[i][j].end - keys_with_sid[i][j].duration;
             local_start_time_min = min(local_start_time_min, this_start);
@@ -409,7 +409,7 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
 #pragma omp parallel for num_threads(bench->config->CTF_count)
     for(uint i = 0; i < bench->config->CTF_count; i++){
         string ctf_path = string(bench->config->CTB_meta_path) + "C_STcL" + to_string(c_ctb_id)+"-"+to_string(i);
-        C_ctb.ctfs[i].dump(ctf_path);
+        C_ctb.ctfs[i].dump_meta(ctf_path);
     }
     logt("dumped meta for CTF",bg_start);
     C_ctb.print_meta();
@@ -443,7 +443,7 @@ int main(int argc, char **argv){
     uint merge_ctb_count = 2;
     for(uint i = 0; i < 20; i += merge_ctb_count){
         for(uint j = i; j < i + merge_ctb_count; j++){
-            for(uint k = 0; k < bench->config->kv_capacity; k++){
+            for(uint k = 0; k < bench->config->CTF_count; k++){
                 bench->load_CTF_keys(j, k);
             }
         }

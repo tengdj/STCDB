@@ -291,7 +291,7 @@ void CTF::transfer_all_in_one(){
     uint8_t * shrink_keys = new uint8_t[key_bit / 8 * CTF_kv_capacity];
     uint8_t * shrink_bitmap = new uint8_t[ctf_bitmap_size];
     uint pid, target, duration, end;
-    uint64_t value_mbr;
+    uint64_t old_value_mbr;
     box real_mbr;
     for(uint kid = 0; kid < CTF_kv_capacity; kid++){
         pid = old_get_key_oid(keys[kid]);
@@ -302,8 +302,8 @@ void CTF::transfer_all_in_one(){
         start_time_min = min(start_time_min, end - duration);
         start_time_max = max(start_time_max, end - duration);
 
-        value_mbr = old_get_key_mbr_code(keys[kid]);
-        real_mbr = new_parse_mbr(value_mbr);
+        old_value_mbr = old_get_key_mbr_code(keys[kid]);
+        real_mbr = new_parse_mbr(old_value_mbr);
         //ctf_mbr.update(real_mbr);
 
         uint low0 = (real_mbr.low[0] - ctf_mbr.low[0])/(ctf_mbr.high[0] - ctf_mbr.low[0]) * x_grid;
@@ -436,12 +436,16 @@ void CTF::print_ctf_meta() {
 
 }
 
-void CTF:: dump(const string& path){
+void CTF::dump_meta(const string& path){
     struct timeval start_time = get_cur_time();
     ofstream wf(path.c_str(), ios::out|ios::binary|ios::trunc);
     wf.write((char *)this, sizeof(CTF));
     wf.write((char *)bitmap, ctf_bitmap_size);
     wf.close();
+}
+
+void CTF::dump_keys(const string& path){
+
 }
 
 CTB::~CTB(){

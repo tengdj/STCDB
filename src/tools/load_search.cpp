@@ -434,10 +434,10 @@ void experiment_box_openmp(workbench *bench){
     bench->box_search_queue.reserve(bench->ctb_count * bench->config->CTF_count);
     time_query tq;
     tq.abandon = true;
-    double edge_length = 0.000329512;             //0.000329512
+    double edge_length = 0.000104192;             //0.000329512
     vector<Point> vp(100);
     get_random_point(vp);
-    for(uint selectivity = 1; selectivity <= 6; selectivity++) {
+    for(uint selectivity = 1; selectivity <= 7; selectivity++) {
         ofstream q;
         q.open("ex_search_box_omp" + to_string(selectivity) + ".csv", ios::out|ios::binary|ios::trunc);
         q << "search edge_length" << ',' << "total_find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ','

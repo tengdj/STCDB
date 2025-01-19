@@ -336,7 +336,7 @@ void *straight_dump(void *arg){
     for(uint i = 0; i < bench->config->CTF_count; i++){
         string ctf_path = string(bench->config->CTB_meta_path) + "test_STcL" + to_string(old_big)+"-"+to_string(i);
         bench->h_ctfs[offset][i].bitmap = &bench->h_bitmaps[offset][bench->bitmaps_size * i];
-        bench->h_ctfs[offset][i].dump(ctf_path);
+        bench->h_ctfs[offset][i].dump_meta(ctf_path);
     }
     logt("dumped meta for CTF",bg_start);
     return NULL;
@@ -495,8 +495,8 @@ void tracer::process(){
                     }
                     cout<<endl;
                 }
-                cout<<"crash_consistency, 2 merge sort and dump"<<endl;
-                cout << "crash dump begin time: " << bench->cur_time << endl;
+                cout<<"crash_consistency, 2 merge sort and dump_meta"<<endl;
+                cout << "crash dump_meta begin time: " << bench->cur_time << endl;
                 //crash_sst_dump((void *)bench);
                 bench->clear();
             }
@@ -537,7 +537,7 @@ void tracer::process(){
                 bench->end_time_max = bench->cur_time;              //old max
                 cout<<"meeting_cut_count:"<<bench->meeting_cut_count<<endl;
                 cout<<"start_time_min:"<<bench->start_time_min<<"start_time_max:"<<bench->start_time_max<<"bench->end_time_min:"<<bench->end_time_min<<"bench->end_time_max:"<<bench->end_time_max<<endl;
-                cout << "dump begin time: " << bench->cur_time << endl;
+                cout << "dump_meta begin time: " << bench->cur_time << endl;
 //                pthread_t bg_thread;
 //                int ret;
 //                if ((ret = pthread_create(&bg_thread, NULL, merge_dump, (void *) bench)) != 0) {

@@ -553,8 +553,8 @@ void workbench::dump_meta(const char *path) {
             string CTB_path = string(path) + "N_CTB" + to_string(i);
             dump_CTB_meta(CTB_path.c_str(), i);
             for(uint j = 0; j < config->CTF_count; j++){
-                string ctf_path = string(config->CTB_meta_path) + "STcL" + to_string(i)+"-"+to_string(j);
-                ctbs[i].ctfs[j].dump(ctf_path);
+                string ctf_path = string(config->CTB_meta_path) + "N_STcL" + to_string(i)+"-"+to_string(j);
+                ctbs[i].ctfs[j].dump_meta(ctf_path);
             }
         }
     }
