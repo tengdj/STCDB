@@ -900,7 +900,7 @@ int main(int argc, char **argv){
     //exp4_search_box_single(nb);
     //experiment_search_box(nb);
     experiment_box_openmp(bench);
-    //experiment_search_time(bench);
+    experiment_search_time(bench);
     //query_search_id(bench);
     //query_search_box(bench);
 

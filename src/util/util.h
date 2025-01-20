@@ -51,6 +51,7 @@ namespace{
 #define DURATION_BIT 32
 #define END_BIT 32
 //26 + 26 + 12 = 64
+#define EDGE_REISTICTION 0.008
 
 
 const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);

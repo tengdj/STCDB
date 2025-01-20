@@ -82,10 +82,12 @@ public:
     uint search_SSTable(uint pid, time_query * tq, bool search_multi, atomic<long long> &search_count, uint *search_multi_pid);
     uint time_search(time_query * tq);
     __uint128_t serial_key(uint64_t pid, uint64_t target, uint64_t duration, uint64_t end, __uint128_t value_mbr);
+    uint64_t serial_mbr(f_box * b);
     void print_key(__uint128_t key);
     void parse_key(__uint128_t key, uint &pid, uint &target, uint &duration, uint &end, uint64_t &value_mbr);
     void parse_key(__uint128_t key, key_info &ki, uint64_t &value_mbr);
     void print_ctf_meta();
+    void print_bitmap();
     void dump_meta(const string& path);
     void dump_keys(const string& path);
     box new_parse_mbr(uint64_t value_mbr);
@@ -94,13 +96,6 @@ public:
     int binary_search(uint oid);
     uint ctf_get_key_oid(__uint128_t temp_128);
 };
-//            string sst_path = config->raid_path + to_string(j%2) + "/N_SSTable_"+to_string(i)+"-"+to_string(j);
-//            ofstream SSTable_of;
-//            SSTable_of.open(sst_path , ios::out|ios::binary|ios::trunc);
-//            assert(SSTable_of.is_open());
-//            SSTable_of.write((char *)ctbs[i].ctfs[j].keys, ctbs[i].ctfs[j].key_bit / 8 * ctbs[i].ctfs[j].CTF_kv_capacity);
-//            SSTable_of.close();
-//            delete[] ctbs[i].ctfs[j].keys;
 
 class CTB {             //contact tracing block
 public:

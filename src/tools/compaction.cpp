@@ -2,106 +2,6 @@
 
 using namespace std;
 
-//constexpr size_t CACHE_LINE_SIZE = 64;
-//
-//struct PaddedAtomicBool {
-//    atomic<bool> value;
-//    char padding[CACHE_LINE_SIZE - sizeof(atomic<bool>)];
-//
-//    PaddedAtomicBool() : value(false) {}
-//};
-
-void a_clear_cache(){
-    string cmd = "sync; sudo sh -c 'echo 1 > /proc/sys/vm/drop_caches'";        //sudo!!!
-    if(system(cmd.c_str())!=0){
-        fprintf(stderr, "Error when disable buffer cache\n");
-    }
-    cout << "clear_cache" << endl;
-}
-
-workbench * a_load_meta(const char *path) {
-    log("loading meta from %s", path);
-    string bench_path = string(path) + "workbench";
-    struct timeval start_time = get_cur_time();
-    ifstream in(bench_path, ios::in | ios::binary);
-    if(!in.is_open()){
-        log("%s cannot be opened",bench_path.c_str());
-        exit(0);
-    }
-    generator_configuration * config = new generator_configuration();
-    workbench * bench = new workbench(config);
-    in.read((char *)config, sizeof(generator_configuration));               //also read meta
-    in.read((char *)bench, sizeof(workbench));      //bench->config = NULL
-    bench->config = config;
-    bench->ctbs = new CTB[40];
-    for(int i = 0; i < 40; i++){
-        //CTB temp_ctb;
-        string CTB_path = string(path) + "CTB" + to_string(i);
-        bench->load_CTB_meta(CTB_path.c_str(), i);
-    }
-    logt("bench meta load from %s",start_time, bench_path.c_str());
-    return bench;
-}
-
-uint a_search_keys_by_pid(__uint128_t* keys, uint64_t wp, uint capacity, vector<__uint128_t> & v_keys, vector<uint> & v_indices){
-    uint count = 0;
-    //cout<<"into search_SSTable wp "<< wp <<endl;
-    int find = -1;
-    int low = 0;
-    int high = capacity - 1;
-    int mid;
-    uint64_t temp_wp;
-    while (low <= high) {
-        mid = (low + high) / 2;
-        temp_wp = keys[mid] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
-//        cout << get_key_wid(keys[mid]) <<'-' << get_key_pid(keys[mid]) << endl;
-//        cout << "temp_wp" << temp_wp << endl;
-        if (temp_wp == wp){
-            find = mid;
-            break;
-        }
-        else if (temp_wp > wp){
-            high = mid - 1;
-        }
-        else {
-            low = mid + 1;
-        }
-    }
-    if(find==-1){
-        //cout<<"cannot find"<<endl;
-        return 0;
-    }
-    //cout<<"exactly find"<<endl;
-    uint cursor = find;
-    while(temp_wp == wp && cursor >= 1){
-        cursor--;
-        temp_wp = keys[cursor] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
-    }
-    if(temp_wp == wp && cursor == 0){
-        count++;
-        v_keys.push_back(keys[cursor]);
-        v_indices.push_back(cursor);
-    }
-    while(cursor+1<capacity){
-        cursor++;
-        temp_wp = keys[cursor] >> (OID_BIT + MBR_BIT + DURATION_BIT + END_BIT);
-        if(temp_wp == wp){
-            count++;
-            v_keys.push_back(keys[cursor]);
-            v_indices.push_back(cursor);
-        }
-        else break;
-    }
-    //cout<<"find !"<<endl;
-    return count;
-}
-
-struct dump_args {
-    string path;
-    __uint128_t * keys;
-    uint SIZE;
-};
-
 bool cmp(pair<key_info, f_box> a, pair<key_info, f_box> b){
     if(a.first.oid == b.first.oid){
         return a.first.target < b.first.target;
@@ -129,14 +29,13 @@ void cpu_sort_by_key(key_info* keys, f_box* values, uint n) {
 }
 
 void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vector< vector<key_info> > &keys_with_sid, vector< vector<f_box> > &mbrs_with_sid,
-                  vector< vector<uint> > &invert_index, vector< pair< vector<key_info>, vector<f_box> > > &objects_map){
+                  vector< vector<uint> > &invert_index, vector< pair< vector<key_info>, vector<f_box> > > &objects_map ){
     uint c_ctb_id = start_ctb / merge_ctb_count;
     cout<<"step into the sst_dump"<<endl;
     //new_bench *bench = (new_bench *)arg;
     CTB C_ctb;
     C_ctb.sids = new unsigned short[bench->config->num_objects];
     copy(bench->ctbs[start_ctb].sids, bench->ctbs[start_ctb].sids + bench->config->num_objects, C_ctb.sids);
-    //find all oversize sid
     for(int i = 1; i < merge_ctb_count; i++){
         for(int j = 0; j < bench->config->num_objects; j++){
             if(bench->ctbs[start_ctb + i].sids[j] == 1){
@@ -144,6 +43,29 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
             }
         }
     }
+
+//find all oversize sid
+//uint sid = x_index * bench->config->split_num + y_index + 2
+//    for(int i = 1; i < merge_ctb_count; i++){
+//        for(int j = 0; j < bench->config->num_objects; j++){
+//            if(bench->ctbs[start_ctb + i].sids[j] == 0){
+//                continue;
+//            }
+//            if(bench->ctbs[start_ctb + i].sids[j] == 1 || C_ctb.sids[j] == 1){
+//                C_ctb.sids[j] = 1;
+//            }
+//            else{
+//                uint new_ctf = bench->ctbs[start_ctb + i].sids[j] - 2;
+//                uint new_x = new_ctf / bench->config->split_num;
+//                uint new_y = new_ctf % bench->config->split_num;
+//                uint old_ctf = bench->ctbs[start_ctb + i].sids[j] - 2;
+//                uint old_x = old_ctf / bench->config->split_num;
+//                uint old_y = old_ctf % bench->config->split_num;
+//                C_ctb.sids[j] = (old_x + new_x) / 2 * bench->config->split_num + (old_y + new_y) / 2 + 2;
+//            }
+//        }
+//    }
+
     key_info * another_o_buffer_k = new key_info[1024*1024*1024/16];        //1G
     f_box * another_o_buffer_b = new f_box[1024*1024*1024/16];
     atomic<int> another_o_count = 0;
@@ -220,7 +142,7 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
     double analyze_time = get_time_elapsed(bg_start,true);
     fprintf(stdout,"\tanalyze_time:\t%.2f\n",analyze_time);
 
-    //get limit abd bits
+    //get limit and bits
     C_ctb.end_time_min = 1 << 30;
     C_ctb.end_time_max = 0;
     for(int i = 0; i < merge_ctb_count; i++){
@@ -256,20 +178,35 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
     double get_limit = get_time_elapsed(bg_start,true);
     fprintf(stdout,"\tget_limit:\t%.2f\n",get_limit);
 
+    {
+        CTF * ctf = &C_ctb.ctfs[0];
+        for(int j = 0; j < ctf->CTF_kv_capacity; j+=10000) {
+            mbrs_with_sid[0][j].print();
+        }
+    }
+
+
 #pragma omp parallel for num_threads(bench->config->CTF_count)
     for(uint i = 0; i < bench->config->CTF_count; i++){
-        C_ctb.ctfs[i].bitmap = new uint8_t[C_ctb.ctfs[i].ctf_bitmap_size];
-        f_box * CTF_mbr = &C_ctb.ctfs[i].ctf_mbr;
-        for(int j = 0; j < C_ctb.ctfs[i].CTF_kv_capacity; j++) {
-            uint low0 = (mbrs_with_sid[i][j].low[0] - CTF_mbr->low[0])/(CTF_mbr->high[0] - CTF_mbr->low[0]) * C_ctb.ctfs[i].x_grid;
-            uint low1 = (mbrs_with_sid[i][j].low[1] - CTF_mbr->low[1])/(CTF_mbr->high[1] - CTF_mbr->low[1]) * C_ctb.ctfs[i].y_grid;
-            uint high0 = (mbrs_with_sid[i][j].high[0] - CTF_mbr->low[0])/(CTF_mbr->high[0] - CTF_mbr->low[0]) * C_ctb.ctfs[i].x_grid;
-            uint high1 = (mbrs_with_sid[i][j].high[1] - CTF_mbr->low[1])/(CTF_mbr->high[1] - CTF_mbr->low[1]) * C_ctb.ctfs[i].y_grid;
+        CTF * ctf = &C_ctb.ctfs[i];
+        ctf->bitmap = new unsigned char[ctf->ctf_bitmap_size];
+        for(int j = 0; j < ctf->CTF_kv_capacity; j++) {
+//            f_box key_box = mbrs_with_sid[i][j];
+//            if(key_box.low[0] > key_box.high[0] || key_box.low[1] > key_box.high[1]){
+//                cout << " error box " << endl;
+//            }
+            uint low0 = (mbrs_with_sid[i][j].low[0] - ctf->ctf_mbr.low[0])/(ctf->ctf_mbr.high[0] - ctf->ctf_mbr.low[0]) * ctf->x_grid;
+            uint low1 = (mbrs_with_sid[i][j].low[1] - ctf->ctf_mbr.low[1])/(ctf->ctf_mbr.high[1] - ctf->ctf_mbr.low[1]) * ctf->y_grid;
+            uint high0 = (mbrs_with_sid[i][j].high[0] - ctf->ctf_mbr.low[0])/(ctf->ctf_mbr.high[0] - ctf->ctf_mbr.low[0]) * ctf->x_grid;
+            uint high1 = (mbrs_with_sid[i][j].high[1] - ctf->ctf_mbr.low[1])/(ctf->ctf_mbr.high[1] - ctf->ctf_mbr.low[1]) * ctf->y_grid;
             uint bit_pos = 0;
-            for (uint m = low0; m <= high0; m++) {
-                for (uint n = low1; n <= high1; n++) {
-                    bit_pos = m + n * C_ctb.ctfs[i].x_grid;
-                    C_ctb.ctfs[i].bitmap[bit_pos / 8] |= (1 << (bit_pos % 8));
+            for (uint m = low0; m <= high0 && m < ctf->x_grid; m++) {
+                for (uint n = low1; n <= high1 && n < ctf->y_grid; n++) {
+                    bit_pos = m + n * ctf->x_grid;
+                    if(bit_pos > ctf->ctf_bitmap_size * 8){
+                        cout << "bit_pos "  << bit_pos << " m-n " << m << '-' << n << " x_grid " << ctf->x_grid << "y_grid" << ctf->y_grid << endl;
+                    }
+                    ctf->bitmap[bit_pos / 8] |= (1 << (bit_pos % 8));
                 }
             }
         }
@@ -277,39 +214,9 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
     double write_bitmap_time = get_time_elapsed(bg_start,true);
     fprintf(stdout,"\twrite_bitmap_time:\t%.2f\n",write_bitmap_time);
 
-//            //    //output bitmap
-//        CUDA_SAFE_CALL(cudaMemcpy(bench->h_bitmaps[offset], h_bench.d_bitmaps, bench->bitmaps_size, cudaMemcpyDeviceToHost));
-//        cerr << "output picked bitmap" << endl;
-//        Point * bit_points = new Point[bench->bit_count];
-//        uint count_p;
-//        for(uint j = 0;j<bench->config->CTF_count; j++){
-//            //cerr<<"bitmap"<<j<<endl;
-//            cerr<<endl;
-//            CTF * temp_ctf = &bench->h_ctfs[offset][j];
-//            count_p = 0;
-//            bool is_print = false;
-//            for(uint i=0;i<bench->bit_count;i++){
-//                if(bench->h_bitmaps[offset][j*(bench->bit_count/8) + i/8] & (1<<(i%8))){
-//                    if(!is_print){
-//                        cout<<i<<"in SST"<<j<<endl;
-//                        is_print = true;
-//                    }
-//                    Point bit_p;
-//                    uint x=0,y=0;
-//                    x = i % temp_ctf->x_grid;
-//                    y = i / temp_ctf->x_grid;
-//                    bit_p.x = (double)x/temp_ctf->x_grid*(temp_ctf->ctf_mbr.high[0] - temp_ctf->ctf_mbr.low[0]) + temp_ctf->ctf_mbr.low[0];
-//                    bit_p.y = (double)y/temp_ctf->y_grid*(temp_ctf->ctf_mbr.high[1] - temp_ctf->ctf_mbr.low[1]) + temp_ctf->ctf_mbr.low[1];
-//                    bit_points[count_p] = bit_p;
-//                    count_p++;
-//                }
-//            }
-//            cout<<"bit_points.size():"<<count_p<<endl;
-//            print_points(bit_points,count_p);
-//            //cerr << "process output bitmap finish" << endl;
-//        }
-//        delete[] bit_points;
-
+    for(uint i = 0; i < bench->config->CTF_count; i++) {
+        C_ctb.ctfs[i].print_bitmap();
+    }
 
     for(uint i = 0; i < bench->config->CTF_count; i++) {
         CTF * ctf = &C_ctb.ctfs[i];
@@ -378,7 +285,7 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
 
     merged_buffer.keys = new __uint128_t[merged_buffer.oversize_kv_count];
     merged_buffer.boxes = new f_box[merged_buffer.oversize_kv_count];
-    uint *key_index = new uint[o_count];        //0
+    uint *key_index = new uint[o_count]{0};        //0
     uint taken_id = 0;
     uint kv_count = 0;
     while(kv_count < merged_buffer.oversize_kv_count) {
@@ -386,8 +293,8 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
         taken_id = 0;
         for (int i = 0; i < o_count; i++) {
             if (key_index[i] < ob[i].oversize_kv_count && temp_key > ob[i].keys[key_index[i]]){
-                temp_key = ob[i].keys[key_index[i]];
                 taken_id = i;
+                temp_key = ob[taken_id].keys[key_index[taken_id]];
             }
         }
         merged_buffer.keys[kv_count] = temp_key;
@@ -404,12 +311,14 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
 
     string CTB_path = string(bench->config->CTB_meta_path) + "C_CTB" + to_string(c_ctb_id);
     bench->dump_CTB_meta(CTB_path.c_str(), &C_ctb);
-    logt("dumped meta for CTB %d",bg_start, c_ctb_id);
+    logt("dumped meta for C_CTB %d",bg_start, c_ctb_id);
 
 #pragma omp parallel for num_threads(bench->config->CTF_count)
     for(uint i = 0; i < bench->config->CTF_count; i++){
         string ctf_path = string(bench->config->CTB_meta_path) + "C_STcL" + to_string(c_ctb_id)+"-"+to_string(i);
         C_ctb.ctfs[i].dump_meta(ctf_path);
+        string sst_path = bench->config->raid_path + to_string(i%2) + "/C_SSTable_"+to_string(c_ctb_id)+"-"+to_string(i);
+        C_ctb.ctfs[i].dump_keys(sst_path.c_str());
     }
     logt("dumped meta for CTF",bg_start);
     C_ctb.print_meta();
@@ -425,12 +334,15 @@ int main(int argc, char **argv){
     cout << "bench->ctb_count " << bench->ctb_count << endl;
     cout << "max_ctb " << max_ctb << endl;
     bench->ctb_count = max_ctb;
-
     for(int i = 0; i < bench->ctb_count; i++) {
         for (int j = 0; j < bench->config->CTF_count; j++) {
             bench->ctbs[i].ctfs[j].keys = nullptr;
         }
     }
+//    for(uint i = 0; i < 100; i++){
+//        bench->ctbs[1].ctfs[i].print_bitmap();
+//    }
+//    return 0;
 
     vector< vector<key_info> > keys_with_sid(bench->config->CTF_count);
     vector< vector<f_box> > mbrs_with_sid(bench->config->CTF_count);
@@ -441,7 +353,7 @@ int main(int argc, char **argv){
     vector< pair< vector<key_info>, vector<f_box> > > objects_map(bench->config->num_objects);
 
     uint merge_ctb_count = 2;
-    for(uint i = 0; i < 20; i += merge_ctb_count){
+    for(uint i = 0; i < 2; i += merge_ctb_count){
         for(uint j = i; j < i + merge_ctb_count; j++){
             for(uint k = 0; k < bench->config->CTF_count; k++){
                 bench->load_CTF_keys(j, k);
@@ -455,7 +367,11 @@ int main(int argc, char **argv){
         //init
         for(uint j = i; j < i + merge_ctb_count; j++){
             for(uint k = 0; k < bench->config->kv_capacity; k++){
-                delete []bench->ctbs[j].ctfs[k].keys;
+                if(bench->ctbs[j].ctfs[k].keys){
+                    delete []bench->ctbs[j].ctfs[k].keys;
+                    bench->ctbs[j].ctfs[k].keys = nullptr;
+                }
+
             }
         }
         for(uint j = 0; j < bench->config->CTF_count; j++){

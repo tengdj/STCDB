@@ -160,10 +160,11 @@ uint cuda_get_key_end(__uint128_t key){
 
 __host__ __device__
 uint64_t serialize_mbr(f_box* b, f_box* bitmap_mbr, CTF * ctf){
+    float longer_edge = max(bitmap_mbr->high[0] - bitmap_mbr->low[0], bitmap_mbr->high[1] - bitmap_mbr->low[1]);
     uint64_t low0 = (b->low[0] - bitmap_mbr->low[0])/(bitmap_mbr->high[0] - bitmap_mbr->low[0]) * ((1ULL << (ctf->low_x_bit)) - 1);
     uint64_t low1 = (b->low[1] - bitmap_mbr->low[1])/(bitmap_mbr->high[1] - bitmap_mbr->low[1]) * ((1ULL << (ctf->low_y_bit)) - 1);
-    uint64_t x = (b->high[0] - bitmap_mbr->low[0])/(bitmap_mbr->high[0] - bitmap_mbr->low[0]) * ((1ULL << (ctf->edge_bit)) - 1);
-    uint64_t y = (b->high[1] - bitmap_mbr->low[1])/(bitmap_mbr->high[1] - bitmap_mbr->low[1]) * ((1ULL << (ctf->edge_bit)) - 1);
+    uint64_t x = (b->high[0] - b->low[0])/longer_edge * ((1ULL << (ctf->edge_bit)) - 1);
+    uint64_t y = (b->high[1] - b->low[1])/longer_edge * ((1ULL << (ctf->edge_bit)) - 1);
     uint64_t value_mbr = ((uint64_t)low0 << (ctf->low_y_bit + ctf->edge_bit + ctf->edge_bit)) + ((uint64_t)low1 << (ctf->edge_bit + ctf->edge_bit))
                         + ((uint64_t)x << (ctf->edge_bit)) + (uint64_t)y;
     return value_mbr;
@@ -171,10 +172,11 @@ uint64_t serialize_mbr(f_box* b, f_box* bitmap_mbr, CTF * ctf){
 
 __host__ __device__
 uint64_t serialize_mbr(box* b, box* bitmap_mbr, CTF * ctf){
+    float longer_edge = max(bitmap_mbr->high[0] - bitmap_mbr->low[0], bitmap_mbr->high[1] - bitmap_mbr->low[1]);
     uint64_t low0 = (b->low[0] - bitmap_mbr->low[0])/(bitmap_mbr->high[0] - bitmap_mbr->low[0]) * ((1ULL << (ctf->low_x_bit)) - 1);
     uint64_t low1 = (b->low[1] - bitmap_mbr->low[1])/(bitmap_mbr->high[1] - bitmap_mbr->low[1]) * ((1ULL << (ctf->low_y_bit)) - 1);
-    uint64_t x = (b->high[0] - bitmap_mbr->low[0])/(bitmap_mbr->high[0] - bitmap_mbr->low[0]) * ((1ULL << (ctf->edge_bit)) - 1);
-    uint64_t y = (b->high[1] - bitmap_mbr->low[1])/(bitmap_mbr->high[1] - bitmap_mbr->low[1]) * ((1ULL << (ctf->edge_bit)) - 1);
+    uint64_t x = (b->high[0] - b->low[0])/longer_edge * ((1ULL << (ctf->edge_bit)) - 1);
+    uint64_t y = (b->high[1] - b->low[1])/longer_edge * ((1ULL << (ctf->edge_bit)) - 1);
     uint64_t value_mbr = ((uint64_t)low0 << (ctf->low_y_bit + ctf->edge_bit + ctf->edge_bit)) + ((uint64_t)low1 << (ctf->edge_bit + ctf->edge_bit))
                          + ((uint64_t)x << (ctf->edge_bit)) + (uint64_t)y;
     return value_mbr;
@@ -1850,6 +1852,7 @@ void process_with_gpu(workbench *bench, workbench* d_bench, gpu_info *gpu){
 //        //cerr << "process output bitmap finish" << endl;
 //        delete[] bit_points;
 
+        //STR
         thrust::device_ptr<uint64_t> d_vector_xys = thrust::device_pointer_cast(h_bench.mid_xys);
         thrust::device_ptr<uint> d_vector_oids = thrust::device_pointer_cast(h_bench.d_oids);
         thrust::sort_by_key(d_vector_xys, d_vector_xys + bench->config->num_objects, d_vector_oids);

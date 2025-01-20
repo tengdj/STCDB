@@ -24,6 +24,7 @@ old_workbench * old_load_meta(const char *path, uint max_ctb) {
     in.read((char *)bench, sizeof(old_workbench));      //bench->config = NULL
     bench->config = config;
     bench->ctbs = new CTB[config->big_sorted_run_capacity];
+#pragma omp parallel for num_threads(bench->config->num_threads)
     for(int i = 0; i < min(max_ctb, bench->ctb_count); i++){
         //CTB temp_ctb;
         string CTB_path = string(path) + "CTB" + to_string(i);
@@ -55,7 +56,6 @@ int main(){
     struct timeval start_time = get_cur_time();
     bench->make_new_ctf_with_old_ctb(max_ctb);
     logt("make_new_ctf_with_old_ctb ",start_time);
-    cout << "search begin" << endl;
     bench->dump_meta(bench->config->CTB_meta_path);
     return 0;
 }
