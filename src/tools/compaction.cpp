@@ -339,9 +339,29 @@ int main(int argc, char **argv){
             bench->ctbs[i].ctfs[j].keys = nullptr;
         }
     }
+
 //    for(uint i = 0; i < 100; i++){
-//        bench->ctbs[1].ctfs[i].print_bitmap();
+//        bench->ctbs[0].ctfs[i].print_bitmap();
+//        //bench->ctbs[1].ctfs[i].ctf_mbr.print();
 //    }
+//    CTF * ctf = &bench->ctbs[0].ctfs[0];
+//    bench->load_CTF_keys(0, 0);
+//    uint8_t * data = reinterpret_cast<uint8_t *>(ctf->keys);
+//    uint temp_oid = 0;
+//    for(uint i = 0; i < ctf->CTF_kv_capacity; i++){
+//        key_info temp_ki;
+//        __uint128_t temp_128 = 0;
+//        memcpy(&temp_128, data + i * ctf->key_bit / 8, ctf->key_bit / 8);
+//        uint64_t value_mbr = 0;
+//        ctf->parse_key(temp_128, temp_ki, value_mbr);
+////        box key_box = ctf->new_parse_mbr(value_mbr);
+////        if(key_box.high[1] - key_box.low[1] > 0.008 || key_box.high[0] - key_box.low[0] > 0.008){
+////            cerr << "i " <<  i <<" ";
+////            key_box.print();
+////        }
+//
+//    }
+//
 //    return 0;
 
     vector< vector<key_info> > keys_with_sid(bench->config->CTF_count);

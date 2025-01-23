@@ -197,8 +197,10 @@ public:
     uint id_not_find_count = 0;
     uint mbr_find_count = 0;
     uint mbr_unique_find = 0;
-    uint intersect_sst_count = 0;
+    uint intersect_sst_count = 0;           //tree find count
     uint time_find_count = 0;
+    uint time_find_vector_size = 0;
+    uint time_contain_count = 0;
     uint meeting_cut_count = 0;
     uint larger_than_1000s = 0;
     uint larger_than_2000s = 0;

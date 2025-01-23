@@ -437,11 +437,12 @@ void experiment_box_openmp(workbench *bench){
     double edge_length = 0.000104192;             //0.000329512
     vector<Point> vp(100);
     get_random_point(vp);
-    for(uint selectivity = 1; selectivity <= 7; selectivity++) {
+    for(uint selectivity = 1; selectivity <= 11; selectivity++) {
         ofstream q;
         q.open("ex_search_box_omp" + to_string(selectivity) + ".csv", ios::out|ios::binary|ios::trunc);
         q << "search edge_length" << ',' << "total_find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ','
-            << "total_MB" << ',' << "prepare_time(ms)" << ',' << "mid x" << ',' << "mid y" << ',' << "buffer_time" << ','  << "buffer_find" << endl;
+            << "total_MB" << ',' << "prepare_time(ms)" << ',' << "mid x" << ',' << "mid y" << ',' << "buffer_time" << ','
+            << "buffer_find" << ',' << "time_contain_count" << endl;
         for (int i = 0; i < 100; i++) {
             bench->clear_all_keys();
             clear_cache();
@@ -450,7 +451,8 @@ void experiment_box_openmp(workbench *bench){
             bench->mbr_find_count = 0;
             bench->intersect_sst_count = 0;
             bench->bit_find_count = 0;
-            double margin = edge_length / 2;
+            bench->time_contain_count = 0;
+
             Point mid = vp[i];
             box search_area(mid.x - edge_length / 2, mid.y - edge_length / 2, mid.x + edge_length / 2,
                             mid.y + edge_length / 2);
@@ -506,33 +508,39 @@ void experiment_box_openmp(workbench *bench){
             double multi_thread_consume = get_time_elapsed(multi_thread_start, true);
             q << edge_length << ',' << bench->search_count << ',' << multi_thread_consume << ','
               << bench->intersect_sst_count << ',' << bench->bit_find_count << ','
-              << total_MB / 1024 / 1024 << ',' << prepare_consume << ',' << mid.x << ',' << mid.y << ',' << buffer_consume << ','  << end_buffer << endl;
+              << total_MB / 1024 / 1024 << ',' << prepare_consume << ',' << mid.x << ',' << mid.y << ',' << buffer_consume << ','
+              << end_buffer << ',' << bench->time_contain_count << endl;
             bench->box_search_queue.clear();
         }
         q.close();
-        edge_length *= 3.162;
+        edge_length *= 2;       //3.162
     }
 }
 
 void experiment_search_time(workbench *bench){
-    uint last_search = 3600 * (24 * 7 - 1);
+    uint last_search = 3600 * (24 * 7 - 5);
     uint time_pick = last_search / 10;
+    ofstream q;
+    q.open("search_time.csv", ios::out|ios::binary|ios::trunc);
+    q << "start_second" << ',' << "duration" << ',' << "find count" << ',' << "time_consume(ms)" << ',' << "total_index_find"
+        << ',' << "contained count" << ',' << "traverse_keys count" << endl;
     for(uint base_time = time_pick; base_time <= last_search; base_time += time_pick){
-        ofstream q;
-        q.open("search_time" + to_string(base_time) + ".csv", ios::out|ios::binary|ios::trunc);
-        q << "start_second" << ',' << "duration" << ',' << "find count" << ',' << "time_consume(ms)" << endl;
         time_query tq;
         tq.abandon = false;
         tq.t_start = base_time;
-        for(uint i = 600; i <= 3600; i+= 600){
+        for(uint i = 600; i <= 3600 * 3; i+= 600){
             tq.t_end = tq.t_start + i;
             bench->clear_all_keys();
             clear_cache();
+            bench->search_count = 0;
+            bench->time_find_vector_size = 0;
+            bench->time_contain_count = 0;
             struct timeval disk_search_time = get_cur_time();
             uint find_count = bench->search_time_in_disk(&tq);
             double time_consume = get_time_elapsed(disk_search_time);
             cout << "find_count" << find_count << "time_consume" << time_consume << endl;
-            q << tq.t_start << ',' << i << ',' << find_count << ',' << time_consume << endl;
+            q << tq.t_start << ',' << i << ',' << find_count << ',' << time_consume << ',' << bench->time_find_vector_size
+                << ',' << bench->time_contain_count << ',' << bench->time_find_vector_size - bench->time_contain_count << endl;
         }
     }
 }
@@ -844,6 +852,111 @@ void compress_rate(workbench * bench){
     }
 }
 
+void one_batch_box_search(workbench * bench, uint ctb_id){
+    uint ctb_MB = 0;
+    for(uint j = 0; j < bench->config->CTF_count; j++){
+        CTF * ctf = &bench->ctbs[ctb_id].ctfs[j];
+        ctb_MB += ctf->CTF_kv_capacity * ctf->key_bit / 8;
+    }
+    ctb_MB = ctb_MB / 1024 / 1024;
+    cout << "ctb_MB" << ctb_MB << endl;         //1822
+    struct timeval build_start = get_cur_time();
+    bench->total_rtree = new RTree<int *, double, 2, double>();
+    for(uint j = 0; j < bench->config->CTF_count; j++){
+        f_box & m = bench->ctbs[ctb_id].ctfs[j].ctf_mbr;
+        box b;
+        b.low[0] = m.low[0];
+        b.low[1] = m.low[1];
+        b.high[0] = m.high[0];
+        b.high[1] = m.high[1];
+        bench->total_rtree->Insert(b.low, b.high, new int(ctb_id * bench->config->CTF_count +j));
+    }
+    double build_tree_time = get_time_elapsed(build_start, true);
+    ofstream q;
+    q.open("one_batch_box_search.csv", ios::out|ios::binary|ios::trunc);
+    q << "search edge_length" << ',' << "total_find_count" << ',' << "total_time_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ','
+      << "total_MB" << ',' << "prepare_time(ms)" << ',' << "build_tree_time" << ',' << "load_time" << ',' << "buffer_time" << ','  << "buffer_find" << endl;
+
+
+    bench->box_search_queue.reserve(bench->ctb_count * bench->config->CTF_count);
+    time_query tq;
+    tq.abandon = true;
+    double edge_length = 0.000104192;             //0.000329512
+    for(uint selectivity = 1; selectivity <= 7; selectivity++) {
+        for (int i = 0; i < 10; i++) {
+            bench->clear_all_keys();
+            clear_cache();
+            struct timeval prepare_start = get_cur_time();
+            bench->search_count = 0;
+            bench->mbr_find_count = 0;
+            bench->intersect_sst_count = 0;
+            bench->bit_find_count = 0;
+            Point mid = {-87.717895, 41.856374};
+            box search_area(mid.x - edge_length / 2, mid.y - edge_length / 2, mid.x + edge_length / 2,
+                            mid.y + edge_length / 2);
+
+            bench->mbr_search_in_disk(search_area, &tq);
+            double prepare_consume = get_time_elapsed(prepare_start, true);
+
+            //search_area.print();
+            uint before_buffer = bench->search_count;
+
+            bench->mbr_search_in_obuffer(search_area, ctb_id, &tq);
+
+            double buffer_consume = get_time_elapsed(prepare_start, true);
+            uint end_buffer = bench->search_count - before_buffer;
+
+            uint64_t total_MB = 0;
+            for (auto info: bench->box_search_queue) {
+                total_MB += bench->ctbs[info.ctb_id].ctfs[info.ctf_id].CTF_kv_capacity * bench->ctbs[info.ctb_id].ctfs[info.ctf_id].key_bit / 8;
+            }
+            //cout << "total_MB" << total_MB * sizeof(__uint128_t) / 1024 / 1024 << endl;
+            struct timeval multi_thread_start = get_cur_time();
+
+            double load_time = 0;
+            for (auto info: bench->box_search_queue) {
+                CTF * ctf = &bench->ctbs[info.ctb_id].ctfs[info.ctf_id];
+                uint mbr_find_count = 0;
+                struct timeval load_start = get_cur_time();
+                if (!ctf->keys) {
+                    bench->load_CTF_keys(info.ctb_id, info.ctf_id);
+                }
+                load_time += get_time_elapsed(load_start, true);
+                uint8_t * data = reinterpret_cast<uint8_t *>(ctf->keys);
+                for (uint q = 0; q < ctf->CTF_kv_capacity; q++) {
+                    key_info temp_ki;
+                    __uint128_t temp_128 = 0;
+                    memcpy(&temp_128, data + q * ctf->key_bit / 8, ctf->key_bit / 8);
+                    uint64_t value_mbr = 0;
+                    ctf->parse_key(temp_128, temp_ki, value_mbr);
+
+                    if (info.tq.abandon ) {
+                        //uint pid = get_key_oid(temp_key);
+                        box key_box = ctf->new_parse_mbr(value_mbr);
+                        if (search_area.intersect(key_box)) {
+                            mbr_find_count++;
+                            //cout<<"box find!"<<endl;
+                            //key_box.print();
+                        }
+                    }
+                }
+//                delete[] ctf->keys;
+//                ctf->keys = nullptr;
+                bench->search_count.fetch_add(mbr_find_count, std::memory_order_relaxed);
+            }
+
+            double multi_thread_consume = get_time_elapsed(multi_thread_start, true);
+            q << edge_length << ',' << bench->search_count << ',' << multi_thread_consume << ','
+              << bench->intersect_sst_count << ',' << bench->bit_find_count << ','
+              << total_MB / 1024 / 1024 << ',' << prepare_consume << ',' << build_tree_time << ',' << load_time << ',' << buffer_consume << ','  << end_buffer << endl;
+            bench->box_search_queue.clear();
+        }
+        edge_length *= 3.162;       //3.162
+    }
+    q.close();
+
+};
+
 int main(int argc, char **argv){
     clear_cache();
     string path = "../data/meta/";
@@ -853,12 +966,15 @@ int main(int argc, char **argv){
     cout << "bench->ctb_count " << bench->ctb_count << endl;
     cout << "max_ctb " << max_ctb << endl;
     bench->ctb_count = max_ctb;
-
     for(int i = 0; i < bench->ctb_count; i++) {
         for (int j = 0; j < bench->config->CTF_count; j++) {
             bench->ctbs[i].ctfs[j].keys = nullptr;
         }
     }
+
+//    one_batch_box_search(bench, 10);
+//    return 0;
+
 
     //compress_rate(bench);
 
@@ -900,7 +1016,7 @@ int main(int argc, char **argv){
     //exp4_search_box_single(nb);
     //experiment_search_box(nb);
     experiment_box_openmp(bench);
-    experiment_search_time(bench);
+    //experiment_search_time(bench);
     //query_search_id(bench);
     //query_search_box(bench);
 

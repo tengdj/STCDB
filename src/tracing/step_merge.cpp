@@ -132,8 +132,8 @@ void CTF::eight_parallel() {
 }
 
 void CTF::get_ctf_bits(box map_mbr, configuration * config){
-    ctf_mbr.high[0] += 0.000001;
-    ctf_mbr.high[1] += 0.000001;
+//    ctf_mbr.high[0] += 0.000001;
+//    ctf_mbr.high[1] += 0.000001;
 
     id_bit = min_bits_to_store(config->num_objects);
     duration_bit = min_bits_to_store(config->max_meet_time - 1);
@@ -187,12 +187,13 @@ __uint128_t CTF::serial_key(uint64_t pid, uint64_t target, uint64_t duration, ui
 }
 
 uint64_t CTF::serial_mbr(f_box * b){
-    if(b->low[0] > b->high[0]){
-        swap(b->low[0], b->high[0]);                //old data error
-    }
-    if(b->low[1] > b->high[1]){
-        swap(b->low[1], b->high[1]);
-    }
+//    if(b->low[0] > b->high[0]){
+//        swap(b->low[0], b->high[0]);                //old data error
+//    }
+//    if(b->low[1] > b->high[1]){
+//        swap(b->low[1], b->high[1]);
+//    }
+    assert(b->low[0] <= b->high[0] && b->low[1] <= b->high[1]);
     float longer_edge = max(ctf_mbr.high[0] - ctf_mbr.low[0], ctf_mbr.high[1] - ctf_mbr.low[1]);
     uint64_t low0 = (b->low[0] - ctf_mbr.low[0])/(ctf_mbr.high[0] - ctf_mbr.low[0]) * ((1ULL << (low_x_bit)) - 1);
     uint64_t low1 = (b->low[1] - ctf_mbr.low[1])/(ctf_mbr.high[1] - ctf_mbr.low[1]) * ((1ULL << (low_y_bit)) - 1);
@@ -318,29 +319,43 @@ uint old_get_key_end(__uint128_t key){
     return (uint)(key & ((1ULL << 12) - 1));
 }
 
-void old_parse_mbr(__uint128_t key, f_box &b, f_box bitmap_mbr){
+void old_parse_mbr(__uint128_t key, f_box &b, f_box bitmap_mbr){        //MBR_BIT 36
     uint64_t mbr_code = old_get_key_mbr_code(key);
     uint64_t low0 = mbr_code >> (MBR_BIT/4*3);
     uint64_t low1 = (mbr_code >> (MBR_BIT/2)) & ((1ULL << (MBR_BIT/4)) - 1);
     uint64_t high0 = (mbr_code >> (MBR_BIT/4)) & ((1ULL << (MBR_BIT/4)) - 1);
     uint64_t high1 = mbr_code & ((1ULL << (MBR_BIT/4)) - 1);
 
-    //缺少一个float uint转吧
+    if(low0 > high0){
+        high0 = low0;
+    }
+    if(low1 > high1){
+        high1 = low1;
+    }
 
     b.low[0] = (double)low0/((1ULL << (MBR_BIT/4)) - 1) * (bitmap_mbr.high[0] - bitmap_mbr.low[0]) + bitmap_mbr.low[0];
     b.low[1] = (double)low1/((1ULL << (MBR_BIT/4)) - 1) * (bitmap_mbr.high[1] - bitmap_mbr.low[1]) + bitmap_mbr.low[1];
     b.high[0] = (double)high0/((1ULL << (MBR_BIT/4)) - 1) * (bitmap_mbr.high[0] - bitmap_mbr.low[0]) + bitmap_mbr.low[0];
     b.high[1] = (double)high1/((1ULL << (MBR_BIT/4)) - 1) * (bitmap_mbr.high[1] - bitmap_mbr.low[1]) + bitmap_mbr.low[1];
+
+    if(b.low[0] > b.high[0]){
+        cerr << "x_err ";
+        swap(b.low[0], b.high[0]);
+    }
+    if(b.low[1] > b.high[1]){
+        cerr << "still err ";
+        swap(b.low[1], b.high[1]);
+    }
 }
 
 void CTF::transfer_all_in_one(){
     assert(key_bit % 8 == 0);
     uint8_t * shrink_keys = new uint8_t[key_bit / 8 * CTF_kv_capacity];
-    uint8_t * shrink_bitmap = new uint8_t[ctf_bitmap_size];
+    unsigned char * shrink_bitmap = new uint8_t[ctf_bitmap_size];
     uint pid, target, duration, end;
-    uint64_t old_value_mbr, new_value_mbr;
+    uint64_t new_value_mbr;
     f_box real_mbr;
-    for(uint kid = 0; kid < CTF_kv_capacity; kid++){
+    for(uint kid = 0; kid < CTF_kv_capacity; kid++) {
         pid = old_get_key_oid(keys[kid]);
         target = old_get_key_target(keys[kid]);
         duration = old_get_key_duration(keys[kid]);
@@ -349,16 +364,22 @@ void CTF::transfer_all_in_one(){
         start_time_min = min(start_time_min, end - duration);
         start_time_max = max(start_time_max, end - duration);
         old_parse_mbr(keys[kid], real_mbr, ctf_mbr);
+        assert(ctf_mbr.contain(real_mbr));
 
         uint low0 = (real_mbr.low[0] - ctf_mbr.low[0])/(ctf_mbr.high[0] - ctf_mbr.low[0]) * x_grid;
         uint low1 = (real_mbr.low[1] - ctf_mbr.low[1])/(ctf_mbr.high[1] - ctf_mbr.low[1]) * y_grid;
         uint high0 = (real_mbr.high[0] - ctf_mbr.low[0])/(ctf_mbr.high[0] - ctf_mbr.low[0]) * x_grid;
         uint high1 = (real_mbr.high[1] - ctf_mbr.low[1])/(ctf_mbr.high[1] - ctf_mbr.low[1]) * y_grid;
+        assert(low0 <= x_grid);
+        assert(high0 <= x_grid);
+        assert(low1 <= y_grid);
+        assert(high1 <= y_grid);
         uint bit_pos = 0;
-        for(uint i=low0;i<high0;i++){
-            for(uint j=low1;j<high1 ;j++){
+        for(uint i=low0;i<=high0 && i < x_grid;i++){
+            for(uint j=low1;j<=high1 && j < y_grid;j++){
+
                 bit_pos = i + j * x_grid;
-                assert(bit_pos / 8 < ctf_bitmap_size);
+                //assert(bit_pos / 8 < ctf_bitmap_size);
                 shrink_bitmap[bit_pos / 8] |= (1 << (bit_pos % 8));
             }
         }
@@ -369,7 +390,7 @@ void CTF::transfer_all_in_one(){
 
     }
     delete []bitmap;
-    bitmap = (unsigned char *)shrink_bitmap;
+    bitmap = shrink_bitmap;
     delete []keys;
     keys = reinterpret_cast<__uint128_t *>(shrink_keys);
 
@@ -481,14 +502,12 @@ void CTF::print_ctf_meta() {
 }
 
 void CTF::print_bitmap(){
-    for(uint i=0;i<ctf_bitmap_size;i++){
-        cout << (bitmap[i] & 0xff);
-    }
-
-
+//    for(uint i=0;i<ctf_bitmap_size;i++){
+//        cout << (bitmap[i] & 0xff);
+//    }
 
     cerr << endl;
-    ctf_mbr.print();
+    //ctf_mbr.print();
     Point * bit_points = new Point[ctf_bitmap_size * 8];
     uint count_p = 0;
     for(uint i=0;i<ctf_bitmap_size * 8;i++){

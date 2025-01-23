@@ -273,6 +273,18 @@ public:
                 low[0],high[1],
                 low[0],low[1]);
     }
+    bool is_contained(box &target){
+        return target.low[0]<=low[0]&&
+               target.high[0]>=high[0]&&
+               target.low[1]<=low[1]&&
+               target.high[1]>=high[1];
+    }
+    bool contain(f_box &target){
+        return target.low[0]>=low[0]&&
+               target.high[0]<=high[0]&&
+               target.low[1]>=low[1]&&
+               target.high[1]<=high[1];
+    }
     bool intersect(box &target){
         return !(target.low[0]>high[0]||            //target is at the right of this
                  target.high[0]<low[0]||            //... left...
@@ -284,7 +296,7 @@ public:
         print_vertices();
         fprintf(stderr,"))\n");
     }
-    void update(box &b){
+    void update(f_box &b){
         if(low[0] > b.low[0]){
             low[0] = b.low[0];
         }

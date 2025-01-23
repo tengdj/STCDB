@@ -341,7 +341,10 @@ vector<Interval> query_intervals(const vector<Interval>& start_sorted, const vec
 
 uint workbench::search_time_in_disk(time_query * tq){          //not finish
     vector<Interval> result = query_intervals(start_sorted, end_sorted, tq->t_start, tq->t_end);
+    time_find_vector_size = result.size();
     cout << "result.size()" << result.size() << endl;
+    atomic<uint> temp_contain;
+    temp_contain = 0;
 #pragma omp parallel for num_threads(config->num_threads)
     for(uint j = 0; j < result.size(); j++){
         //cout << "start " << result[j].start << " end " << result[j].end << " value " << result[j].value << endl;
@@ -351,20 +354,33 @@ uint workbench::search_time_in_disk(time_query * tq){          //not finish
             if(ctb_id > ctb_count) continue;
             uint ctf_id = result[j].value % config->CTF_count;
             CTF * ctf = &ctbs[ctb_id].ctfs[ctf_id];
-            if (!ctf->keys) {
-                load_CTF_keys(ctb_id, ctf_id);
+            if(tq->t_start < ctf->start_time_min && ctf->end_time_max < tq->t_end){
+                count += ctf->CTF_kv_capacity;
+                temp_contain.fetch_add(1, std::memory_order_relaxed);
             }
-            count += ctf->time_search(tq);
-            delete []ctbs[ctb_id].ctfs[ctf_id].keys;
-            ctbs[ctb_id].ctfs[ctf_id].keys = nullptr;
+            else{
+                if (!ctf->keys) {
+                    load_CTF_keys(ctb_id, ctf_id);
+                }
+                count += ctf->time_search(tq);
+                delete []ctbs[ctb_id].ctfs[ctf_id].keys;
+                ctbs[ctb_id].ctfs[ctf_id].keys = nullptr;
+            }
         }
         else{   //hit buffer
             int ctb_id = -1 - result[j].value;
-            count += ctbs[ctb_id].o_buffer.o_time_search(tq);
+            if(tq->t_start < ctbs[ctb_id].o_buffer.start_time_min && ctbs[ctb_id].o_buffer.end_time_max < tq->t_end){
+                count += ctbs[ctb_id].o_buffer.oversize_kv_count;
+                temp_contain.fetch_add(1, std::memory_order_relaxed);
+            }
+            else{
+                count += ctbs[ctb_id].o_buffer.o_time_search(tq);
+            }
         }
         search_count.fetch_add(count, std::memory_order_relaxed);
     }
     uint ret = search_count;
+    time_contain_count = temp_contain;
     search_count = 0;
     return ret;
 }
@@ -495,6 +511,11 @@ bool workbench::mbr_search_in_disk(box b, time_query * tq){
         uint CTB_id = intersect_mbrs[j].first / config->CTF_count;
         uint CTF_id = intersect_mbrs[j].first % config->CTF_count;
         CTF *ctf = &ctbs[CTB_id].ctfs[CTF_id];
+        if(ctf->ctf_mbr.is_contained(b)){
+            time_contain_count++;
+            search_count += ctf->CTF_kv_capacity;
+            continue;
+        }
         bool find = false;
         for(uint bid=0; bid < ctf->ctf_bitmap_size * 8; bid++){
             if(ctf->bitmap[bid / 8] & (1 << (bid % 8))){
@@ -511,7 +532,6 @@ bool workbench::mbr_search_in_disk(box b, time_query * tq){
                     ret = true;
                     break;
                 }
-
             }
         }
 
@@ -622,17 +642,17 @@ void workbench::load_CTB_meta(const char *path, int i) {
     in.read((char *)ctbs[i].o_buffer.o_bitmaps, bit_count / 8);
     in.close();
 
-    std::cerr << "Size of ctbs[i].sids: "
-              << bytes_to_MB(config->num_objects * sizeof(unsigned short)) << " MB" << std::endl;
-
-    std::cerr << "Size of ctbs[i].o_buffer.keys: "
-              << bytes_to_MB(ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t)) << " MB" << std::endl;
-
-    std::cerr << "Size of ctbs[i].o_buffer.boxes: "
-              << bytes_to_MB(ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box)) << " MB" << std::endl;
-
-    std::cerr << "Size of ctbs[i].o_buffer.o_bitmaps: "
-              << bytes_to_MB(bit_count / 8) << " MB" << std::endl;
+//    std::cerr << "Size of ctbs[i].sids: "
+//              << bytes_to_MB(config->num_objects * sizeof(unsigned short)) << " MB" << std::endl;
+//
+//    std::cerr << "Size of ctbs[i].o_buffer.keys: "
+//              << bytes_to_MB(ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t)) << " MB" << std::endl;
+//
+//    std::cerr << "Size of ctbs[i].o_buffer.boxes: "
+//              << bytes_to_MB(ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box)) << " MB" << std::endl;
+//
+//    std::cerr << "Size of ctbs[i].o_buffer.o_bitmaps: "
+//              << bytes_to_MB(bit_count / 8) << " MB" << std::endl;
 
     uint byte_of_CTB_meta = config->num_objects * sizeof(unsigned short) +  ctbs[i].o_buffer.oversize_kv_count * sizeof(__uint128_t)
                             + ctbs[i].o_buffer.oversize_kv_count * sizeof(f_box) + bit_count / 8;
@@ -642,7 +662,7 @@ void workbench::load_CTB_meta(const char *path, int i) {
     //ctbs[i].ctfs is a pointer but no malloc
     ctbs[i].ctfs = new CTF[config->CTF_count];
     for(uint j = 0; j < 100; j++){
-        string CTF_path = string(path) + "STcL" + to_string(i)+"-"+to_string(j);
+        string CTF_path = string(path) + "N_STcL" + to_string(i)+"-"+to_string(j);
         load_CTF_meta(CTF_path.c_str(), i, j);
     }
     logt("CTF meta %d load from %s",start_time, i, path);
@@ -671,6 +691,9 @@ void old_workbench::old_load_CTB_meta(const char *path, int i) {
     in.read((char *)&ctbs[i], sizeof(CTB) - sizeof(oversize_buffer) - 8);
     in.read((char *)&ctbs[i].o_buffer, sizeof(old_oversize_buffer));
     in.read((char *)&ctbs[i].box_rtree, 8);
+    if(ctbs[i].ctfs){
+        cout << "must re new ctfs" << endl;
+    }
     ctbs[i].first_widpid = new uint64_t[config->CTF_count];
     ctbs[i].sids = new unsigned short[config->num_objects];
     ctbs[i].bitmaps = new unsigned char[bitmaps_size];
@@ -739,11 +762,14 @@ void workbench::build_trees(uint max_ctb){
     temp.reserve(max_ctb * (config->CTF_count + 1));
     for(int i = 0; i < max_ctb; i++){
         for(int j = 0; j < config->CTF_count; j++) {
-            if(ctbs[i].ctfs[j].start_time_min < ctbs[i].ctfs[j].end_time_max - 3600 * 4){               //for long tail
-                ctbs[i].ctfs[j].start_time_min = ctbs[i].ctfs[j].end_time_max - 3600 * 4;
+            if(ctbs[i].ctfs[j].start_time_min < ctbs[i].ctfs[j].end_time_max - 4096){               //for long tail
+                ctbs[i].ctfs[j].start_time_min = ctbs[i].ctfs[j].end_time_max - 4096 - 500 * get_rand_double();
             }
             Interval temp_in(ctbs[i].ctfs[j].start_time_min, ctbs[i].ctfs[j].end_time_max, (int)(i * config->CTF_count +j));
             temp.push_back(temp_in);
+        }
+        if(ctbs[i].o_buffer.start_time_min < ctbs[i].o_buffer.end_time_max - 4096){
+            ctbs[i].o_buffer.start_time_min = ctbs[i].o_buffer.end_time_max - 4096 - 500 * get_rand_double();
         }
         Interval temp_in(ctbs[i].o_buffer.start_time_min, ctbs[i].o_buffer.end_time_max, (int)(-1-i));
         temp.push_back(temp_in);
