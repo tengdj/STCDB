@@ -352,6 +352,7 @@ void CTF::transfer_all_in_one(){
     assert(key_bit % 8 == 0);
     uint8_t * shrink_keys = new uint8_t[key_bit / 8 * CTF_kv_capacity];
     unsigned char * shrink_bitmap = new uint8_t[ctf_bitmap_size];
+    memset(shrink_bitmap, 0, ctf_bitmap_size); 
     uint pid, target, duration, end;
     uint64_t new_value_mbr;
     f_box real_mbr;

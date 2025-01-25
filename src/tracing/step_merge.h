@@ -24,6 +24,13 @@ struct key_info{
     uint end;
 };
 
+struct object_info{
+    f_box object_mbr;       //may be useless
+    Point ave_loc;
+    uint oid;
+    uint key_count;
+};
+
 class old_oversize_buffer {             //contact tracing block
 public:
     uint oversize_kv_count = 0;

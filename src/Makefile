@@ -6,7 +6,8 @@ SRCS := $(wildcard */*.cpp)
 OBJS := $(patsubst %.cpp,%.o,$(SRCS))
 
 INCLUDES	= -I /usr/include -I ./src -I /usr/local/cuda/targets/x86_64-linux/include/
-LIBS		= -L/usr/lib/x86_64-linux-gnu -lboost_program_options -lpthread -fopenmp -pg -L/usr/local/lib -I/usr/local/include  -lrocksdb
+LIBS		= -L/usr/lib/x86_64-linux-gnu -lboost_program_options -lpthread -fopenmp -pg -L/usr/local/lib -I/usr/local/include  -lrocksdb -ltbb
+
 CPPFLAGS	= -g -std=c++17 -Wno-cpp -fopenmp
 
 CUDALIBS	= -L/usr/local/cuda/lib64 -lcudart
