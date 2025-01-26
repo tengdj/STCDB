@@ -312,7 +312,7 @@ void *straight_dump(void *arg){
     uint8_t * h_ctf_keys = reinterpret_cast<uint8_t *>(bench->h_keys[offset]);
 #pragma omp parallel for num_threads(bench->config->CTF_count)          //there is little improvement when 100->128 threads
     for(uint sst_count=0; sst_count < bench->config->CTF_count; sst_count++){
-        string sst_path = bench->config->raid_path + to_string(sst_count%2) + "/test_SSTable_"+to_string(old_big)+"-"+to_string(sst_count);
+        string sst_path = bench->config->raid_path + to_string(sst_count%2) + "/6_SSTable_"+to_string(old_big)+"-"+to_string(sst_count);
         ofstream SSTable_of;
         SSTable_of.open(sst_path , ios::out|ios::binary|ios::trunc);
         assert(SSTable_of.is_open());
@@ -328,13 +328,13 @@ void *straight_dump(void *arg){
     //delete[] bit_points;
     bench->dumping = false;
 
-    string CTB_path = string(bench->config->CTB_meta_path) + "test_CTB" + to_string(old_big);
+    string CTB_path = string(bench->config->CTB_meta_path) + "6_CTB" + to_string(old_big);
     bench->dump_CTB_meta(CTB_path.c_str(), old_big);
     logt("dumped meta for CTB %d",bg_start, old_big);
 
 #pragma omp parallel for num_threads(bench->config->CTF_count)
     for(uint i = 0; i < bench->config->CTF_count; i++){
-        string ctf_path = string(bench->config->CTB_meta_path) + "test_STcL" + to_string(old_big)+"-"+to_string(i);
+        string ctf_path = string(bench->config->CTB_meta_path) + "6_STcL" + to_string(old_big)+"-"+to_string(i);
         bench->h_ctfs[offset][i].bitmap = &bench->h_bitmaps[offset][bench->bitmaps_size * i];
         bench->h_ctfs[offset][i].dump_meta(ctf_path);
     }
