@@ -288,6 +288,10 @@ public:
 	// external source
 	Point *points = NULL;
 
+    //added
+    char keys_file_prefix[24] = "N"; 
+    uint bitmap_grid = 1000;
+
 	workbench(workbench *bench);
 	workbench(configuration *conf);
 	~workbench(){};
@@ -658,7 +662,7 @@ public:
 //};
 
 old_workbench * old_load_meta(const char *path, uint max_ctb);
-workbench * load_meta(const char *path, uint max_ctb);
+workbench * load_meta(const char *path, uint max_ctb, uint CTF_count = 100);
 workbench * bench_transfer(old_workbench * old_bench);
 
 

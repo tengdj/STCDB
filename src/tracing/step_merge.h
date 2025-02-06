@@ -28,7 +28,7 @@ struct object_info{
     f_box object_mbr;       //may be useless
     Point ave_loc;
     uint oid;
-    uint key_count;
+    //uint key_count;
 };
 
 class old_oversize_buffer {             //contact tracing block
@@ -52,7 +52,7 @@ public:
     uint end_time_min = 0;
     uint end_time_max = 0;
 
-    ~oversize_buffer();
+    //~oversize_buffer();
     uint search_buffer(uint32_t oid, time_query * tq, bool search_multi, atomic<long long> &search_count, uint *search_multi_pid);
     uint o_time_search(time_query * tq);
 
@@ -71,6 +71,7 @@ public:
     uint start_time_max = 0;
     uint end_time_min = 0;
     uint end_time_max = 0;
+    uint ctf_bitmap_size = 0;          //bytes
     uint16_t key_bit = 0;
     uint16_t id_bit = 0;
     uint16_t duration_bit = 0;
@@ -81,11 +82,13 @@ public:
     uint16_t mbr_bit = 0;
     uint16_t x_grid = 0;
     uint16_t y_grid = 0;
-    uint16_t ctf_bitmap_size = 0;          //bytes
+    //uint16_t ctf_bitmap_size = 0;          //bytes
 //    ~CTF();
 
     void eight_parallel();
     void get_ctf_bits(box map_mbr, configuration * config);
+    void get_ctf_bits(box map_mbr, configuration * config, uint bitmap_grid);
+    //uint count_meta_size();
     uint search_SSTable(uint pid, time_query * tq, bool search_multi, atomic<long long> &search_count, uint *search_multi_pid);
     uint time_search(time_query * tq);
     __uint128_t serial_key(uint64_t pid, uint64_t target, uint64_t duration, uint64_t end, __uint128_t value_mbr);

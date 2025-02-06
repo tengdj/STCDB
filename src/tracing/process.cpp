@@ -210,9 +210,9 @@ void tracer::print_traces(){
 	points.clear();
 }
 
-workbench * load_meta(const char *path, uint max_ctb) {
-    log("loading meta from %s", path);
-    string bench_path = string(path) + "N_workbench";
+workbench * load_meta(const char *path, uint max_ctb, uint CTF_count) {
+    //log("loading meta from %s", path);
+    string bench_path = "../data/meta/N_workbench";           //_workbench
     struct timeval start_time = get_cur_time();
     ifstream in(bench_path, ios::in | ios::binary);
     if(!in.is_open()){
@@ -225,6 +225,7 @@ workbench * load_meta(const char *path, uint max_ctb) {
     cout << bench->ctb_count << "bench->ctb_count" << endl;
     in.read((char *)bench, sizeof(workbench));      //bench->config = NULL
     bench->config = config;
+    bench->config->CTF_count = CTF_count;
     bench->ctbs = new CTB[config->big_sorted_run_capacity];
 #pragma omp parallel for num_threads(bench->config->num_threads)
     for(int i = 0; i < min(max_ctb, bench->ctb_count); i++){
@@ -312,7 +313,9 @@ void *straight_dump(void *arg){
     uint8_t * h_ctf_keys = reinterpret_cast<uint8_t *>(bench->h_keys[offset]);
 #pragma omp parallel for num_threads(bench->config->CTF_count)          //there is little improvement when 100->128 threads
     for(uint sst_count=0; sst_count < bench->config->CTF_count; sst_count++){
-        string sst_path = bench->config->raid_path + to_string(sst_count%2) + "/6_SSTable_"+to_string(old_big)+"-"+to_string(sst_count);
+        string sst_path = bench->config->raid_path 
+            + to_string(sst_count%2) + "/6oversize_" + to_string(bench->config->file_size) + "_SSTable_"
+            +to_string(old_big)+"-"+to_string(sst_count);
         ofstream SSTable_of;
         SSTable_of.open(sst_path , ios::out|ios::binary|ios::trunc);
         assert(SSTable_of.is_open());
@@ -328,14 +331,16 @@ void *straight_dump(void *arg){
     //delete[] bit_points;
     bench->dumping = false;
 
-    string CTB_path = string(bench->config->CTB_meta_path) + "6_CTB" + to_string(old_big);
+    string CTB_path = string(bench->config->CTB_meta_path) 
+        + "/6oversize_" + to_string(bench->config->file_size) + "_CTB" + to_string(old_big);
     bench->dump_CTB_meta(CTB_path.c_str(), old_big);
     logt("dumped meta for CTB %d",bg_start, old_big);
 
 #pragma omp parallel for num_threads(bench->config->CTF_count)
     for(uint i = 0; i < bench->config->CTF_count; i++){
-        string ctf_path = string(bench->config->CTB_meta_path) + "6_STcL" + to_string(old_big)+"-"+to_string(i);
-        bench->h_ctfs[offset][i].bitmap = &bench->h_bitmaps[offset][bench->bitmaps_size * i];
+        string ctf_path = string(bench->config->CTB_meta_path) 
+            + "/6oversize_" + to_string(bench->config->file_size) + "_STcL" + to_string(old_big)+"-"+to_string(i);
+        bench->h_ctfs[offset][i].bitmap = &bench->h_bitmaps[offset][bench->bit_count / 8 * i];       
         bench->h_ctfs[offset][i].dump_meta(ctf_path);
     }
     logt("dumped meta for CTF",bg_start);
@@ -399,6 +404,13 @@ void tracer::process(){
             bench->end_time_min = config->start_time + config->min_meet_time;           //first min time
             bench->start_time_min = (1ULL<<32) -1;
             bench->start_time_max = 0;
+
+            vector<double> area_reistriction = {0.00000724534, 0.0000095889, 
+            0.0000133709, 0.0000192537, 0.0000301749, 0.000053588,
+             0.000103177, 0.000204741, 0.00044563, 0.00233805, 100};        //100 is not cut
+            bench->dProbFalse = area_reistriction[bench->config->file_size];
+            cout << "bench->config->file_size" <<  bench->config->file_size 
+                << " bench->dProbFalse" << bench->dProbFalse << endl;
 
 //            //command
 //            int ret1;
@@ -547,20 +559,26 @@ void tracer::process(){
 
 
 
-//                ofstream p;
-//                string filename = "longer_edges" + to_string(bench->ctb_count) + ".csv";
-//                cout << filename << endl;
-//                p.open(filename, ios::out|ios::binary|ios::trunc);
-//                p << "percent(%)" << ',' << "edge_length" << endl;
-//                int this_count = 0;
-//                for(int i = 0 ; i < bench->config->num_objects; i += 20000){
-//                    p << i/20000 << ',' << bench->h_longer_edges[i] << endl;
-////                    if(i%1000000==0){
-////                        cout << i/1000000 << " " << bench->h_longer_edges[i] << endl;
-////                    }
-//                }
-//                p.close();
-
+                // ofstream p;
+                // string filename = "larger_areas" + to_string(bench->ctb_count) + ".csv";
+                // cout << filename << endl;
+                // p.open(filename, ios::out|ios::binary|ios::trunc);
+                // p << "percent(%)" << ',' << "edge_length" << endl;
+                // int zero_split = 0;
+                // for(int i = 0 ; i < bench->config->num_objects; i++){
+                //     if(bench->h_longer_edges[i] > 0){
+                //         zero_split = i;
+                //         break;
+                //     }
+                // }
+                // assert(zero_split > 0);
+                // int thousand_one = (bench->config->num_objects - zero_split) / 1000;
+                // cout << "zero_split" << zero_split << " thousand_one" << thousand_one << endl;
+                // for(int i = zero_split ; i < bench->config->num_objects; i += thousand_one){
+                //     p << (i - zero_split)/1000 << ',' << bench->h_longer_edges[i] << endl;
+                // }
+                // p.close();
+                // return;
 
                 if(config->MemTable_capacity==2){
                     straight_dump((void *)bench);

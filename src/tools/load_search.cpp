@@ -689,66 +689,7 @@ void experiment_search_time(workbench *bench){
 ////    q.close();
 ////}
 //
-//bool temp_mbr_search_in_CTB(new_bench * nb,box b, uint CTB_id){
-//    uint i = CTB_id;
-//    bool ret = false, find = false;
-//    box bit_b = nb->make_bit_box(b);
-//    uint bit_pos = 0;
-//    if(!nb->ctbs[i].ctfs){
-//        nb->ctbs[i].ctfs = new CTF[nb->config->CTF_count];
-//    }
-//    //cout << "in bg_run" << i << endl;
-//
-//    uint buffer_find = 0;
-////    for(uint q = 0; q < ctbs[i].o_buffer.oversize_kv_count; q++){
-////        if(ctbs[i].o_buffer.boxes[q].intersect(b)){
-////            //uni.insert(cuda_get_key_oid(ctbs[i].o_buffer.keys[i]));
-////            buffer_find++;
-////            mbr_find_count++;
-////            //cout<<"box find!"<<endl;
-////            //ctbs[i].o_buffer.boxes[q].print();
-////        }
-////    }
-//
-//    for (uint j = 0; j < 100; j++) {
-//        uint CTF_id = j;
-//        find = true;
-////        for (uint p = bit_b.low[0]-1; (p <= bit_b.high[0]+1) && (!find); p++) {
-////            for (uint q = bit_b.low[1]-1; (q <= bit_b.high[1]+1) && (!find); q++) {
-////                bit_pos = xy2d(SID_BIT / 2, p, q);
-////                if (nb->ctbs[i].bitmaps[CTF_id * (nb->bit_count / 8) + bit_pos / 8] & (1 << (bit_pos % 8))) {              //mbr intersect bitmap
-////                    //cerr << "SSTable_" << CTF_id << "bit_pos" << bit_pos << endl;
-////                    find = true;
-////                    ret = true;
-////                    break;
-////                }
-////            }
-////        }
-//        if(find){
-//            nb->bit_find_count++;
-//            if(!nb->ctbs[i].ctfs[CTF_id].keys){
-//                nb->load_CTF_keys(i, CTF_id);
-//            }
-//            uint this_find = 0;
-//            for(uint q = 0; q < nb->ctbs[i].CTF_capacity[CTF_id]; q++){
-//                uint pid = get_key_oid(nb->ctbs[i].ctfs[CTF_id].keys[q]);
-//                box key_box;
-//                parse_mbr(nb->ctbs[i].ctfs[CTF_id].keys[q], key_box, nb->ctbs[i].bitmap_mbrs[j]);
-//                if(b.intersect(key_box)){
-//                    //uni.insert(pid);
-//                    this_find++;
-//                    nb->mbr_find_count++;
-//                    //cout<<"box find!"<<endl;
-//                    //key_box.print();
-//
-//                }
-//            }
-//            //cerr<<this_find<<"finds in sst "<<CTF_id<<endl;
-//
-//        }
-//    }
-//    return ret;
-//}
+
 //
 //
 ////int main(int argc, char **argv){
@@ -959,9 +900,9 @@ void one_batch_box_search(workbench * bench, uint ctb_id){
 
 int main(int argc, char **argv){
     clear_cache();
-    string path = "../data/meta/";
+    string path = "../data/meta/N";
     //workbench * bench = C_load_meta(path.c_str());
-    uint max_ctb = 1215;
+    uint max_ctb = 3;
     workbench * bench = load_meta(path.c_str(), max_ctb);
     cout << "bench->ctb_count " << bench->ctb_count << endl;
     cout << "max_ctb " << max_ctb << endl;

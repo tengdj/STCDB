@@ -301,15 +301,22 @@ void workbench::clear_all_keys(){
 
 void workbench::load_CTF_keys(uint CTB_id, uint CTF_id){
     ifstream read_sst;
-    string filename = config->raid_path + to_string(CTF_id%2) + "/N_SSTable_"+to_string(CTB_id)+"-"+to_string(CTF_id);
+    string filename = config->raid_path + to_string(CTF_id%2) + "/" + string(keys_file_prefix) + "_SSTable_" 
+        + to_string(CTB_id)+"-"+to_string(CTF_id);
     read_sst.open(filename, ios::in|ios::binary);
     if(!read_sst.is_open()){
-        cout << filename << endl;
+        cout << "keys cannot open" << filename << endl;
     }
-    //assert(read_sst.is_open());
     CTF * ctf = &ctbs[CTB_id].ctfs[CTF_id];
-    uint8_t * data = new uint8_t[ctf->CTF_kv_capacity * ctf->key_bit];
-    read_sst.read((char *)data, ctf->CTF_kv_capacity * ctf->key_bit);
+    size_t bytes_expected = ctf->CTF_kv_capacity * ctf->key_bit / 8;
+    uint8_t * data = new uint8_t[bytes_expected];
+    read_sst.read((char *)data, bytes_expected);
+    size_t bytes_read = read_sst.gcount();  
+    if (bytes_read < bytes_expected) {
+        std::cerr << "ERROR: File is too small! Expected " << bytes_expected
+                << " bytes, but only read " << bytes_read << " bytes." << std::endl;
+        exit(1);
+    }
     read_sst.close();
     ctf->keys = reinterpret_cast<__uint128_t *>(data);
 }
@@ -523,11 +530,13 @@ bool workbench::mbr_search_in_disk(box b, time_query * tq){
                 uint x=0,y=0;
                 x = bid % ctf->x_grid;
                 y = bid / ctf->x_grid;
-                bit_p.x = (double) x / ctf->x_grid * (ctf->ctf_mbr.high[0] - ctf->ctf_mbr.low[0]) +
-                          ctf->ctf_mbr.low[0];
-                bit_p.y = (double) y / ctf->y_grid * (ctf->ctf_mbr.high[1] - ctf->ctf_mbr.low[1]) +
-                          ctf->ctf_mbr.low[1];
-                if(b.contain(bit_p)){
+                double left_right = (ctf->ctf_mbr.high[0] - ctf->ctf_mbr.low[0]) / ctf->x_grid;
+                double top_down = (ctf->ctf_mbr.high[1] - ctf->ctf_mbr.low[1]) / ctf->y_grid;
+                bit_p.x = (double) x * left_right + ctf->ctf_mbr.low[0];
+                bit_p.y = (double) y * top_down + ctf->ctf_mbr.low[1];
+                box pixel_b(bit_p.x - left_right / 2, bit_p.y - top_down / 2, bit_p.x + left_right / 2,
+                            bit_p.y + top_down / 2);
+                if(b.intersect(pixel_b)){
                     find = true;
                     ret = true;
                     break;
@@ -625,7 +634,7 @@ double bytes_to_MB(size_t bytes) {
 }
 
 void workbench::load_CTB_meta(const char *path, int i) {
-    string CTB_path = string(path) + "N_CTB" + to_string(i);
+    string CTB_path = string(path) + "_CTB" + to_string(i);     //N_CTB
     struct timeval start_time = get_cur_time();
     ifstream in(CTB_path.c_str(), ios::in | ios::binary);
     if (!in.is_open()) {
@@ -661,8 +670,8 @@ void workbench::load_CTB_meta(const char *path, int i) {
 
     //ctbs[i].ctfs is a pointer but no malloc
     ctbs[i].ctfs = new CTF[config->CTF_count];
-    for(uint j = 0; j < 100; j++){
-        string CTF_path = string(path) + "N_STcL" + to_string(i)+"-"+to_string(j);
+    for(uint j = 0; j < config->CTF_count; j++){
+        string CTF_path = string(path) + "_STcL" + to_string(i)+"-"+to_string(j);          //N_STcL
         load_CTF_meta(CTF_path.c_str(), i, j);
     }
     logt("CTF meta %d load from %s",start_time, i, path);
