@@ -48,9 +48,9 @@ void ex_oversize_cut(uint k, double edge_length, vector<Point> vp, workbench *be
         ofstream q;
         q.open("ex_oversize_cut" + to_string(k) + ".csv", ios::out|ios::binary|ios::trunc);
         q << "search edge_length" << ',' << "total_find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ','
-            << "total_MB" << ',' << "prepare_time(ms)" << ',' << "mid x" << ',' << "mid y" << ',' << "buffer_time" << ','
-            << "buffer_find" << ',' << "time_contain_count" << endl;
-        for (int i = 0; i < 1000; i++) {
+          << "total_MB" << ',' << "prepare_time(ms)" << ',' << "load_ctf_time" << ',' << "mid x" << ',' << "mid y" << ',' << "buffer_time" << ','
+          << "buffer_find" << ',' << "buffer_bitmap_hit" << ',' << "time_contain_count" << endl;
+        for (uint i = 0; i < min(100, (int)vp.size()); i++) {
             bench->clear_all_keys();
             clear_cache();
             struct timeval prepare_start = get_cur_time();
@@ -69,9 +69,9 @@ void ex_oversize_cut(uint k, double edge_length, vector<Point> vp, workbench *be
 
             //search_area.print();
             uint before_buffer = bench->search_count;
-
+            short buffer_bitmap_hit = 0;
             for (uint j = 0; j < min((uint) 1215, bench->ctb_count); j++) {
-                bench->mbr_search_in_obuffer(search_area, j, &tq);
+                buffer_bitmap_hit = bench->mbr_search_in_obuffer(search_area, j, &tq);
             }
             double buffer_consume = get_time_elapsed(prepare_start, true);
             uint end_buffer = bench->search_count - before_buffer;
@@ -83,12 +83,15 @@ void ex_oversize_cut(uint k, double edge_length, vector<Point> vp, workbench *be
             //cout << "total_MB" << total_MB * sizeof(__uint128_t) / 1024 / 1024 << endl;
             struct timeval multi_thread_start = get_cur_time();
 
+            double load_time = 0;
             for (auto info: bench->box_search_queue) {
                 CTF * ctf = &bench->ctbs[info.ctb_id].ctfs[info.ctf_id];
                 uint mbr_find_count = 0;
+                struct timeval load_start = get_cur_time();
                 if (!ctf->keys) {
                     bench->load_CTF_keys(info.ctb_id, info.ctf_id);
                 }
+                load_time += get_time_elapsed(load_start, true);
                 uint8_t * data = reinterpret_cast<uint8_t *>(ctf->keys);
                 for (uint q = 0; q < ctf->CTF_kv_capacity; q++) {
                     key_info temp_ki;
@@ -107,16 +110,16 @@ void ex_oversize_cut(uint k, double edge_length, vector<Point> vp, workbench *be
                         }
                     }
                 }
-                delete[] ctf->keys;
-                ctf->keys = nullptr;
+                // delete[] ctf->keys;
+                // ctf->keys = nullptr;
                 bench->search_count.fetch_add(mbr_find_count, std::memory_order_relaxed);
             }
 
             double multi_thread_consume = get_time_elapsed(multi_thread_start, true);
             q << edge_length << ',' << bench->search_count << ',' << multi_thread_consume << ','
               << bench->intersect_sst_count << ',' << bench->bit_find_count << ','
-              << total_MB / 1024 / 1024 << ',' << prepare_consume << ',' << mid.x << ',' << mid.y << ',' << buffer_consume << ','
-              << end_buffer << ',' << bench->time_contain_count << endl;
+              << total_MB / 1024 / 1024 << ',' << prepare_consume << ',' << load_time << ',' << mid.x << ',' << mid.y << ',' << buffer_consume << ','
+              << end_buffer << ',' << buffer_bitmap_hit << ',' << bench->time_contain_count << endl;
             bench->box_search_queue.clear();
         }
         q.close();

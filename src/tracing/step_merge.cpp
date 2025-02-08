@@ -518,14 +518,16 @@ uint CTF::search_SSTable(uint pid, time_query * tq, bool search_multi, atomic<lo
 
 uint CTF::time_search(time_query * tq){
     uint count = 0;
+    uint8_t * data = reinterpret_cast<uint8_t *>(keys);
     for(uint i = 0; i < CTF_kv_capacity; i++){
-        __uint128_t key;
-        uint pid, target, duration, end;
-        uint64_t value_mbr;
-        parse_key(keys[i], pid, target, duration, end, value_mbr);
-        end += end_time_min;
-        uint start = end - duration;
-        if((tq->t_start < start) && (end < tq->t_end)) {
+        key_info temp_ki;
+        __uint128_t temp_128 = 0;
+        memcpy(&temp_128, data + i * key_bit / 8, key_bit / 8);
+        uint64_t value_mbr = 0;
+        parse_key(temp_128, temp_ki, value_mbr);
+        temp_ki.end += end_time_min;
+        uint start = temp_ki.end - temp_ki.duration;
+        if((tq->t_start < start) && (temp_ki.end < tq->t_end)) {
             count++;
         }
     }

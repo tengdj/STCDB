@@ -364,11 +364,12 @@ uint workbench::search_time_in_disk(time_query * tq){          //not finish
             if(tq->t_start < ctf->start_time_min && ctf->end_time_max < tq->t_end){
                 count += ctf->CTF_kv_capacity;
                 temp_contain.fetch_add(1, std::memory_order_relaxed);
+                load_CTF_keys(ctb_id, ctf_id);      //count time
             }
             else{
-                if (!ctf->keys) {
+                //if (!ctf->keys) {
                     load_CTF_keys(ctb_id, ctf_id);
-                }
+                //}
                 count += ctf->time_search(tq);
                 delete []ctbs[ctb_id].ctfs[ctf_id].keys;
                 ctbs[ctb_id].ctfs[ctf_id].keys = nullptr;
@@ -476,18 +477,19 @@ bool PolygonSearchCallback(int * i, box poly_mbr,void* arg){
 bool workbench::mbr_search_in_obuffer(box b, uint CTB_id, time_query * tq){
     uint i = CTB_id;
     bool ret = false;
-    if(!ctbs[i].ctfs){
-        ctbs[i].ctfs = new CTF[config->CTF_count];
-    }
     for(uint bid=0; bid < bit_count; bid++){
         if(ctbs[CTB_id].o_buffer.o_bitmaps[bid / 8] & (1 << (bid % 8))){
             Point bit_p;
             uint x=0,y=0;
             x = bid % DEFAULT_bitmap_edge;
             y = bid / DEFAULT_bitmap_edge;
-            bit_p.x = (double)x/DEFAULT_bitmap_edge*(mbr.high[0] - mbr.low[0]) + mbr.low[0];
-            bit_p.y = (double)y/DEFAULT_bitmap_edge*(mbr.high[1] - mbr.low[1]) + mbr.low[1];
-            if(b.contain(bit_p)){
+            double left_right = (mbr.high[0] - mbr.low[0]) / DEFAULT_bitmap_edge;
+            double top_down = (mbr.high[1] - mbr.low[1]) / DEFAULT_bitmap_edge;
+            bit_p.x = (double) x * left_right + mbr.low[0];
+            bit_p.y = (double) y * top_down + mbr.low[1];
+            box pixel_b(bit_p.x - left_right / 2, bit_p.y - top_down / 2, bit_p.x + left_right / 2,
+                        bit_p.y + top_down / 2);
+            if(b.intersect(pixel_b)){
                 ret = true;
                 break;
             }

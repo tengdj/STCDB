@@ -902,7 +902,7 @@ int main(int argc, char **argv){
     clear_cache();
     string path = "../data/meta/N";
     //workbench * bench = C_load_meta(path.c_str());
-    uint max_ctb = 3;
+    uint max_ctb = 1215;
     workbench * bench = load_meta(path.c_str(), max_ctb);
     cout << "bench->ctb_count " << bench->ctb_count << endl;
     cout << "max_ctb " << max_ctb << endl;
@@ -956,8 +956,8 @@ int main(int argc, char **argv){
 //    cout << "real_world_time(s) " << real_world_time / 1000 << endl;
     //exp4_search_box_single(nb);
     //experiment_search_box(nb);
-    experiment_box_openmp(bench);
-    //experiment_search_time(bench);
+    //experiment_box_openmp(bench);
+    experiment_search_time(bench);
     //query_search_id(bench);
     //query_search_box(bench);
 
