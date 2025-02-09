@@ -52,20 +52,20 @@ void cpu_sort_by_key(vector<key_info> & keys, vector<f_box> & values) {
 
 // Compare function to sort by sid and ave_loc.x
 bool compare_two_level(const object_info& a, const object_info& b, const unsigned short* sids) {
-    bool a_is_last = (sids[a.oid] <= 1); // 判断 a 是否应该放在后面
-    bool b_is_last = (sids[b.oid] <= 1); // 判断 b 是否应该放在后面
+    bool a_is_last = (sids[a.oid] <= 1); // Check if a should be placed last
+    bool b_is_last = (sids[b.oid] <= 1); // Check if b should be placed last
 
-    // 分区逻辑：将 sids <= 1 的元素放在后面
-    if (a_is_last != b_is_last) {
-        return b_is_last; // 如果 a 应该放在前面，b 应该放在后面，返回 true
+    // Partition logic: place elements with sids <= 1 at the end
+    if (a_is_last != b_is_last) {           // Partition
+        return b_is_last; // If a should be placed first and b should be placed last, return true
     }
 
-    // 排序逻辑：对于 sids > 1 的元素，按照 ave_loc.x 从小到大排序
-    if (!a_is_last) { // 只有 sids > 1 的元素需要排序
+    // Sorting logic: for elements with sids > 1, sort by ave_loc.x in ascending order
+    if (!a_is_last) { // Only elements with sids > 1 need to be sorted
         return a.ave_loc.x < b.ave_loc.x;
     }
 
-    // 对于 sids <= 1 的元素，保持原始顺序（稳定排序）
+    // For elements with sids <= 1, maintain the original order (stable sort)
     return false;
 }
 
@@ -717,9 +717,8 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
         str_list[i].oid = i;
         if(C_ctb.sids[i] == 2){
             str_list[i].ave_loc.x = str_list[i].object_mbr.low[0] / 2 + str_list[i].object_mbr.high[0] / 2;
-            str_list[i].ave_loc.y = str_list[i].object_mbr.low[1]/ 2 + str_list[i].object_mbr.high[1] / 2;
+            str_list[i].ave_loc.y = str_list[i].object_mbr.low[1] / 2 + str_list[i].object_mbr.high[1] / 2;
         }
-
     }
     double init_str_list = get_time_elapsed(bg_start,true);
     fprintf(stdout,"\tinit_str_list:\t%.2f\n",init_str_list);
@@ -1033,6 +1032,7 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
         C_ctb.ctfs[i].dump_meta(ctf_path);
         string sst_path = bench->config->raid_path + to_string(i%2) + "/" + prefix + "_SSTable_"+to_string(c_ctb_id)+"-"+to_string(i);
         C_ctb.ctfs[i].dump_keys(sst_path.c_str());
+        delete[] C_ctb.ctfs[i].keys;
     }
     double dump_ctf_keys_time = get_time_elapsed(bg_start,true);
     fprintf(stdout,"\t dump_ctf_keys_time:\t%.2f\n",dump_ctf_keys_time);
@@ -1193,16 +1193,17 @@ int main(int argc, char **argv){
     clear_cache();
     string path = "../data/meta/N";
     //workbench * bench = C_load_meta(path.c_str());
-    workbench * bench = load_meta(path.c_str(), 65);
-    for(int i = 0; i < 65; i++) {
+    uint max_ctb = 32;
+    workbench * bench = load_meta(path.c_str(), max_ctb);
+    for(int i = 0; i < max_ctb; i++) {
         for (int j = 0; j < bench->config->CTF_count; j++) {
             bench->ctbs[i].ctfs[j].keys = nullptr;
         }
     }
-    uint max_ctb = 2;
-    for(max_ctb = 64; max_ctb <= 64; max_ctb *= 2 ){
-        bench->ctb_count = max_ctb;
-        cout << "max_ctb " << max_ctb << endl;
+    uint total_ctf_count = 32 / 2 * 100;
+    vector<uint> ctf_nums = {100, 196, 400, 784, 1600};
+    assert(bench->config->G_bytes == 2);
+    for(uint i = 0; i < 5; i++){
         clear_cache();
         bench->clear_all_keys();
         //cout << "bench->ctb_count " << bench->ctb_count << endl;
@@ -1233,8 +1234,8 @@ int main(int argc, char **argv){
         //
         //    return 0;
 
-        uint new_split_num = 20;
-        uint new_CTF_count = new_split_num * new_split_num;
+        uint new_CTF_count = ctf_nums[i];
+        uint new_split_num = sqrt(ctf_nums[i]);
         bench->config->split_num = new_split_num;
         vector<object_info> str_list(bench->config->num_objects);
         vector< vector<key_info> > keys_with_sid(new_CTF_count);
@@ -1245,7 +1246,7 @@ int main(int argc, char **argv){
         }
         vector< pair< vector<key_info>, vector<f_box> > > objects_map(bench->config->num_objects);
 
-        uint merge_ctb_count = max_ctb;
+        uint merge_ctb_count = bench->config->G_bytes;
         for(uint i = 0; i < max_ctb; i += merge_ctb_count){
             // for(uint j = i; j < i + merge_ctb_count; j++){
             //     for(uint k = 0; k < bench->config->CTF_count; k++){
@@ -1258,15 +1259,14 @@ int main(int argc, char **argv){
             fprintf(stdout,"\tcompaction_total:\t%.2f\n",compaction_total);
 
             //init
-            for(uint j = i; j < i + merge_ctb_count; j++){
-                for(uint k = 0; k < bench->config->CTF_count; k++){
-                    if(bench->ctbs[j].ctfs[k].keys){
-                        delete []bench->ctbs[j].ctfs[k].keys;
-                        bench->ctbs[j].ctfs[k].keys = nullptr;
-                    }
-
-                }
-            }
+//            for(uint j = i; j < i + merge_ctb_count; j++){
+//                for(uint k = 0; k < bench->config->CTF_count; k++){
+//                    if(bench->ctbs[j].ctfs[k].keys){
+//                        delete []bench->ctbs[j].ctfs[k].keys;
+//                        bench->ctbs[j].ctfs[k].keys = nullptr;
+//                    }
+//                }
+//            }
             for(uint j = 0; j < new_CTF_count; j++){
                 keys_with_sid[j].clear();
                 mbrs_with_sid[j].clear();
@@ -1277,8 +1277,7 @@ int main(int argc, char **argv){
                 p.second.clear();
             }
         }
+        bench->config->G_bytes *= 2;
     }
-
-
     return 0;
 }
