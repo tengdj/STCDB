@@ -222,8 +222,8 @@ workbench * load_meta(const char *path, uint max_ctb, uint CTF_count) {
     generator_configuration * config = new generator_configuration();
     workbench * bench = new workbench(config);
     in.read((char *)config, sizeof(generator_configuration));               //also read meta
-    cout << bench->ctb_count << "bench->ctb_count" << endl;
     in.read((char *)bench, sizeof(workbench));      //bench->config = NULL
+    cout << bench->ctb_count << "bench->ctb_count" << endl;
     bench->config = config;
     bench->config->CTF_count = CTF_count;
     bench->ctbs = new CTB[config->big_sorted_run_capacity];

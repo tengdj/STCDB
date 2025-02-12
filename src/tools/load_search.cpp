@@ -902,7 +902,7 @@ int main(int argc, char **argv){
     clear_cache();
     string path = "../data/meta/N";
     //workbench * bench = C_load_meta(path.c_str());
-    uint max_ctb = 1215;
+    uint max_ctb = 10;
     workbench * bench = load_meta(path.c_str(), max_ctb);
     cout << "bench->ctb_count " << bench->ctb_count << endl;
     cout << "max_ctb " << max_ctb << endl;
@@ -912,6 +912,20 @@ int main(int argc, char **argv){
             bench->ctbs[i].ctfs[j].keys = nullptr;
         }
     }
+
+//    for(int i = 0; i < bench->ctb_count; i++) {
+//        bench->load_CTF_keys(i, 0);
+//        CTF *ctf = &bench->ctbs[i].ctfs[0];
+//        uint8_t *data = reinterpret_cast<uint8_t *>(ctf->keys);
+//        for (uint64_t q = 0; q < ctf->CTF_kv_capacity; q++) {
+//            key_info temp_ki;
+//            __uint128_t temp_128 = 0;
+//            memcpy(&temp_128, data + q * ctf->key_bit / 8, ctf->key_bit / 8);
+//            uint64_t value_mbr = 0;
+//            ctf->parse_key(temp_128, temp_ki, value_mbr);
+//            cout << temp_ki.oid << " temp_ki.oid " << endl;
+//        }
+//    }
 
 //    one_batch_box_search(bench, 10);
 //    return 0;
@@ -951,13 +965,13 @@ int main(int argc, char **argv){
     //experiment_twice(nb);
     //exp4_search_oid_single(nb);
 //    struct timeval start = get_cur_time();
-   // experiment_search_oid(bench, max_ctb);
+    experiment_search_oid(bench, max_ctb);
 //    double real_world_time = get_time_elapsed(start, true);
 //    cout << "real_world_time(s) " << real_world_time / 1000 << endl;
     //exp4_search_box_single(nb);
     //experiment_search_box(nb);
     //experiment_box_openmp(bench);
-    experiment_search_time(bench);
+    //experiment_search_time(bench);
     //query_search_id(bench);
     //query_search_box(bench);
 
