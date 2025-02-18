@@ -185,7 +185,7 @@ void CTF::get_ctf_bits(box map_mbr, configuration * config){
 
 }
 
-void CTF::get_ctf_bits(box map_mbr, configuration * config, uint bitmap_grid){
+void CTF::get_ctf_bits(box map_mbr, configuration * config, float map_granularity){
 //    ctf_mbr.high[0] += 0.000001;
 //    ctf_mbr.high[1] += 0.000001;
 
@@ -200,8 +200,8 @@ void CTF::get_ctf_bits(box map_mbr, configuration * config, uint bitmap_grid){
 
     uint low_x_grid = (ctf_mbr.high[0] - ctf_mbr.low[0]) / map_x_grid_length;
     uint low_y_grid = (ctf_mbr.high[1] - ctf_mbr.low[1]) / map_y_grid_length;
-    low_x_bit = min_bits_to_store(low_x_grid - 1);
-    low_y_bit = min_bits_to_store(low_y_grid - 1);
+    low_x_bit = min_bits_to_store(max(low_x_grid, (uint)1) - 1);
+    low_y_bit = min_bits_to_store(max(low_y_grid, (uint)1) - 1);
 
     //box, 1m granularity. 0.008 is the max edge restriction. area is 0.00005
 //    int x_restriction = EDGE_REISTICTION / map_x_grid_length;
@@ -211,29 +211,77 @@ void CTF::get_ctf_bits(box map_mbr, configuration * config, uint bitmap_grid){
     mbr_bit = low_x_bit + low_y_bit + 2 * edge_bit;
     if(mbr_bit >= 64){
         std::cout << "Low X Bit: " << low_x_bit
-         << "Low Y Bit: " << low_y_bit
-         << "Edge Bit: " << edge_bit << std::endl;
+                  << "Low Y Bit: " << low_y_bit
+                  << "Edge Bit: " << edge_bit << std::endl;
     }
     assert(mbr_bit <= 64);
     eight_parallel();
 
     //42000m high, 30000m width, 100m granularity
-    // int old_width_grid = (ctf_mbr.high[0] - ctf_mbr.low[0]) / (map_mbr.high[0] - map_mbr.low[0]) * bitmap_grid;
-    // int old_high_grid = (ctf_mbr.high[1] - ctf_mbr.low[1]) / (map_mbr.high[1] - map_mbr.low[1]) * bitmap_grid;
-    // x_grid = max(old_width_grid + 1, 64);
-    // y_grid = max(old_high_grid + 1, 64);
-    // if(x_grid >= 256 || y_grid >= 256){
-    //     cout << "x_grid " << x_grid << " y_grid " << y_grid << endl;
-    //     //ctf_mbr.print();
-    //     x_grid = min(old_width_grid + 1, 255);
-    //     y_grid = min(old_high_grid + 1, 255);
-    // }
-    x_grid = bitmap_grid;
-    y_grid = bitmap_grid;
-    ctf_bitmap_size = (x_grid * y_grid + 7) / 8;        //error uint16 range
-    //assert(ctf_bitmap_size < 256 * 256 / 8);
+    int old_width_grid = (ctf_mbr.high[0] - ctf_mbr.low[0]) / (map_mbr.high[0] - map_mbr.low[0]) * 300 * map_granularity;
+    int old_high_grid = (ctf_mbr.high[1] - ctf_mbr.low[1]) / (map_mbr.high[1] - map_mbr.low[1]) * 420 * map_granularity;
+    x_grid = max(old_width_grid + 1, 2);
+    y_grid = max(old_high_grid + 1, 2);
+    if(x_grid >= 256 || y_grid >= 256){
+        cout << "x_grid " << x_grid << " y_grid " << y_grid << endl;
+        //ctf_mbr.print();
+        x_grid = min(old_width_grid + 1, 255);
+        y_grid = min(old_high_grid + 1, 255);
+    }
+    ctf_bitmap_size = (x_grid * y_grid + 7) / 8;
+    assert(ctf_bitmap_size < 256 * 256 / 8);
 
 }
+
+//void CTF::get_ctf_bits(box map_mbr, configuration * config, uint bitmap_grid){
+////    ctf_mbr.high[0] += 0.000001;
+////    ctf_mbr.high[1] += 0.000001;
+//
+//    id_bit = min_bits_to_store(config->num_objects);
+//    duration_bit = min_bits_to_store(config->max_meet_time - 1);
+//    end_bit = duration_bit;     //end is always rest in the range of duration
+//
+//    //m granularity, is 0.00001
+//    //left bottom float to 0.00001 granularity  ~=  (map_mbr.high[0] - map_mbr.low[0]) / 30000   ~=   (map_mbr.high[1] - map_mbr.low[1]) / 42000
+//    double map_x_grid_length =  (map_mbr.high[0] - map_mbr.low[0]) / 3000;
+//    double map_y_grid_length =  (map_mbr.high[1] - map_mbr.low[1]) / 4200;
+//
+//    uint low_x_grid = (ctf_mbr.high[0] - ctf_mbr.low[0]) / map_x_grid_length;
+//    uint low_y_grid = (ctf_mbr.high[1] - ctf_mbr.low[1]) / map_y_grid_length;
+//    low_x_bit = min_bits_to_store(low_x_grid - 1);
+//    low_y_bit = min_bits_to_store(low_y_grid - 1);
+//
+//    //box, 1m granularity. 0.008 is the max edge restriction. area is 0.00005
+////    int x_restriction = EDGE_REISTICTION / map_x_grid_length;
+////    int y_restriction = EDGE_REISTICTION / map_y_grid_length;
+////    edge_bit = min_bits_to_store((uint)max(x_restriction, y_restriction) - 1);
+//    edge_bit = max(low_x_bit, low_y_bit);
+//    mbr_bit = low_x_bit + low_y_bit + 2 * edge_bit;
+//    if(mbr_bit >= 64){
+//        std::cout << "Low X Bit: " << low_x_bit
+//         << "Low Y Bit: " << low_y_bit
+//         << "Edge Bit: " << edge_bit << std::endl;
+//    }
+//    assert(mbr_bit <= 64);
+//    eight_parallel();
+//
+//    //42000m high, 30000m width, 100m granularity
+//    // int old_width_grid = (ctf_mbr.high[0] - ctf_mbr.low[0]) / (map_mbr.high[0] - map_mbr.low[0]) * bitmap_grid;
+//    // int old_high_grid = (ctf_mbr.high[1] - ctf_mbr.low[1]) / (map_mbr.high[1] - map_mbr.low[1]) * bitmap_grid;
+//    // x_grid = max(old_width_grid + 1, 64);
+//    // y_grid = max(old_high_grid + 1, 64);
+//    // if(x_grid >= 256 || y_grid >= 256){
+//    //     cout << "x_grid " << x_grid << " y_grid " << y_grid << endl;
+//    //     //ctf_mbr.print();
+//    //     x_grid = min(old_width_grid + 1, 255);
+//    //     y_grid = min(old_high_grid + 1, 255);
+//    // }
+//    x_grid = bitmap_grid;
+//    y_grid = bitmap_grid;
+//    ctf_bitmap_size = (x_grid * y_grid + 7) / 8;        //error uint16 range
+//    //assert(ctf_bitmap_size < 256 * 256 / 8);
+//
+//}
 
 // uint CTF::count_meta_size(){
 //     uint total_B = sizeof(CTF) + ctf_bitmap_size;

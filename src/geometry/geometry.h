@@ -312,52 +312,10 @@ public:
         }
     }
 	float area() const {
+        assert(high[0] >= low[0] && high[1] >= low[1]);
         return (high[0] - low[0]) * (high[1] - low[1]);
     }
 };
-
-inline float calculate_total_area(const std::vector<f_box>& boxes) {
-    std::vector<std::pair<float, std::pair<float, float>>> events; // {x, {y1, y2}}
-    for (const auto& box : boxes) {
-        events.push_back({box.low[0], {box.low[1], box.high[1]}});  
-        events.push_back({box.high[0], {box.low[1], box.high[1]}}); 
-    }
-    std::sort(events.begin(), events.end());
-    std::multiset<std::pair<float, float>> active_intervals;
-
-    float total_area = 0.0;
-    float prev_x = 0.0;
-
-    for (const auto& event : events) {
-        float x = event.first;
-        float y1 = event.second.first;
-        float y2 = event.second.second;
-
-        if (!active_intervals.empty()) {
-            float height = 0.0;
-            float prev_y = -100000.0;
-            for (const auto& interval : active_intervals) {
-                float curr_y1 = interval.first;
-                float curr_y2 = interval.second;
-                if (curr_y1 > prev_y) {
-                    height += curr_y2 - curr_y1;
-                    prev_y = curr_y2;
-                } else if (curr_y2 > prev_y) {
-                    height += curr_y2 - prev_y;
-                    prev_y = curr_y2;
-                }
-            }
-            total_area += height * (x - prev_x);
-        }
-        if (x == event.first) { 
-            active_intervals.insert({y1, y2});
-        } else { 
-            active_intervals.erase(active_intervals.find({y1, y2}));
-        }
-        prev_x = x;
-    }
-    return total_area;
-}
 
 class uint_box{
 public:

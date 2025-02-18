@@ -87,7 +87,8 @@ public:
 
     void eight_parallel();
     void get_ctf_bits(box map_mbr, configuration * config);
-    void get_ctf_bits(box map_mbr, configuration * config, uint bitmap_grid);
+    void get_ctf_bits(box map_mbr, configuration * config, float map_granularity);
+    //void get_ctf_bits(box map_mbr, configuration * config, uint bitmap_grid);
     //uint count_meta_size();
     uint search_SSTable(uint pid, time_query * tq, bool search_multi, atomic<long long> &search_count, uint *search_multi_pid);
     uint time_search(time_query * tq);

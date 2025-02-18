@@ -773,12 +773,12 @@ void workbench::build_trees(uint max_ctb){
     temp.reserve(max_ctb * (config->CTF_count + 1));
     for(int i = 0; i < max_ctb; i++){
         for(int j = 0; j < config->CTF_count; j++) {
-            if(ctbs[i].ctfs[j].start_time_min < (int)ctbs[i].ctfs[j].end_time_max - 4096){               //for long tail
-                ctbs[i].ctfs[j].start_time_min = ctbs[i].ctfs[j].end_time_max - 4096 - 500 * get_rand_double();
-            }
-            if(ctbs[i].ctfs[j].start_time_min > ctbs[i].ctfs[j].start_time_max){        //uint overflow
-                int real_start = max(0, (int)(ctbs[i].ctfs[j].start_time_max - 4500));
-            }
+//            if(ctbs[i].ctfs[j].start_time_min < (int)ctbs[i].ctfs[j].end_time_max - 4096){               //for long tail
+//                ctbs[i].ctfs[j].start_time_min = ctbs[i].ctfs[j].end_time_max - 4096 - 500 * get_rand_double();
+//            }
+//            if(ctbs[i].ctfs[j].start_time_min > ctbs[i].ctfs[j].start_time_max){        //uint overflow   //useless
+//                int real_start = max(0, (int)(ctbs[i].ctfs[j].start_time_max - 4500));
+//            }
             Interval temp_in(ctbs[i].ctfs[j].start_time_min, ctbs[i].ctfs[j].end_time_max, (int)(i * config->CTF_count +j));
             temp.push_back(temp_in);
         }

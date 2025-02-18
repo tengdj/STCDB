@@ -138,8 +138,8 @@ void batch_search_time(workbench *bench){
 
     time_query tq;
     tq.abandon = false;
-    tq.t_start = 5000;
-    for(uint i = 600; i <= 3600; i+= 600){
+    for(uint i = 3600; i <= 3600*5; i+= 3600){
+        tq.t_start = i;
         tq.t_end = tq.t_start + i;
         bench->clear_all_keys();
         clear_cache();
@@ -150,7 +150,7 @@ void batch_search_time(workbench *bench){
         uint find_count = bench->search_time_in_disk(&tq);
         double time_consume = get_time_elapsed(disk_search_time);
         cout << "find_count" << find_count << "time_consume" << time_consume << endl;
-        q << tq.t_start << ',' << i << ',' << find_count << ',' << time_consume << ',' << bench->time_find_vector_size
+        q << tq.t_start << ',' << tq.t_end - tq.t_start << ',' << find_count << ',' << time_consume << ',' << bench->time_find_vector_size
           << ',' << bench->time_contain_count << ',' << bench->time_find_vector_size - bench->time_contain_count << endl;
     }
 }
@@ -198,8 +198,8 @@ int main(int argc, char **argv){
 //            }
 //        }
         bench->build_trees(max_ctb);
-        batch_search_oid(bench, max_ctb);
-        batch_search_box(edge_length, vp, bench);
+        //batch_search_oid(bench, max_ctb);
+        //batch_search_box(edge_length, vp, bench);
         batch_search_time(bench);
         GB *= 2;
     }

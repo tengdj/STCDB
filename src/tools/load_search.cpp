@@ -425,7 +425,7 @@ void experiment_search_oid(workbench *bench, uint max_ctb){
 
 void get_random_point(vector<Point> &vp){
     for(uint i = 0; i < vp.size(); i++){
-        vp[i].x = -87.9 + 0.01 + (0.36 - 0.01) * get_rand_double();
+        vp[i].x = -87.75 + 0.01 + (0.36 - 0.01) * get_rand_double();
         vp[i].y = 41.65 + 0.01 + (0.36 - 0.01) * get_rand_double();
     }
 }
@@ -434,10 +434,10 @@ void experiment_box_openmp(workbench *bench){
     bench->box_search_queue.reserve(bench->ctb_count * bench->config->CTF_count);
     time_query tq;
     tq.abandon = true;
-    double edge_length = 0.000104192;             //0.000329512
+    double edge_length = 0.104212;             //0.000104192
     vector<Point> vp(100);
     get_random_point(vp);
-    for(uint selectivity = 1; selectivity <= 11; selectivity++) {
+    for(uint selectivity = 11; selectivity <= 11; selectivity++) {
         ofstream q;
         q.open("ex_search_box_omp" + to_string(selectivity) + ".csv", ios::out|ios::binary|ios::trunc);
         q << "search edge_length" << ',' << "total_find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ','
@@ -453,6 +453,8 @@ void experiment_box_openmp(workbench *bench){
             bench->bit_find_count = 0;
             bench->time_contain_count = 0;
 
+            vp[i].x = -87.8 + 0.01 + (0.08 - 0.01) * get_rand_double();
+            vp[i].y = 41.82 + 0.01 + (0.08 - 0.01) * get_rand_double();
             Point mid = vp[i];
             box search_area(mid.x - edge_length / 2, mid.y - edge_length / 2, mid.x + edge_length / 2,
                             mid.y + edge_length / 2);
@@ -735,9 +737,8 @@ void experiment_search_time(workbench *bench){
 void compress_rate(workbench * bench){
     ofstream q;
     q.open("compress_rate.csv", ios::out|ios::binary|ios::trunc);
-    q << "ctf" << ',' << "CTF_kv_capacity" << ',' << "time_consume(ms)" << endl;
+    q << "ctf" << ',' << "CTF_kv_capacity" << ',' << "code_load" << ',' << "parse_consume" << ',' << "full_load" << endl;
     struct timeval compress_time = get_cur_time();
-
 
     for(uint i = 0; i < bench->config->CTF_count; i++){
         compress_time = get_cur_time();
@@ -898,11 +899,48 @@ void one_batch_box_search(workbench * bench, uint ctb_id){
 
 };
 
+void one_batch_oid_search(workbench *bench, uint max_ctb){
+    time_query tq;
+    tq.abandon = true;
+    ofstream q;
+    q.open("one_batch_oid_search.csv", ios::out|ios::binary|ios::trunc);
+    q << "question number" << ',' << "prepare_consume(ms)" << ',' << "search_id_consume" << ',' << "find_id_count" << ',' << "sid_zero_count" << ','
+      << "hit_buffer" << ',' << "hit_ctf" << endl;
+    for(int i = 0; i < 1000; i++){
+        bench->clear_all_keys();
+        clear_cache();
+        bench->search_count = 0;
+        bench->hit_buffer = 0;
+        bench->hit_ctf = 0;
+        //bench->wid_filter_count = 0;
+        uint pid = get_rand_number(bench->config->num_objects);
+        bench->search_multi = false;
+        struct timeval prepare_start = get_cur_time();
+        vector<uint> search_list;
+        search_list.reserve(max_ctb);
+        for(uint j = 0; j < max_ctb; j++){
+            if(bench->ctbs->sids[pid] != 0){
+                search_list.push_back(j);
+            }
+        }
+        double prepare_consume = get_time_elapsed(prepare_start, true);
+//#pragma omp parallel for num_threads(bench->config->num_threads)
+        for(uint j = 0; j < search_list.size(); j++){
+            bench->id_search_in_CTB(pid, search_list[j], &tq);
+        }
+        double search_id_consume = get_time_elapsed(prepare_start, true);
+        bench->search_multi = false;
+        q << pid << ',' << prepare_consume << ',' << search_id_consume << ',' << bench->search_count << ',' << max_ctb - bench->hit_buffer - bench->hit_ctf
+          << ',' << bench->hit_buffer << ',' << bench->hit_ctf << endl;
+    }
+    q.close();
+}
+
 int main(int argc, char **argv){
     clear_cache();
     string path = "../data/meta/N";
     //workbench * bench = C_load_meta(path.c_str());
-    uint max_ctb = 10;
+    uint max_ctb = 1215;
     workbench * bench = load_meta(path.c_str(), max_ctb);
     cout << "bench->ctb_count " << bench->ctb_count << endl;
     cout << "max_ctb " << max_ctb << endl;
@@ -926,7 +964,7 @@ int main(int argc, char **argv){
 //            cout << temp_ki.oid << " temp_ki.oid " << endl;
 //        }
 //    }
-
+//    one_batch_oid_search(bench, 1);
 //    one_batch_box_search(bench, 10);
 //    return 0;
 
@@ -965,12 +1003,12 @@ int main(int argc, char **argv){
     //experiment_twice(nb);
     //exp4_search_oid_single(nb);
 //    struct timeval start = get_cur_time();
-    experiment_search_oid(bench, max_ctb);
+//    experiment_search_oid(bench, max_ctb);
 //    double real_world_time = get_time_elapsed(start, true);
 //    cout << "real_world_time(s) " << real_world_time / 1000 << endl;
     //exp4_search_box_single(nb);
     //experiment_search_box(nb);
-    //experiment_box_openmp(bench);
+    experiment_box_openmp(bench);
     //experiment_search_time(bench);
     //query_search_id(bench);
     //query_search_box(bench);
