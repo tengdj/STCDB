@@ -172,8 +172,8 @@ void CTF::get_ctf_bits(box map_mbr, configuration * config){
     //42000m high, 30000m width, 100m granularity
     int old_width_grid = (ctf_mbr.high[0] - ctf_mbr.low[0]) / (map_mbr.high[0] - map_mbr.low[0]) * 300;
     int old_high_grid = (ctf_mbr.high[1] - ctf_mbr.low[1]) / (map_mbr.high[1] - map_mbr.low[1]) * 420;
-    x_grid = max(old_width_grid + 1, 2);
-    y_grid = max(old_high_grid + 1, 2);
+    x_grid = max(old_width_grid + 1, 32);
+    y_grid = max(old_high_grid + 1, 32);
     if(x_grid >= 256 || y_grid >= 256){
         cout << "x_grid " << x_grid << " y_grid " << y_grid << endl;
         //ctf_mbr.print();
@@ -222,14 +222,7 @@ void CTF::get_ctf_bits(box map_mbr, configuration * config, float map_granularit
     int old_high_grid = (ctf_mbr.high[1] - ctf_mbr.low[1]) / (map_mbr.high[1] - map_mbr.low[1]) * 420 * map_granularity;
     x_grid = max(old_width_grid + 1, 2);
     y_grid = max(old_high_grid + 1, 2);
-    if(x_grid >= 256 || y_grid >= 256){
-        cout << "x_grid " << x_grid << " y_grid " << y_grid << endl;
-        //ctf_mbr.print();
-        x_grid = min(old_width_grid + 1, 255);
-        y_grid = min(old_high_grid + 1, 255);
-    }
     ctf_bitmap_size = (x_grid * y_grid + 7) / 8;
-    assert(ctf_bitmap_size < 256 * 256 / 8);
 
 }
 
@@ -549,13 +542,23 @@ uint CTF::search_SSTable(uint pid, time_query * tq, bool search_multi, atomic<lo
         uint temp_pid = ctf_get_key_oid(temp_128);
         if(temp_pid == pid){
             if(tq->abandon) {       //check_key_time
-                count++;
+                uint64_t value_mbr = 0;
+                key_info temp_ki;
+                parse_key(temp_128, temp_ki, value_mbr);
+                box key_box = new_parse_mbr(value_mbr);
+                box search_area(-87.93905, 41.95142, -87.87725, 42.00961);
+                if (search_area.intersect(key_box)) {
+                    count++;
+                }
                 //cout<< temp_pid << "-" << get_key_target(keys[cursor]) << endl;
                 if (search_multi) {
                     long long search_multi_length = search_count.fetch_add(1, std::memory_order_relaxed);
                     //search_multi_pid[search_multi_length] = get_key_target(keys[cursor]);  !!!!!!!!!!!!
                 }
             }
+//            else{
+//                vector<Interval> result = query_intervals(start_sorted, end_sorted, tq->t_start, tq->t_end);
+//            }
         }
         else break;
         cursor++;

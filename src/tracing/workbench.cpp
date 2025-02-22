@@ -301,17 +301,18 @@ void workbench::clear_all_keys(){
 
 void workbench::load_CTF_keys(uint CTB_id, uint CTF_id){
     ifstream read_sst;
-    string filename = config->raid_path + to_string(CTF_id%2) + "/" + string(keys_file_prefix) + "_SSTable_" 
+    string filename = config->raid_path + to_string(CTF_id%2) + "/" + string(keys_file_prefix) + "_SSTable_"
         + to_string(CTB_id)+"-"+to_string(CTF_id);
     read_sst.open(filename, ios::in|ios::binary);
     if(!read_sst.is_open()){
         cout << "keys cannot open" << filename << endl;
     }
     CTF * ctf = &ctbs[CTB_id].ctfs[CTF_id];
-    size_t bytes_expected = ctf->CTF_kv_capacity * ctf->key_bit / 8;
+    uint64_t bytes_expected = ctf->key_bit / 8 * (uint64_t)ctf->CTF_kv_capacity;
+    //cout << "bytes_expected " << bytes_expected << " filename " << filename << endl;
     uint8_t * data = new uint8_t[bytes_expected];
     read_sst.read((char *)data, bytes_expected);
-    size_t bytes_read = read_sst.gcount();  
+    uint64_t bytes_read = read_sst.gcount();
     if (bytes_read < bytes_expected) {
         std::cerr << "ERROR: File is too small! Expected " << bytes_expected
                 << " bytes, but only read " << bytes_read << " bytes." << std::endl;
@@ -419,7 +420,7 @@ bool workbench::id_search_in_CTB(uint pid, uint CTB_id, time_query * tq){
     uint target_count = ctbs[i].ctfs[ctf_id].search_SSTable(pid, tq, search_multi, search_count, search_multi_pid);
     if(!search_multi)
         search_count.fetch_add(target_count, std::memory_order_relaxed);
-    hit_ctf.fetch_add(1, std::memory_order_relaxed);
+    if(target_count) hit_ctf.fetch_add(1, std::memory_order_relaxed);
 //    delete[] ctbs[i].ctfs[ctf_id].keys;
 //    ctbs[i].ctfs[ctf_id].keys = nullptr;
     if(target_count){
@@ -773,12 +774,13 @@ void workbench::build_trees(uint max_ctb){
     temp.reserve(max_ctb * (config->CTF_count + 1));
     for(int i = 0; i < max_ctb; i++){
         for(int j = 0; j < config->CTF_count; j++) {
-//            if(ctbs[i].ctfs[j].start_time_min < (int)ctbs[i].ctfs[j].end_time_max - 4096){               //for long tail
-//                ctbs[i].ctfs[j].start_time_min = ctbs[i].ctfs[j].end_time_max - 4096 - 500 * get_rand_double();
-//            }
-//            if(ctbs[i].ctfs[j].start_time_min > ctbs[i].ctfs[j].start_time_max){        //uint overflow   //useless
-//                int real_start = max(0, (int)(ctbs[i].ctfs[j].start_time_max - 4500));
-//            }
+            if(ctbs[i].ctfs[j].start_time_min < (int)ctbs[i].ctfs[j].end_time_max - 4096){               //for long tail
+                ctbs[i].ctfs[j].start_time_min = ctbs[i].ctfs[j].end_time_max - 4096 - 500 * get_rand_double();
+            }
+            if(ctbs[i].ctfs[j].start_time_min > ctbs[i].ctfs[j].start_time_max){        //uint overflow   //useless
+                int real_start = max(0, (int)(ctbs[i].ctfs[j].start_time_max - 4500));
+                ctbs[i].ctfs[j].start_time_min = real_start;
+            }
             Interval temp_in(ctbs[i].ctfs[j].start_time_min, ctbs[i].ctfs[j].end_time_max, (int)(i * config->CTF_count +j));
             temp.push_back(temp_in);
         }

@@ -7,7 +7,8 @@
 #include <rocksdb/options.h>
 #include <rocksdb/cache.h>
 #include <rocksdb/table.h>
-#include <rocksdb/compaction_filter.h> // 手动 Compaction 相关的功能
+#include <rocksdb/compaction_filter.h>
+#include "rocksdb/write_batch.h"
 
 using namespace std;
 using namespace ROCKSDB_NAMESPACE;
@@ -131,6 +132,7 @@ void print_big_endian_bytes(const std::string& big_endian) {
 }
 
 void insert_ctb(workbench *bench, uint ctb_id, DB * db){
+    rocksdb::WriteBatch batch;
     uint i = ctb_id;
     //bench->ctbs[i].ctfs = new CTF[100];
     for(uint j = 0; j < 100; j++) {
@@ -146,12 +148,17 @@ void insert_ctb(workbench *bench, uint ctb_id, DB * db){
             temp_ki.end += ctf->end_time_min;
             uint start = temp_ki.end - temp_ki.duration;
             uint64_t temp_key = ((uint64_t)temp_ki.oid << (oid_bit + duration_bit)) + ((uint64_t)temp_ki.target << (duration_bit)) + (uint64_t)start;
-            Status s = db->Put(WriteOptions(), uint64_to_big_endian(temp_key), uint128_to_big_endian(bench->ctbs[i].ctfs[j].keys[k]));
-            if (!s.ok()){
-                cerr << s.ToString() << endl;
-                assert(s.ok());
-            }
+            batch.Put("key" + uint64_to_big_endian(temp_key), "value" + uint128_to_big_endian(temp_128));
+            //Status s = db->Put(WriteOptions(), uint64_to_big_endian(temp_key), uint128_to_big_endian(temp_128));
         }
+    }
+    timeval write_start = get_cur_time();
+    Status s = db->Write(rocksdb::WriteOptions(), &batch);
+    double batch_write_time = get_time_elapsed(write_start, true);
+    cout << "batch write time: " << batch_write_time << endl;
+    if (!s.ok()){
+        cerr << s.ToString() << endl;
+        assert(s.ok());
     }
 }
 
@@ -229,7 +236,7 @@ void RestartDatabase(DB*& db, string kDBPath, const Options& options) {
 
 int main(int argc, char **argv){
     clear_cache();
-    string path = "../data/meta/";
+    string path = "../data/meta/N";
     //workbench * bench = C_load_meta(path.c_str());
     uint max_ctb = 12;
     workbench * bench = load_meta(path.c_str(), max_ctb);
@@ -284,7 +291,7 @@ int main(int argc, char **argv){
     ofstream of;
     of.open("rocks.csv", ios::out|ios::binary|ios::trunc);
     of << "ctbid" << ',' << "total_size(GB)" << ',' << "insert_time(ms)" << ',' << "compaction_time" << ','  << "search_time(ms)" << endl;
-    for(uint i = 10; i < 11; i++){
+    for(uint i = 0; i < 1; i++){
         uint total_ctb_size = 0;
         for(uint j = 0; j < 100; j++) {
             total_ctb_size += bench->ctbs[i].ctfs[j].CTF_kv_capacity;
@@ -294,7 +301,7 @@ int main(int argc, char **argv){
         struct timeval start_time = get_cur_time();
         insert_ctb(bench, i, db);
         double insert_time = get_time_elapsed(start_time, true);
-
+        cout << "insert_time: " << insert_time << endl;
 
         // 手动触发全量 Compaction
         rocksdb::CompactRangeOptions compact_options;

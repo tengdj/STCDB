@@ -275,6 +275,87 @@ void experiment_search_oid(workbench *bench, uint max_ctb){
     }
     q.close();
 }
+
+void hybrid_oid(workbench *bench, uint max_ctb){
+    time_query tq;
+    tq.abandon = true;
+    tq.t_start = 10000;
+    tq.t_end = 13600;
+    ofstream q;
+    q.open("hybrid_oid.csv", ios::out|ios::binary|ios::trunc);
+    q << "question number" << ',' << "prepare_consume(ms)" << ',' << "search_id_consume" << ',' << "find_id_count" << ',' << "sid_zero_count" << ','
+      << "hit_buffer" << ',' << "hit_ctf" << endl;
+    for(int i = 0; i < 100; i++){
+        bench->clear_all_keys();
+        clear_cache();
+        bench->search_count = 0;
+        bench->hit_buffer = 0;
+        bench->hit_ctf = 0;
+        //bench->wid_filter_count = 0;
+        uint pid = get_rand_number(bench->config->num_objects);
+        bench->search_multi = false;
+        struct timeval prepare_start = get_cur_time();
+        vector<uint> search_list;
+        search_list.reserve(max_ctb);
+        for(uint j = 0; j < max_ctb; j++){
+            if(bench->ctbs->sids[pid] != 0){
+                search_list.push_back(j);
+            }
+        }
+        double prepare_consume = get_time_elapsed(prepare_start, true);
+#pragma omp parallel for num_threads(bench->config->num_threads)
+        for(uint j = 0; j < search_list.size(); j++){
+            bench->id_search_in_CTB(pid, search_list[j], &tq);
+        }
+        double search_id_consume = get_time_elapsed(prepare_start, true);
+        bench->search_multi = false;
+        q << pid << ',' << prepare_consume << ',' << search_id_consume << ',' << bench->search_count << ',' << max_ctb - bench->hit_buffer - bench->hit_ctf
+          << ',' << bench->hit_buffer << ',' << bench->hit_ctf << endl;
+    }
+    q.close();
+}
+
+void airport_oid(workbench *bench, uint max_ctb){
+    time_query tq;
+    tq.abandon = true;
+    ofstream q;
+    q.open("airport_oid.csv", ios::out|ios::binary|ios::trunc);
+    q << "question number" << ',' << "prepare_consume(ms)" << ',' << "search_id_consume" << ',' << "find_id_count" << ',' << "sid_zero_count" << ','
+      << "hit_buffer" << ',' << "hit_ctf" << endl;
+    for(int i = 0; i < 100; i++){
+        bench->clear_all_keys();
+        clear_cache();
+        bench->search_count = 0;
+        bench->hit_buffer = 0;
+        bench->hit_ctf = 0;
+        //bench->wid_filter_count = 0;
+        //uint pid = 604150;
+        //uint pid = 5873134;
+        uint pid = get_rand_number(bench->config->num_objects);
+        bench->search_multi = false;
+        struct timeval prepare_start = get_cur_time();
+        vector<uint> search_list;
+        search_list.reserve(max_ctb);
+        for(uint j = 0; j < max_ctb; j++){
+            if(bench->ctbs->sids[pid] != 0){
+                search_list.push_back(j);
+            }
+        }
+
+
+        double prepare_consume = get_time_elapsed(prepare_start, true);
+#pragma omp parallel for num_threads(bench->config->num_threads)
+        for(uint j = 0; j < search_list.size(); j++){
+            bench->id_search_in_CTB(pid, search_list[j], &tq);
+        }
+        double search_id_consume = get_time_elapsed(prepare_start, true);
+        bench->search_multi = false;
+        q << pid << ',' << prepare_consume << ',' << search_id_consume << ',' << bench->search_count << ',' << max_ctb - bench->hit_buffer - bench->hit_ctf
+          << ',' << bench->hit_buffer << ',' << bench->hit_ctf << endl;
+    }
+    q.close();
+}
+
 //
 //void *box_search_unit(void *arg){
 //    query_context *ctx = (query_context *)arg;
@@ -435,15 +516,15 @@ void experiment_box_openmp(workbench *bench){
     time_query tq;
     tq.abandon = true;
     double edge_length = 0.104212;             //0.000104192
-    vector<Point> vp(100);
+    vector<Point> vp(1000);
     get_random_point(vp);
     for(uint selectivity = 11; selectivity <= 11; selectivity++) {
         ofstream q;
         q.open("ex_search_box_omp" + to_string(selectivity) + ".csv", ios::out|ios::binary|ios::trunc);
         q << "search edge_length" << ',' << "total_find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ','
             << "total_MB" << ',' << "prepare_time(ms)" << ',' << "mid x" << ',' << "mid y" << ',' << "buffer_time" << ','
-            << "buffer_find" << ',' << "time_contain_count" << endl;
-        for (int i = 0; i < 100; i++) {
+            << "buffer_find" << ',' << "buffer_hit_count" << ',' << "time_contain_count" << endl;
+        for (int i = 0; i < 1000; i++) {
             bench->clear_all_keys();
             clear_cache();
             struct timeval prepare_start = get_cur_time();
@@ -464,12 +545,20 @@ void experiment_box_openmp(workbench *bench){
 
             //search_area.print();
             uint before_buffer = bench->search_count;
+            uint real_ctb_count = min((uint) 1215, bench->ctb_count);
+            bool * is_buffer_hit = new bool[real_ctb_count];
 #pragma omp parallel for num_threads(bench->config->num_threads)
-            for (uint j = 0; j < min((uint) 1215, bench->ctb_count); j++) {
-                bench->mbr_search_in_obuffer(search_area, j, &tq);
+            for (uint j = 0; j < real_ctb_count; j++) {
+                is_buffer_hit[j] = bench->mbr_search_in_obuffer(search_area, j, &tq);
             }
             double buffer_consume = get_time_elapsed(prepare_start, true);
             uint end_buffer = bench->search_count - before_buffer;
+            uint buffer_hit_count = 0;
+            for(uint j = 0; j < real_ctb_count; j++){
+                if(is_buffer_hit[j]){
+                    buffer_hit_count++;
+                }
+            }
 
             uint64_t total_MB = 0;
             for (auto info: bench->box_search_queue) {
@@ -511,12 +600,209 @@ void experiment_box_openmp(workbench *bench){
             q << edge_length << ',' << bench->search_count << ',' << multi_thread_consume << ','
               << bench->intersect_sst_count << ',' << bench->bit_find_count << ','
               << total_MB / 1024 / 1024 << ',' << prepare_consume << ',' << mid.x << ',' << mid.y << ',' << buffer_consume << ','
-              << end_buffer << ',' << bench->time_contain_count << endl;
+              << end_buffer << ',' << buffer_hit_count << ',' << bench->time_contain_count << endl;
             bench->box_search_queue.clear();
         }
         q.close();
         edge_length *= 2;       //3.162
     }
+}
+
+void chicago_u_openmp(workbench *bench){
+    bench->box_search_queue.reserve(bench->ctb_count * bench->config->CTF_count);
+    time_query tq;
+    tq.abandon = true;
+    for(uint selectivity = 11; selectivity <= 11; selectivity++) {
+        ofstream q;
+        q.open("chicago_u.csv", ios::out|ios::binary|ios::trunc);
+        q << "search edge_length" << ',' << "total_find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ','
+          << "total_MB" << ',' << "prepare_time(ms)" << ',' << "mid x" << ',' << "mid y" << ',' << "buffer_time" << ','
+                << "buffer_find" << ',' << "buffer_hit_count" << ',' << "time_contain_count" << endl;
+        for (int i = 0; i < 1; i++) {
+            bench->clear_all_keys();
+            clear_cache();
+            struct timeval prepare_start = get_cur_time();
+            bench->search_count = 0;
+            bench->mbr_find_count = 0;
+            bench->intersect_sst_count = 0;
+            bench->bit_find_count = 0;
+            bench->time_contain_count = 0;
+
+            //box search_area(-87.6818, 42.04871, -87.6688, 42.06275);  //西北
+            //box search_area(-87.93905, 41.95142, -87.87725, 42.00961);  //奥黑尔
+            box search_area(-87.60590, 41.78396, -87.59174, 41.79499);      //芝加哥大学
+            search_area.print();
+            bench->mbr.print();
+
+            bench->mbr_search_in_disk(search_area, &tq);
+            double prepare_consume = get_time_elapsed(prepare_start, true);
+
+            //search_area.print();
+            uint before_buffer = bench->search_count;
+            uint real_ctb_count = min((uint) 1215, bench->ctb_count);
+            bool * is_buffer_hit = new bool[real_ctb_count];
+#pragma omp parallel for num_threads(bench->config->num_threads)
+            for (uint j = 0; j < real_ctb_count; j++) {
+                is_buffer_hit[j] = bench->mbr_search_in_obuffer(search_area, j, &tq);
+            }
+            double buffer_consume = get_time_elapsed(prepare_start, true);
+            uint end_buffer = bench->search_count - before_buffer;
+            uint buffer_hit_count = 0;
+            for(uint j = 0; j < real_ctb_count; j++){
+                if(is_buffer_hit[j]){
+                    buffer_hit_count++;
+                }
+            }
+
+            uint64_t total_MB = 0;
+            for (auto info: bench->box_search_queue) {
+                total_MB += bench->ctbs[info.ctb_id].ctfs[info.ctf_id].CTF_kv_capacity * bench->ctbs[info.ctb_id].ctfs[info.ctf_id].key_bit / 8;
+            }
+            //cout << "total_MB" << total_MB * sizeof(__uint128_t) / 1024 / 1024 << endl;
+            struct timeval multi_thread_start = get_cur_time();
+#pragma omp parallel for num_threads(bench->config->num_threads)
+            for (auto info: bench->box_search_queue) {
+                CTF * ctf = &bench->ctbs[info.ctb_id].ctfs[info.ctf_id];
+                uint mbr_find_count = 0;
+                if (!ctf->keys) {
+                    bench->load_CTF_keys(info.ctb_id, info.ctf_id);
+                }
+                uint8_t * data = reinterpret_cast<uint8_t *>(ctf->keys);
+                for (uint q = 0; q < ctf->CTF_kv_capacity; q++) {
+                    key_info temp_ki;
+                    __uint128_t temp_128 = 0;
+                    memcpy(&temp_128, data + q * ctf->key_bit / 8, ctf->key_bit / 8);
+                    uint64_t value_mbr = 0;
+                    ctf->parse_key(temp_128, temp_ki, value_mbr);
+
+                    if (info.tq.abandon ) {
+                        //uint pid = get_key_oid(temp_key);
+                        box key_box = ctf->new_parse_mbr(value_mbr);
+                        if (search_area.intersect(key_box)) {
+                            mbr_find_count++;
+                            //cout<<"box find!"<<endl;
+                            //key_box.print();
+                        }
+                    }
+                }
+                delete[] ctf->keys;
+                ctf->keys = nullptr;
+                bench->search_count.fetch_add(mbr_find_count, std::memory_order_relaxed);
+            }
+
+            double multi_thread_consume = get_time_elapsed(multi_thread_start, true);
+            q << 0 << ',' << bench->search_count << ',' << multi_thread_consume << ','
+              << bench->intersect_sst_count << ',' << bench->bit_find_count << ','
+              << total_MB / 1024 / 1024 << ',' << prepare_consume << ',' << 0 << ',' << 0 << ',' << buffer_consume << ','
+                    << end_buffer << ',' << buffer_hit_count << ',' << bench->time_contain_count << endl;
+            bench->box_search_queue.clear();
+        }
+        q.close();
+    }
+}
+
+void airport_analyze_openmp(workbench *bench){
+    bench->box_search_queue.reserve(bench->ctb_count * bench->config->CTF_count);
+    time_query tq;
+    tq.abandon = true;
+    vector<uint> oids_in_airport(bench->config->num_objects, 0);
+    for(uint selectivity = 11; selectivity <= 11; selectivity++) {
+        ofstream q;
+        q.open("airport_analyze.csv", ios::out|ios::binary|ios::trunc);
+        q << "search edge_length" << ',' << "total_find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ','
+          << "total_MB" << ',' << "prepare_time(ms)" << ',' << "mid x" << ',' << "mid y" << ',' << "buffer_time" << ','
+          << "buffer_find" << ',' << "buffer_hit_count" << ',' << "time_contain_count" << endl;
+        for (int i = 0; i < 1; i++) {
+            bench->clear_all_keys();
+            clear_cache();
+            struct timeval prepare_start = get_cur_time();
+            bench->search_count = 0;
+            bench->mbr_find_count = 0;
+            bench->intersect_sst_count = 0;
+            bench->bit_find_count = 0;
+            bench->time_contain_count = 0;
+
+            //box search_area(-87.6818, 42.04871, -87.6688, 42.06275);  //西北
+            box search_area(-87.93905, 41.95142, -87.87725, 42.00961);  //奥黑尔
+            //box search_area(-87.60590, 41.78396, -87.59174, 41.79499);      //芝加哥大学
+            search_area.print();
+            bench->mbr.print();
+
+            bench->mbr_search_in_disk(search_area, &tq);
+            double prepare_consume = get_time_elapsed(prepare_start, true);
+
+            //search_area.print();
+            uint before_buffer = bench->search_count;
+            uint real_ctb_count = min((uint) 1215, bench->ctb_count);
+            bool * is_buffer_hit = new bool[real_ctb_count];
+#pragma omp parallel for num_threads(bench->config->num_threads)
+            for (uint j = 0; j < real_ctb_count; j++) {
+                is_buffer_hit[j] = bench->mbr_search_in_obuffer(search_area, j, &tq);
+            }
+            double buffer_consume = get_time_elapsed(prepare_start, true);
+            uint end_buffer = bench->search_count - before_buffer;
+            uint buffer_hit_count = 0;
+            for(uint j = 0; j < real_ctb_count; j++){
+                if(is_buffer_hit[j]){
+                    buffer_hit_count++;
+                }
+            }
+
+            uint64_t total_MB = 0;
+            for (auto info: bench->box_search_queue) {
+                total_MB += bench->ctbs[info.ctb_id].ctfs[info.ctf_id].CTF_kv_capacity * bench->ctbs[info.ctb_id].ctfs[info.ctf_id].key_bit / 8;
+            }
+            //cout << "total_MB" << total_MB * sizeof(__uint128_t) / 1024 / 1024 << endl;
+            struct timeval multi_thread_start = get_cur_time();
+#pragma omp parallel for num_threads(bench->config->num_threads)
+            for (auto info: bench->box_search_queue) {
+                CTF * ctf = &bench->ctbs[info.ctb_id].ctfs[info.ctf_id];
+                uint mbr_find_count = 0;
+                if (!ctf->keys) {
+                    bench->load_CTF_keys(info.ctb_id, info.ctf_id);
+                }
+                uint8_t * data = reinterpret_cast<uint8_t *>(ctf->keys);
+                for (uint q = 0; q < ctf->CTF_kv_capacity; q++) {
+                    key_info temp_ki;
+                    __uint128_t temp_128 = 0;
+                    memcpy(&temp_128, data + q * ctf->key_bit / 8, ctf->key_bit / 8);
+                    uint64_t value_mbr = 0;
+                    ctf->parse_key(temp_128, temp_ki, value_mbr);
+
+                    if (info.tq.abandon ) {
+                        //uint pid = get_key_oid(temp_key);
+                        box key_box = ctf->new_parse_mbr(value_mbr);
+                        if (search_area.intersect(key_box)) {
+                            oids_in_airport[temp_ki.oid]++;
+                            mbr_find_count++;
+                            //cout<<"box find!"<<endl;
+                            //key_box.print();
+                        }
+                    }
+                }
+                delete[] ctf->keys;
+                ctf->keys = nullptr;
+                bench->search_count.fetch_add(mbr_find_count, std::memory_order_relaxed);
+            }
+
+            double multi_thread_consume = get_time_elapsed(multi_thread_start, true);
+            q << 0 << ',' << bench->search_count << ',' << multi_thread_consume << ','
+              << bench->intersect_sst_count << ',' << bench->bit_find_count << ','
+              << total_MB / 1024 / 1024 << ',' << prepare_consume << ',' << 0 << ',' << 0 << ',' << buffer_consume << ','
+              << end_buffer << ',' << buffer_hit_count << ',' << bench->time_contain_count << endl;
+            bench->box_search_queue.clear();
+        }
+        q.close();
+    }
+    uint max_appear_count = 0;
+    uint max_oid = 0;
+    for(uint i = 0; i < oids_in_airport.size(); i++){
+        if(max_appear_count < oids_in_airport[i]){
+            max_appear_count = oids_in_airport[i];
+            max_oid = i;
+        }
+    }
+    cout << "max_appear_oid:" << max_oid << " count" << max_appear_count << endl;
 }
 
 void experiment_search_time(workbench *bench){
@@ -794,6 +1080,7 @@ void compress_rate(workbench * bench){
     }
 }
 
+
 void one_batch_box_search(workbench * bench, uint ctb_id){
     uint ctb_MB = 0;
     for(uint j = 0; j < bench->config->CTF_count; j++){
@@ -940,7 +1227,7 @@ int main(int argc, char **argv){
     clear_cache();
     string path = "../data/meta/N";
     //workbench * bench = C_load_meta(path.c_str());
-    uint max_ctb = 1215;
+    uint max_ctb = 174;
     workbench * bench = load_meta(path.c_str(), max_ctb);
     cout << "bench->ctb_count " << bench->ctb_count << endl;
     cout << "max_ctb " << max_ctb << endl;
@@ -950,6 +1237,15 @@ int main(int argc, char **argv){
             bench->ctbs[i].ctfs[j].keys = nullptr;
         }
     }
+
+//    uint64_t all_meetings_count = 0;
+//    for(uint i = 0; i < max_ctb; i++){
+//        for(uint j = 0; j < bench->config->CTF_count; j++){
+//            all_meetings_count += bench->ctbs[i].ctfs[j].CTF_kv_capacity;
+//        }
+//    }
+//    cout << "all_meetings_count " << all_meetings_count << " GB " << all_meetings_count / 1024 / 1024/ 1024 * 16 << endl;
+//    return 0;
 
 //    for(int i = 0; i < bench->ctb_count; i++) {
 //        bench->load_CTF_keys(i, 0);
@@ -1008,10 +1304,15 @@ int main(int argc, char **argv){
 //    cout << "real_world_time(s) " << real_world_time / 1000 << endl;
     //exp4_search_box_single(nb);
     //experiment_search_box(nb);
-    experiment_box_openmp(bench);
+    //experiment_box_openmp(bench);
     //experiment_search_time(bench);
     //query_search_id(bench);
     //query_search_box(bench);
+
+    //chicago_u_openmp(bench);
+    //hybrid_oid(bench, max_ctb);
+    //airport_analyze_openmp(bench);
+    airport_oid(bench, max_ctb);
 
     return 0;
 }

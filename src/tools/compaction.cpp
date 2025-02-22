@@ -15,7 +15,7 @@ struct Event {
 };
 
 // 计算两个矩形的重叠面积
-float twoboxOverlapArea(const f_box& A, const f_box& B) {
+float twoboxOverlapRate(const f_box& A, const f_box& B) {
     // 检查输入矩形是否合法
     if (A.low[0] > A.high[0] || A.low[1] > A.high[1] ||
         B.low[0] > B.high[0] || B.low[1] > B.high[1]) {
@@ -39,7 +39,7 @@ float twoboxOverlapArea(const f_box& A, const f_box& B) {
 
     // 计算重叠区域的面积
     float overlapArea = (overlapHigh[0] - overlapLow[0]) * (overlapHigh[1] - overlapLow[1]);
-    return overlapArea;
+    return overlapArea / (A.area() + B.area());
 }
 
 // 计算当前活跃区间的总长度
@@ -176,11 +176,11 @@ void ctf_num_search(double edge_length, vector<Point> vp, workbench *bench){
         ofstream q;
         //"bitmap_grid_search" + to_string(bench->bitmap_grid)
         //"ctf_num_search" + to_string(bench->config->CTF_count)
-        q.open("bitmap_grid_search" + to_string(bench->bitmap_grid) + ".csv", ios::out|ios::binary|ios::trunc);
-        q << "search edge_length" << ',' << "total_find_count" << ',' << "multi_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ','
+        q.open("ctf_num_search" + to_string(bench->config->CTF_count) + ".csv", ios::out|ios::binary|ios::trunc);
+        q << "search edge_length" << ',' << "total_find_count" << ',' << "single_thread_consume" << ',' << "intersect_mbr_count" << ',' << "bitmap_find_count" << ','
           << "total_MB" << ',' << "prepare_time(ms)" << ',' << "load_ctf_time" << ',' << "mid x" << ',' << "mid y" << ',' << "buffer_time" << ','
           << "buffer_find" << ',' << "buffer_bitmap_hit" << ',' << "time_contain_count" << endl;
-        for (uint i = 0; i < min(100, (int)vp.size()); i++) {
+        for (uint i = 0; i < min(1000, (int)vp.size()); i++) {
             bench->clear_all_keys();
             clear_cache();
             struct timeval prepare_start = get_cur_time();
@@ -307,6 +307,7 @@ void * ex_ctf_size(double edge_length, vector<Point> vp, workbench * bench, uint
 
     uint new_CTF_count = bench->config->split_num * bench->config->split_num;
     C_ctb.ctfs = new CTF[new_CTF_count];
+    uint thread_this = min((uint)bench->config->num_threads,new_CTF_count);
     uint old_CTF_count = bench->config->CTF_count;
     //bench->config->CTF_count = new_CTF_count;
     //bench->merge_kv_capacity = bench->config->kv_restriction * merge_ctb_count;         //less than that  //useless
@@ -452,7 +453,7 @@ void * ex_ctf_size(double edge_length, vector<Point> vp, workbench * bench, uint
     double write_sid_time = get_time_elapsed(bg_start,true);
     fprintf(stdout,"\t write_sid_time:\t%.2f\n",write_sid_time);
 
-#pragma omp parallel for num_threads(new_CTF_count)
+#pragma omp parallel for num_threads(thread_this)
     for (int j = 0; j < new_CTF_count; j++) {
         std::sort(invert_index[j].begin(), invert_index[j].end());      //same sid, sort oid
         uint v_capacity = 0;
@@ -496,7 +497,7 @@ void * ex_ctf_size(double edge_length, vector<Point> vp, workbench * bench, uint
         C_ctb.start_time_min = min(C_ctb.start_time_min, bench->ctbs[start_ctb + i].start_time_min);
         C_ctb.start_time_max = max(C_ctb.start_time_max, bench->ctbs[start_ctb + i].start_time_max);
     }
-#pragma omp parallel for num_threads(new_CTF_count)
+#pragma omp parallel for num_threads(thread_this)
     for(uint i = 0; i < new_CTF_count; i++){
         float local_low[2] = {100000.0,100000.0};
         float local_high[2] = {-100000.0,-100000.0};
@@ -523,16 +524,16 @@ void * ex_ctf_size(double edge_length, vector<Point> vp, workbench * bench, uint
         C_ctb.ctfs[i].start_time_max = local_start_time_max;
         C_ctb.ctfs[i].end_time_min = C_ctb.end_time_min;
         C_ctb.ctfs[i].end_time_max = C_ctb.end_time_max;
-        float map_gra = bench->bitmap_grid / 16.0 / 4;
-        C_ctb.ctfs[i].get_ctf_bits(bench->mbr, bench->config, map_gra);     //1/4 1/2 1 2 4 8
-        //C_ctb.ctfs[i].get_ctf_bits(bench->mbr, bench->config);
+        float map_gra = bench->bitmap_grid / 16.0 / 16;
+        //C_ctb.ctfs[i].get_ctf_bits(bench->mbr, bench->config, map_gra);     //16/1 1/8 1/4 1/2 1 2 4 8 16
+        C_ctb.ctfs[i].get_ctf_bits(bench->mbr, bench->config);
     }
     double get_limit = get_time_elapsed(bg_start,true);
     fprintf(stdout,"\tget_limit:\t%.2f\n",get_limit);
 
-    for(uint i = 0; i < new_CTF_count; i++){
-        cout << "ctf_bitmap_size" << C_ctb.ctfs[i].ctf_bitmap_size << endl;
-    }
+//    for(uint i = 0; i < new_CTF_count; i++){
+//        cout << "ctf_bitmap_size" << C_ctb.ctfs[i].ctf_bitmap_size << endl;
+//    }
 
     // {
     //     CTF * ctf = &C_ctb.ctfs[0];
@@ -542,7 +543,7 @@ void * ex_ctf_size(double edge_length, vector<Point> vp, workbench * bench, uint
     // }
 
 
-#pragma omp parallel for num_threads(new_CTF_count)
+#pragma omp parallel for num_threads(thread_this)
     for(uint i = 0; i < new_CTF_count; i++){
         CTF * ctf = &C_ctb.ctfs[i];
         ctf->bitmap = new unsigned char[ctf->ctf_bitmap_size];
@@ -672,6 +673,14 @@ void * ex_ctf_size(double edge_length, vector<Point> vp, workbench * bench, uint
         string sst_path = bench->config->raid_path + to_string(i%2) + "/C_SSTable_"+to_string(0)+"-"+to_string(i);
         C_ctb.ctfs[i].dump_keys(sst_path.c_str());
     }
+    double dump_new_keys = get_time_elapsed(bg_start,true);
+    fprintf(stdout,"\t dump_new_keys:\t%.2f\n",dump_new_keys);
+
+    ofstream q;
+    q.open("file" + to_string(new_CTF_count) + ".csv", ios::out|ios::binary|ios::trunc);
+    q << "GB" << ',' << "STR(ms)" << ',' << "encoding" << ',' << "load_keys" << ',' << "dump_all"
+      << ',' << "area_exclusive" << ',' << "union_area" << ',' << "area_handshake" << ','
+      << "area_sum" << ',' << "two_tree_kB" << ',' << "load_keys" << ',' << "bitmap_kb" << endl;
     vector<f_box> ctf_mbrs(new_CTF_count);
     float area_sum = 0;
     uint bitmap_kb = 0;
@@ -682,6 +691,28 @@ void * ex_ctf_size(double edge_length, vector<Point> vp, workbench * bench, uint
     }
     bitmap_kb /= 1024;
     cout << "new_CTF_count " << new_CTF_count << " bitmap_grid " << bench->bitmap_grid << " bitmap_kb " << bitmap_kb << endl;
+    float union_area = calculateUnionArea(ctf_mbrs);
+    cout << "overlap_area " << union_area << " area_sum " << area_sum << "overlap rate " << union_area / area_sum << endl;
+    float area_handshake = 0;
+    for(uint i = 0; i < new_CTF_count; i++){
+        for(uint j = i + 1; j < new_CTF_count; j++){
+            area_handshake += twoboxOverlapRate(C_ctb.ctfs[i].ctf_mbr, C_ctb.ctfs[j].ctf_mbr);
+        }
+    }
+    float handshake_count = new_CTF_count * (new_CTF_count - 1) / 2;
+    cout << "handshake " << area_handshake << " handshake rate " << area_handshake / handshake_count << endl;
+    float area_exclusive = area_sum - area_handshake * 2;
+    cout << " area_exclusive " << area_exclusive << " final rate " << area_exclusive / union_area << endl;
+
+    uint rtree_size = sizeof(RTree<int *, double, 2, double>) * new_CTF_count;
+    uint btree_size = sizeof(Interval) * bench->start_sorted.size() * 2;
+    uint two_tree_kB = (rtree_size + btree_size) / 1024;
+    cout << "rtree_size " << rtree_size << " btree_size " << btree_size << endl;
+
+    q << merge_ctb_count * 2 << ',' << STR_time << ',' << encoding_time
+      << ',' << load_keys_time << ',' << 0 << ',' << area_exclusive << ',' << union_area << ',' << area_handshake << ',' << area_sum
+      << ',' << two_tree_kB << ',' << dump_new_keys << ',' << bitmap_kb << endl;
+    q.close();
 
     string prefix = "C";
     strncpy(bench->keys_file_prefix, prefix.c_str(), sizeof(bench->keys_file_prefix) - 1);
@@ -756,6 +787,7 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
     atomic<int> another_o_count = 0;
 
     uint new_CTF_count = bench->config->split_num * bench->config->split_num;
+    uint thread_this = min((uint)bench->config->num_threads,new_CTF_count);
     C_ctb.ctfs = new CTF[new_CTF_count];
     uint old_CTF_count = bench->config->CTF_count;
     //bench->config->CTF_count = new_CTF_count;
@@ -827,7 +859,6 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
     double init_str_list = get_time_elapsed(bg_start,true);
     fprintf(stdout,"\tinit_str_list:\t%.2f\n",init_str_list);
 
-
     // uint zero_count = 0, one_count = 0;
     // for(uint i = 0; i < bench->config->num_objects; i++){
     //     if(C_ctb.sids[i] == 0) zero_count++;
@@ -835,7 +866,6 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
     // }
     // cout << "zero_count = " << zero_count << endl;
     // cout << "one_count = " << one_count << endl;
-
 
     auto * csids = C_ctb.sids;
     std::sort(std::execution::par, str_list.begin(), str_list.end(), [&csids](const object_info& a, const object_info& b) {
@@ -901,7 +931,7 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
     double write_sid_time = get_time_elapsed(bg_start,true);
     fprintf(stdout,"\t write_sid_time:\t%.2f\n",write_sid_time);
 
-#pragma omp parallel for num_threads(new_CTF_count)
+#pragma omp parallel for num_threads(thread_this)
     for (int j = 0; j < new_CTF_count; j++) {
         std::sort(invert_index[j].begin(), invert_index[j].end());      //same sid, sort oid
         uint v_capacity = 0;
@@ -952,7 +982,7 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
         C_ctb.start_time_min = min(C_ctb.start_time_min, bench->ctbs[start_ctb + i].start_time_min);
         C_ctb.start_time_max = max(C_ctb.start_time_max, bench->ctbs[start_ctb + i].start_time_max);
     }
-#pragma omp parallel for num_threads(new_CTF_count)
+#pragma omp parallel for num_threads(thread_this)
     for(uint i = 0; i < new_CTF_count; i++){
         float local_low[2] = {100000.0,100000.0};
         float local_high[2] = {-100000.0,-100000.0};
@@ -991,7 +1021,7 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
     //     }
     // }
 
-#pragma omp parallel for num_threads(new_CTF_count)
+#pragma omp parallel for num_threads(thread_this)
     for(uint i = 0; i < new_CTF_count; i++){
         CTF * ctf = &C_ctb.ctfs[i];
         ctf->bitmap = new unsigned char[ctf->ctf_bitmap_size];
@@ -1136,10 +1166,11 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
     float area_handshake = 0;
     for(uint i = 0; i < new_CTF_count; i++){
         for(uint j = i + 1; j < new_CTF_count; j++){
-            area_handshake += twoboxOverlapArea(C_ctb.ctfs[i].ctf_mbr, C_ctb.ctfs[j].ctf_mbr);
+            area_handshake += twoboxOverlapRate(C_ctb.ctfs[i].ctf_mbr, C_ctb.ctfs[j].ctf_mbr);
         }
     }
-    cout << "handshake " << area_handshake << " handshake rate " << area_handshake / area_sum << endl;
+    float handshake_count = new_CTF_count * (new_CTF_count - 1) / 2;
+    cout << "handshake " << area_handshake << " handshake rate " << area_handshake / handshake_count << endl;
     float area_exclusive = area_sum - area_handshake * 2;
     cout << " area_exclusive " << area_exclusive << " final rate " << area_exclusive / union_area << endl;
 
@@ -1160,7 +1191,7 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
         C_ctb.ctfs[i].dump_meta(ctf_path);
         string sst_path = bench->config->raid_path + to_string(i%2) + "/" + prefix + "_SSTable_"+to_string(c_ctb_id)+"-"+to_string(i);
         C_ctb.ctfs[i].dump_keys(sst_path.c_str());
-        delete[] C_ctb.ctfs[i].keys;
+        //delete[] C_ctb.ctfs[i].keys;
     }
     double dump_ctf_keys_time = get_time_elapsed(bg_start,true);
     fprintf(stdout,"\t dump_ctf_keys_time:\t%.2f\n",dump_ctf_keys_time);
@@ -1207,15 +1238,17 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
 //    double edge_length = 0.00104192;             //0.000329512
 //    string path = "../data/meta/N";
 //    //workbench * bench = C_load_meta(path.c_str());
-//    uint max_ctb = 3;
+//    uint max_ctb = 1;
 //    workbench * bench = load_meta(path.c_str(), max_ctb);
 //    for(int i = 0; i < max_ctb; i++) {
 //        for (int j = 0; j < bench->config->CTF_count; j++) {
 //            bench->ctbs[i].ctfs[j].keys = nullptr;
 //        }
 //    }
-//    //for(uint new_split_num = 30; new_split_num <= 30; new_split_num+=1){
-//    for(uint new_split_num = 10; new_split_num <= 10; new_split_num+=10){
+//    vector<int> num = {4, 8, 16, 32, 64, 128, 256};
+//    //for(uint new_split_num = 100; new_split_num <= 200; new_split_num+=10){
+//    for(uint j = 5; j < 7; j++){
+//        uint new_split_num = num[j];
 //        clear_cache();
 //        //bench->clear_all_keys();
 //
@@ -1226,11 +1259,11 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
 //        vector< vector<f_box> > mbrs_with_sid(new_CTF_count);
 //        vector< vector<uint> > invert_index(new_CTF_count);
 //        for (auto& vec : invert_index) {
-//            vec.reserve(200000);        //20000000 / 400
+//            vec.reserve(20000000/(new_CTF_count - 1));        //20000000 / 400
 //        }
 //        vector< pair< vector<key_info>, vector<f_box> > > objects_map(bench->config->num_objects);
 //
-//        uint merge_ctb_count = 3;
+//        uint merge_ctb_count = 1;
 //        for(uint i = 0; i < max_ctb; i += merge_ctb_count){
 //            // for(uint j = i; j < i + merge_ctb_count; j++){
 //            //     for(uint k = 0; k < bench->config->CTF_count; k++){
@@ -1269,144 +1302,44 @@ void * merge_dump(workbench * bench, uint start_ctb, uint merge_ctb_count, vecto
 
 
 //bitmap granulirity
-int main(int argc, char **argv){
-    clear_cache();
-    double edge_length = 0.000104192;             //0.000329512
-    vector<Point> vp(1000);
-    for(uint i = 0; i < vp.size(); i++){
-        vp[i].x = -87.9 + 0.01 + (0.36 - 0.01) * get_rand_double();
-        vp[i].y = 41.65 + 0.01 + (0.36 - 0.01) * get_rand_double();
-    }
-    string path = "../data/meta/N";
-    //workbench * bench = C_load_meta(path.c_str());
-    uint max_ctb = 1;
-    uint new_split_num = 16;
-    uint new_CTF_count = 256;
-    workbench * bench = load_meta(path.c_str(), max_ctb);
-    for(int i = 0; i < max_ctb; i++) {
-        for (int j = 0; j < bench->config->CTF_count; j++) {
-            bench->ctbs[i].ctfs[j].keys = nullptr;
-        }
-    }
-    for(uint grid = 16; grid < 1024; grid*=2){
-        clear_cache();
-        //bench->clear_all_keys();
-        bench->bitmap_grid = grid;
-        bench->config->split_num = new_split_num;
-        vector<object_info> str_list(bench->config->num_objects);
-        vector< vector<key_info> > keys_with_sid(new_CTF_count);
-        vector< vector<f_box> > mbrs_with_sid(new_CTF_count);
-        vector< vector<uint> > invert_index(new_CTF_count);
-        for (auto& vec : invert_index) {
-            vec.reserve(200000);        //20000000 / 400
-        }
-        vector< pair< vector<key_info>, vector<f_box> > > objects_map(bench->config->num_objects);
-        uint merge_ctb_count = max_ctb;
-        for(uint i = 0; i < max_ctb; i += merge_ctb_count){
-            struct timeval bg_start = get_cur_time();
-            ex_ctf_size(edge_length, vp, bench, 0, merge_ctb_count, keys_with_sid, mbrs_with_sid, invert_index, objects_map, str_list);
-            double compaction_total = get_time_elapsed(bg_start,true);
-            fprintf(stdout,"\tcompaction_total:\t%.2f\n",compaction_total);
-            for(uint j = 0; j < new_CTF_count; j++){
-                keys_with_sid[j].clear();
-                mbrs_with_sid[j].clear();
-                invert_index[j].clear();
-            }
-            for(auto p : objects_map){
-                p.first.clear();
-                p.second.clear();
-            }
-        }
-    }
-    return 0;
-}
-
-
-
-
-//compaction test   //batch size
 //int main(int argc, char **argv){
 //    clear_cache();
+//    double edge_length = 0.000104192;             //0.000329512
+//    vector<Point> vp(1000);
+//    for(uint i = 0; i < vp.size(); i++){
+//        vp[i].x = -87.9 + 0.01 + (0.36 - 0.01) * get_rand_double();
+//        vp[i].y = 41.65 + 0.01 + (0.36 - 0.01) * get_rand_double();
+//    }
 //    string path = "../data/meta/N";
 //    //workbench * bench = C_load_meta(path.c_str());
-//    uint max_ctb = 32;
+//    uint max_ctb = 1;
+//    uint new_split_num = 16;
+//    uint new_CTF_count = 256;
 //    workbench * bench = load_meta(path.c_str(), max_ctb);
 //    for(int i = 0; i < max_ctb; i++) {
 //        for (int j = 0; j < bench->config->CTF_count; j++) {
 //            bench->ctbs[i].ctfs[j].keys = nullptr;
 //        }
 //    }
-//    vector<uint> ctf_nums = {100, 196, 400, 784, 1600, 3136};
-//    assert(bench->config->G_bytes == 2);
-//    bench->config->G_bytes = 2;
-//    for(uint j = 0; j < 6; j++){                                    //2 4 8 16 32
+//    for(uint grid = 16; grid <= 4096; grid*=2){
 //        clear_cache();
-//        bench->clear_all_keys();
-//        //cout << "bench->ctb_count " << bench->ctb_count << endl;
-//
-//
-//        //    for(uint i = 0; i < 100; i++){
-//        //        bench->ctbs[0].ctfs[i].print_bitmap();
-//        //        //bench->ctbs[1].ctfs[i].ctf_mbr.print();
-//        //    }
-//        //    return 0;
-//        //    CTF * ctf = &bench->ctbs[0].ctfs[0];
-//        //    bench->load_CTF_keys(0, 0);
-//        //    uint8_t * data = reinterpret_cast<uint8_t *>(ctf->keys);
-//        //    uint temp_oid = 0;
-//        //    for(uint i = 0; i < ctf->CTF_kv_capacity; i++){
-//        //        key_info temp_ki;
-//        //        __uint128_t temp_128 = 0;
-//        //        memcpy(&temp_128, data + i * ctf->key_bit / 8, ctf->key_bit / 8);
-//        //        uint64_t value_mbr = 0;
-//        //        ctf->parse_key(temp_128, temp_ki, value_mbr);
-//        ////        box key_box = ctf->new_parse_mbr(value_mbr);
-//        ////        if(key_box.high[1] - key_box.low[1] > 0.008 || key_box.high[0] - key_box.low[0] > 0.008){
-//        ////            cerr << "i " <<  i <<" ";
-//        ////            key_box.print();
-//        ////        }
-//        //
-//        //    }
-//        //
-//        //    return 0;
-//
-//        uint new_CTF_count = ctf_nums[j];
-//        uint new_split_num = sqrt(new_CTF_count);
+//        //bench->clear_all_keys();
+//        bench->bitmap_grid = grid;
 //        bench->config->split_num = new_split_num;
 //        vector<object_info> str_list(bench->config->num_objects);
 //        vector< vector<key_info> > keys_with_sid(new_CTF_count);
 //        vector< vector<f_box> > mbrs_with_sid(new_CTF_count);
 //        vector< vector<uint> > invert_index(new_CTF_count);
 //        for (auto& vec : invert_index) {
-//            vec.reserve(50000);        //20000000 / 400
+//            vec.reserve(200000);        //20000000 / 400
 //        }
-//
-//        uint merge_ctb_count = bench->config->G_bytes / 2;
+//        vector< pair< vector<key_info>, vector<f_box> > > objects_map(bench->config->num_objects);
+//        uint merge_ctb_count = max_ctb;
 //        for(uint i = 0; i < max_ctb; i += merge_ctb_count){
-//            // for(uint j = i; j < i + merge_ctb_count; j++){
-//            //     for(uint k = 0; k < bench->config->CTF_count; k++){
-//            //         bench->load_CTF_keys(j, k);
-//            //     }
-//            // }
-//            vector< pair< vector<key_info>, vector<f_box> > > objects_map(bench->config->num_objects);
 //            struct timeval bg_start = get_cur_time();
-//            merge_dump(bench, i, merge_ctb_count, keys_with_sid, mbrs_with_sid, invert_index, objects_map, str_list);
-//            //cout << i << "i-merge_ctb_count" << merge_ctb_count << endl;
+//            ex_ctf_size(edge_length, vp, bench, 0, merge_ctb_count, keys_with_sid, mbrs_with_sid, invert_index, objects_map, str_list);
 //            double compaction_total = get_time_elapsed(bg_start,true);
 //            fprintf(stdout,"\tcompaction_total:\t%.2f\n",compaction_total);
-//
-//            //init
-////            for(uint j = i; j < i + merge_ctb_count; j++){
-////                for(uint k = 0; k < bench->config->CTF_count; k++){
-////                    if(bench->ctbs[j].ctfs[k].keys){
-////                        delete []bench->ctbs[j].ctfs[k].keys;
-////                        bench->ctbs[j].ctfs[k].keys = nullptr;
-////                    }
-////                }
-////            }
-//
-//            vector<object_info> temp_swap(bench->config->num_objects);
-//            swap(str_list, temp_swap);                                  //init
 //            for(uint j = 0; j < new_CTF_count; j++){
 //                keys_with_sid[j].clear();
 //                mbrs_with_sid[j].clear();
@@ -1417,7 +1350,108 @@ int main(int argc, char **argv){
 //                p.second.clear();
 //            }
 //        }
-//        bench->config->G_bytes *= 2;
 //    }
 //    return 0;
 //}
+
+
+
+
+//compaction test   //batch size
+int main(int argc, char **argv){
+    clear_cache();
+    string path = "../data/meta/N";
+    //workbench * bench = C_load_meta(path.c_str());
+    uint max_ctb = 32;
+    workbench * bench = load_meta(path.c_str(), max_ctb);
+    for(int i = 0; i < max_ctb; i++) {
+        for (int j = 0; j < bench->config->CTF_count; j++) {
+            bench->ctbs[i].ctfs[j].keys = nullptr;
+        }
+    }
+    vector<uint> ctf_nums = {100, 196, 400, 784, 1600, 3136};
+    assert(bench->config->G_bytes == 2);
+    bench->config->G_bytes = 64;
+    for(uint j = 5; j < 6; j++){                                    //2 4 8 16 32
+        clear_cache();
+        bench->clear_all_keys();
+        //cout << "bench->ctb_count " << bench->ctb_count << endl;
+
+
+        //    for(uint i = 0; i < 100; i++){
+        //        bench->ctbs[0].ctfs[i].print_bitmap();
+        //        //bench->ctbs[1].ctfs[i].ctf_mbr.print();
+        //    }
+        //    return 0;
+        //    CTF * ctf = &bench->ctbs[0].ctfs[0];
+        //    bench->load_CTF_keys(0, 0);
+        //    uint8_t * data = reinterpret_cast<uint8_t *>(ctf->keys);
+        //    uint temp_oid = 0;
+        //    for(uint i = 0; i < ctf->CTF_kv_capacity; i++){
+        //        key_info temp_ki;
+        //        __uint128_t temp_128 = 0;
+        //        memcpy(&temp_128, data + i * ctf->key_bit / 8, ctf->key_bit / 8);
+        //        uint64_t value_mbr = 0;
+        //        ctf->parse_key(temp_128, temp_ki, value_mbr);
+        ////        box key_box = ctf->new_parse_mbr(value_mbr);
+        ////        if(key_box.high[1] - key_box.low[1] > 0.008 || key_box.high[0] - key_box.low[0] > 0.008){
+        ////            cerr << "i " <<  i <<" ";
+        ////            key_box.print();
+        ////        }
+        //
+        //    }
+        //
+        //    return 0;
+
+        uint new_CTF_count = ctf_nums[j];
+        uint new_split_num = sqrt(new_CTF_count);
+        bench->config->split_num = new_split_num;
+        vector<object_info> str_list(bench->config->num_objects);
+        vector< vector<key_info> > keys_with_sid(new_CTF_count);
+        vector< vector<f_box> > mbrs_with_sid(new_CTF_count);
+        vector< vector<uint> > invert_index(new_CTF_count);
+        for (auto& vec : invert_index) {
+            vec.reserve(50000);        //20000000 / 400
+        }
+        uint merge_ctb_count = bench->config->G_bytes / 2;
+        for(uint k = 0; k < 2; k++){                            //repeat
+            for(uint i = 0; i < max_ctb; i += merge_ctb_count){
+                // for(uint j = i; j < i + merge_ctb_count; j++){
+                //     for(uint k = 0; k < bench->config->CTF_count; k++){
+                //         bench->load_CTF_keys(j, k);
+                //     }
+                // }
+                vector< pair< vector<key_info>, vector<f_box> > > objects_map(bench->config->num_objects);
+                struct timeval bg_start = get_cur_time();
+                merge_dump(bench, i, merge_ctb_count, keys_with_sid, mbrs_with_sid, invert_index, objects_map, str_list);
+                //cout << i << "i-merge_ctb_count" << merge_ctb_count << endl;
+                double compaction_total = get_time_elapsed(bg_start,true);
+                fprintf(stdout,"\tcompaction_total:\t%.2f\n",compaction_total);
+
+                //init
+//            for(uint j = i; j < i + merge_ctb_count; j++){
+//                for(uint k = 0; k < bench->config->CTF_count; k++){
+//                    if(bench->ctbs[j].ctfs[k].keys){
+//                        delete []bench->ctbs[j].ctfs[k].keys;
+//                        bench->ctbs[j].ctfs[k].keys = nullptr;
+//                    }
+//                }
+//            }
+
+                vector<object_info> temp_swap(bench->config->num_objects);
+                swap(str_list, temp_swap);                                  //init
+                for(uint j = 0; j < new_CTF_count; j++){
+                    keys_with_sid[j].clear();
+                    mbrs_with_sid[j].clear();
+                    invert_index[j].clear();
+                }
+                for(auto p : objects_map){
+                    p.first.clear();
+                    p.second.clear();
+                }
+            }
+        }
+        bench->config->G_bytes *= 2;
+    }
+    return 0;
+}
