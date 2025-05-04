@@ -875,8 +875,8 @@ void cuda_get_limit(workbench *bench) {
     }
 
     if (threadIdx.x < 32) {
-        unsigned int mask = __ballot_sync(0xFFFFFFFF, true); // 确保所有 warp 线程参与
-        // 使用 __shfl_down_sync 实现 warp 归约
+        unsigned int mask = __ballot_sync(0xFFFFFFFF, true);
+        // __shfl_down_sync
         for (int offset = 16; offset > 0; offset /= 2) {
             local_low[0][threadIdx.x] = min(local_low[0][threadIdx.x], __shfl_down_sync(mask, local_low[0][threadIdx.x], offset));
             local_low[1][threadIdx.x] = min(local_low[1][threadIdx.x], __shfl_down_sync(mask, local_low[1][threadIdx.x], offset));
@@ -963,8 +963,8 @@ void get_o_limit(workbench *bench, uint oversize_key_count) {
     }
 
     if (threadIdx.x < 32) {
-        unsigned int mask = __ballot_sync(0xFFFFFFFF, true); // 确保所有 warp 线程参与
-        // 使用 __shfl_down_sync 实现 warp 归约
+        unsigned int mask = __ballot_sync(0xFFFFFFFF, true);
+        //__shfl_down_sync
         for (int offset = 16; offset > 0; offset /= 2) {
             local_end_time_min[threadIdx.x] = min(local_end_time_min[threadIdx.x], __shfl_down_sync(mask, local_end_time_min[threadIdx.x], offset));
             local_end_time_max[threadIdx.x] = max(local_end_time_max[threadIdx.x], __shfl_down_sync(mask, local_end_time_max[threadIdx.x], offset));

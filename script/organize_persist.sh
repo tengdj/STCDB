@@ -13,4 +13,4 @@ for i in "${values[@]}"; do
         1>"$output_file" 2>"$error_file"
 done
 
-echo "所有任务已完成。"
+echo "finished"

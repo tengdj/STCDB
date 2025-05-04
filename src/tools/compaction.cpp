@@ -5,44 +5,40 @@
 using namespace std;
 
 struct Event {
-    float x; // 事件的x坐标
-    float y1, y2; // 矩形的y坐标区间
-    bool isStart; // 是否是矩形的左边界，true表示左边界，false表示右边界
+    float x;
+    float y1, y2;
+    bool isStart; // true is left border，false is right border
 
     bool operator<(const Event& other) const {
         return x < other.x || (x == other.x && isStart > other.isStart);
     }
 };
 
-// 计算两个矩形的重叠面积
 float twoboxOverlapRate(const f_box& A, const f_box& B) {
-    // 检查输入矩形是否合法
     if (A.low[0] > A.high[0] || A.low[1] > A.high[1] ||
         B.low[0] > B.high[0] || B.low[1] > B.high[1]) {
-        return 0.0f; // 非法矩形，返回 0
     }
 
-    // 计算重叠区域的左下角坐标和右上角坐标
+    //left_bottom
     float overlapLow[2] = {
-            std::max(A.low[0], B.low[0]), // 重叠区域的左下角 x
-            std::max(A.low[1], B.low[1])  // 重叠区域的左下角 y
-    };
-    float overlapHigh[2] = {
-            std::min(A.high[0], B.high[0]), // 重叠区域的右上角 x
-            std::min(A.high[1], B.high[1])  // 重叠区域的右上角 y
+            std::max(A.low[0], B.low[0]),
+            std::max(A.low[1], B.low[1])
     };
 
-    // 如果没有重叠区域
+    //right_top
+    float overlapHigh[2] = {
+            std::min(A.high[0], B.high[0]),
+            std::min(A.high[1], B.high[1])
+    };
+
     if (overlapLow[0] >= overlapHigh[0] || overlapLow[1] >= overlapHigh[1]) {
-        return 0.0f;  // 没有重叠
+        return 0.0f;
     }
 
-    // 计算重叠区域的面积
     float overlapArea = (overlapHigh[0] - overlapLow[0]) * (overlapHigh[1] - overlapLow[1]);
     return overlapArea / (A.area() + B.area());
 }
 
-// 计算当前活跃区间的总长度
 float calculateActiveLength(const set<pair<float, float>>& activeIntervals) {
     float totalLength = 0;
     float prevY = -1;
@@ -65,26 +61,21 @@ float calculateActiveLength(const set<pair<float, float>>& activeIntervals) {
 float calculateUnionArea(const vector<f_box>& rectangles) {
     vector<Event> events;
 
-    // 收集所有矩形的左右边界事件
     for (const auto& rect : rectangles) {
-        events.push_back({rect.low[0], rect.low[1], rect.high[1], true});  // 左边界事件
-        events.push_back({rect.high[0], rect.low[1], rect.high[1], false}); // 右边界事件
+        events.push_back({rect.low[0], rect.low[1], rect.high[1], true});
+        events.push_back({rect.high[0], rect.low[1], rect.high[1], false});
     }
 
-    // 按 x 坐标排序事件
     sort(events.begin(), events.end());
 
-    set<pair<float, float>> activeIntervals; // 活跃区间集合
+    set<pair<float, float>> activeIntervals;
     float lastX = events[0].x;
     float totalArea = 0;
 
-    // 扫描线处理事件
     for (const auto& event : events) {
-        // 计算上一段扫描线横跨的面积
         float activeLength = calculateActiveLength(activeIntervals);
         totalArea += activeLength * (event.x - lastX);
 
-        // 更新活跃区间
         if (event.isStart) {
             activeIntervals.insert({event.y1, event.y2});
         } else {

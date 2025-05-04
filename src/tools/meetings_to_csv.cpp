@@ -14,12 +14,12 @@ string formatBox(const box& key_box) {
 }
 
 bool areFirstFourDigitsEqual(double a, double b) {
-   return std::fabs(a - b) < 0.0001; // 判断两数差值是否小于 0.0001
+   return std::fabs(a - b) < 0.0001;
 }
 
-// 检查两点是否接近（前 4 位精度）
+
 bool are_points_equal(double x1, double y1, double x2, double y2) {
-   const double epsilon = 0.0001; // 精度
+   const double epsilon = 0.0001;   //precision
    return std::fabs(x1 - x2) < epsilon && std::fabs(y1 - y2) < epsilon;
 }
 

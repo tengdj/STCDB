@@ -28,7 +28,7 @@ int main(int argc, char** argv) {
     ifstream file("mbr_in_a_sst.txt");
     string line;
     if (!file.is_open()) {
-        cerr << "无法打开文件" << endl;
+        cerr << "file cannot opened" << endl;
         return 1;
     }
     box * mbrs = new box[100];
@@ -36,8 +36,7 @@ int main(int argc, char** argv) {
     while (getline(file, line)) {
         stringstream ss(line);
         string token;
-        // 跳过 "POLYGON((" 并读取所有数字
-        ss.ignore(9, ' '); // 忽略 "POLYGON((" 的长度
+        ss.ignore(9, ' '); // ignore "POLYGON(("
         double number;
         stringstream numStream;
         getline(ss, token, ',');            //low0 low1

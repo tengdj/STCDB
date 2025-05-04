@@ -3,11 +3,11 @@
 for i in {1..10}; do
     echo "Run #$i"
 
-    # 动态调整 --sstable_count 参数
+
     DURATION=$((400 + 250*(i-1)))
     MEMTABLE_CAPACITY=$((2 * i))
 
-    # 运行程序并将输出重定向到文件
+
     ../build/pipeline --map_path ../data/streets.map \
                       --meta_path ../data/chicago.mt \
                       -d $DURATION \
@@ -18,7 +18,7 @@ for i in {1..10}; do
                       --sstable_count 50 \
                       --memTable_capacity $MEMTABLE_CAPACITY
 
-    # 检查程序是否成功执行
+
     if [ $? -eq 0 ]; then
         echo "Run #$i: Program executed successfully."
     else

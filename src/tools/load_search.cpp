@@ -628,9 +628,9 @@ void chicago_u_openmp(workbench *bench){
             bench->bit_find_count = 0;
             bench->time_contain_count = 0;
 
-            //box search_area(-87.6818, 42.04871, -87.6688, 42.06275);  //西北
-            //box search_area(-87.93905, 41.95142, -87.87725, 42.00961);  //奥黑尔
-            box search_area(-87.60590, 41.78396, -87.59174, 41.79499);      //芝加哥大学
+            //box search_area(-87.6818, 42.04871, -87.6688, 42.06275);  //northwest
+            //box search_area(-87.93905, 41.95142, -87.87725, 42.00961);  //O'Hare airport
+            box search_area(-87.60590, 41.78396, -87.59174, 41.79499);      //University of Chicago
             search_area.print();
             bench->mbr.print();
 
@@ -722,9 +722,9 @@ void airport_analyze_openmp(workbench *bench){
             bench->bit_find_count = 0;
             bench->time_contain_count = 0;
 
-            //box search_area(-87.6818, 42.04871, -87.6688, 42.06275);  //西北
-            box search_area(-87.93905, 41.95142, -87.87725, 42.00961);  //奥黑尔
-            //box search_area(-87.60590, 41.78396, -87.59174, 41.79499);      //芝加哥大学
+            //box search_area(-87.6818, 42.04871, -87.6688, 42.06275);  //northwest
+            box search_area(-87.93905, 41.95142, -87.87725, 42.00961);  //O'Hare airport
+            //box search_area(-87.60590, 41.78396, -87.59174, 41.79499);      //University of Chicago
             search_area.print();
             bench->mbr.print();
 

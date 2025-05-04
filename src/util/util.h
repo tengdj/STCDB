@@ -471,25 +471,23 @@ const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
         return h;
     }
 
-    //BloomFilter 文件头部定义
     typedef struct{
-        uint32_t dwMagicCode;                           // 文件头部标识，填充 __MGAIC_CODE__
+        uint32_t dwMagicCode;
         uint32_t dwSeed;
         uint32_t dwCount;
 
-        uint32_t dwMaxItems;                            // n - BloomFilter中最大元素个数 (输入量)
-        double dProbFalse;                              // p - 假阳概率 (输入量，比如万分之一：0.00001)
-        uint32_t dwFilterBits;                          // m = ceil((n * log(p)) / log(1.0 / (pow(2.0, log(2.0))))); - BloomFilter的比特数
-        uint32_t dwHashFuncs;                           // k = round(log(2.0) * m / n); - 哈希函数个数
+        uint32_t dwMaxItems;
+        double dProbFalse;
+        uint32_t dwFilterBits;
+        uint32_t dwHashFuncs;
 
         uint32_t dwResv[6];
-        uint32_t dwFileCrc;                             // (未使用)整个文件的校验和
-        uint32_t dwFilterSize;                          // 后面Filter的Buffer长度
+        uint32_t dwFileCrc;
+        uint32_t dwFilterSize;
     }BloomFileHead;
 
     //#pragma pack()
 
-    // 计算BloomFilter的参数m,k
     static inline void CalcBloomFilterParam(uint32_t n, double p, uint32_t *pm, uint32_t *pk){
         /**
       *  n - Number of items in the filter
@@ -504,10 +502,10 @@ const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
      **/
         uint32_t m, k;
         m =(uint32_t) ceil(-1.0 * n * std::log(p) / 0.480453);
-        m = (m - m % 64) + 64;                              // 8字节对齐
+        m = (m - m % 64) + 64;                              // 8B glignment
         double double_k = (0.69314 *m /n);
 
-        k = round(double_k);                //round 四舍五入
+        k = round(double_k);
 
         *pm = m;
         *pk = k;

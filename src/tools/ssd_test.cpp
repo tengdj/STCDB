@@ -10,8 +10,8 @@ int main(int argc, char **argv){         //test write and read in various number
     generator_configuration config = get_generator_parameters(argc, argv);
     cout << "threads" << config.num_threads << endl;
 
-    size_t size_20MB = 20ULL * 1024 * 1024;  // 使用无符号长整型
-    size_t total_size = size_20MB * 4000;    // 确保不会溢出
+    size_t size_20MB = 20ULL * 1024 * 1024;
+    size_t total_size = size_20MB * 4000;
     char* many_ctfs = new char[total_size];
     memset(many_ctfs, 0, size_20MB * 4000);
     struct timeval start_time;

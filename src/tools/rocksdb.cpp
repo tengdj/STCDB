@@ -94,15 +94,14 @@ string uint64_to_big_endian(uint64_t value) {
 }
 
 string uint128_to_big_endian(__uint128_t value) {
-    char buffer[16]; // 128 位等于 16 字节
+    char buffer[16]; // 128 b = 16 B
     for (int i = 15; i >= 0; --i) {
-        buffer[i] = value & 0xFF; // 提取最低有效字节
-        value >>= 8;             // 右移 8 位
+        buffer[i] = value & 0xFF;
+        value >>= 8;
     }
     return string(buffer, 16);
 }
 
-// 将大端字节序的字符串解压缩为 uint64_t
 uint64_t big_endian_to_uint64(const std::string& input) {
     assert(input.size() == 8 && "Input string must be exactly 8 bytes for uint64_t");
 
@@ -113,7 +112,6 @@ uint64_t big_endian_to_uint64(const std::string& input) {
     return value;
 }
 
-// 将大端字节序的字符串解压缩为 __uint128_t
 __uint128_t big_endian_to_uint128(const std::string& input) {
     assert(input.size() == 16 && "Input string must be exactly 16 bytes for __uint128_t");
 
@@ -163,16 +161,13 @@ void insert_ctb(workbench *bench, uint ctb_id, DB * db){
 }
 
 uint range_query_by_oid(rocksdb::DB* db, uint32_t oid) {
-    // 将 oid 转为大端序字符串
     std::string prefix = uint32_to_big_endian(oid << (32 - oid_bit));       //0~25 is oid, 26~31 is zero
 
     rocksdb::ReadOptions read_options;
     read_options.fill_cache = false;
 
-// 使用配置的 ReadOptions 创建一个迭代器
     rocksdb::Iterator* it = db->NewIterator(read_options);
 
-//    // 定位到以 prefix 开头的第一个键
 //    for (it->Seek(prefix); it->Valid() && it->key().starts_with(prefix); it->Next()) {
 //        parse_and_print_key(it->key());
 //    }
@@ -257,15 +252,12 @@ int main(int argc, char **argv){
     options.create_if_missing = true;
     options.max_log_file_size = 1024 * 1024 * 1024;
 
-    // 使用 ColumnFamilyOptions 禁用自动 Compaction
     rocksdb::ColumnFamilyOptions cf_options;
     cf_options.disable_auto_compactions = true;
-    // 设置 BlockBasedTableFactory
     options.table_factory.reset(rocksdb::NewBlockBasedTableFactory());
 
-//    // 禁用自动 Compaction
+
 //    options.disable_auto_compactions = true;
-//// 避免 Level 0 的文件数量触发自动 Compaction
 //    options.level0_slowdown_writes_trigger = INT_MAX;
 //    options.level0_stop_writes_trigger = INT_MAX;
 
@@ -303,10 +295,9 @@ int main(int argc, char **argv){
         double insert_time = get_time_elapsed(start_time, true);
         cout << "insert_time: " << insert_time << endl;
 
-        // 手动触发全量 Compaction
+
         rocksdb::CompactRangeOptions compact_options;
-        compact_options.exclusive_manual_compaction = false; // 是否独占 Compaction
-        // 对默认列族进行全量 Compaction
+        compact_options.exclusive_manual_compaction = false;
         Status status = db->CompactRange(compact_options, nullptr, nullptr);
         if (!status.ok()) {
             std::cerr << "Failed to compact DB: " << status.ToString() << std::endl;

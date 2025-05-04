@@ -162,16 +162,9 @@ inline void print_parse_key(__uint128_t key){
 
 __host__ __device__
 inline void extract_fields(__uint128_t combined_value, __uint128_t &pid, __uint128_t &target, __uint128_t &duration, __uint128_t &end) {
-    // 提取 end_time_min (最低位 END_BIT)
     end = static_cast<uint64_t>(combined_value & ((1ULL << END_BIT) - 1));
-
-    // 提取 duration (END_BIT 后的 DURATION_BIT 位)
     duration = static_cast<uint64_t>((combined_value >> END_BIT) & ((1ULL << DURATION_BIT) - 1));
-
-    // 提取 target (DURATION_BIT + END_BIT 后的其余位)
     target = static_cast<uint64_t>((combined_value >> (DURATION_BIT + END_BIT)) & ((1ULL << OID_BIT) - 1));
-
-    // 提取 pid (最高位 OID_BIT)
     pid = static_cast<uint64_t>(combined_value >> (OID_BIT + DURATION_BIT + END_BIT));
 }
 
