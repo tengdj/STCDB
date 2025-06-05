@@ -19,24 +19,25 @@ public:
     uint num_threads = 1;
     uint duration = 1000;
     uint num_objects = 1000;
-    string trace_path = "default.tr";              //"/gisdata/chicago/traces"
+    string trace_path = "../data/points/";              //"/gisdata/chicago/traces"      // "../data/points/"
     uint cur_duration = 0;
 
     uint file_size = 3600;                             // data in x seconds is put into file
 
     // for query only
     uint start_time = 0;
-    uint grid_capacity = 100;
-    uint zone_capacity = 100;
+    uint grid_capacity = 50;
+    uint zone_capacity = 20;
     size_t num_meeting_buckets = 100000;
 
     double grid_amplify = 2;
-    uint refine_size = 3;
+    uint refine_size = 4;
     bool dynamic_schema = true;
     bool phased_lookup = true;
     bool unroll = true;
     uint schema_update_delay = 1; //
-    uint min_meet_time = 10;
+    uint min_meet_time = 5;
+    uint max_meet_time = 4096 ;    //4096
     double reach_distance = 2;          //2
     double x_buffer = 0;
     double y_buffer = 0;
@@ -47,14 +48,16 @@ public:
     bool profile = false;
 
     //added
-    bool load_data = true;
+    bool load_data = false;
 
-    uint kv_capacity = 70000000;            //70000000
-    uint kv_restriction = 67108864;                  //2*1024*1024*1024/32 = 67108864
-    uint MemTable_capacity = 10;             //5*2
+    uint G_bytes = 2;
+    uint kv_capacity = 134217728 + 1000000;            //134217728 + 1000000
+    uint kv_restriction = 134217728;                  //2*1024*1024*1024/16 = 134217728
+    uint MemTable_capacity = 2 ;             //5*2 ,and workbench data[100] is not enough
 
-    uint big_sorted_run_capacity = 100;
-    uint SSTable_count = 1024;
+    uint big_sorted_run_capacity = 10000;     //can be made to vector
+    uint CTF_count = 100;              //default 2G
+    uint split_num = 10;
 
     //bool search_kv = true;
     uint search_single_capacity = 100;
@@ -63,7 +66,25 @@ public:
     bool bloom_filter = false;
     double false_positive_rate = 0.0004;
 
-    void print(){
+    bool save_meetings_pers = false;
+    bool load_meetings_pers = false;
+
+    uint oversize_buffer_capacity = 1342177;
+
+    char CTB_meta_path[24] = "../data/meta/";
+    char raid_path[24] = "/data3/raid0_num";
+
+    void update(){
+        //cout << "into update" << endl;
+        assert(MemTable_capacity%2==0);
+        kv_restriction = G_bytes * 33554432;            //33554432 = 1G, now 256 bit
+        kv_capacity = kv_restriction + 1000000;
+        oversize_buffer_capacity = kv_restriction / 100;
+        split_num = sqrt(CTF_count);
+        assert(split_num*split_num == CTF_count);
+    }
+
+    void virtual print(){       //virtual
         fprintf(stderr,"configuration:\n");
         fprintf(stderr,"num threads:\t%d\n",num_threads);
         fprintf(stderr,"num objects:\t%d\n",num_objects);
@@ -87,6 +108,8 @@ public:
         fprintf(stderr,"analyze reach:\t%s\n",analyze_reach?"yes":"no");
         fprintf(stderr,"analyze grid:\t%s\n",analyze_grid?"yes":"no");
 
+        fprintf(stderr,"kv_restriction:\t%d\n",kv_restriction);
+        fprintf(stderr,"split_num:\t%d\n",split_num);
     }
 };
 
@@ -103,6 +126,7 @@ inline configuration get_parameters(int argc, char **argv){
             ("disable_phased_filter", "disable phased filter")
             ("disable_unroll,u", "disable unroll the refinement")
             ("disable_dynamic_schema", "the schema is not dynamically updated")
+
 
             ("analyze_reach", "analyze the reaches statistics")
             ("analyze_grid", "analyze the grid statistics")
@@ -166,7 +190,6 @@ inline configuration get_parameters(int argc, char **argv){
         config.dynamic_schema = false;
     }
 
-
     config.print();
     return config;
 }
@@ -175,14 +198,15 @@ inline configuration get_parameters(int argc, char **argv){
 class generator_configuration:public configuration{
 public:
     // how many percent of the initial points are evenly distributed
-    double walk_rate = 0.4;
+    double walk_rate = 0.3;
     double walk_speed = 1.0;
-    double drive_rate = 0.2;
-    double drive_speed = 15.0;
-    int max_rest_time = 600;
+    double drive_rate = 0.01;         //0.0033
+    double drive_speed = 10.0;
+    uint max_rest_time = 600;
+    //uint max_walk_time = 100;
 
-    string map_path = "/gisdata/chicago/streets";
-    string meta_path = "/gisdata/chicago/tweet.dat";
+    string map_path = "../data/streets.map";
+    string meta_path = "../data/chicago.mt";
 
     void print(){
         fprintf(stderr, "generator configuration:\n");
@@ -224,6 +248,7 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
             ("disable_phased_filter", "disable phased filter")
             ("disable_unroll,u", "disable unroll the refinement")
             ("disable_dynamic_schema", "the schema is not dynamically updated")
+            ("load_data", "the schema is not dynamically updated")
 
             ("analyze_reach", "analyze the reaches statistics")
             ("analyze_grid", "analyze the grid statistics")
@@ -246,6 +271,10 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
             ("trace_path,t", po::value<string>(&config.trace_path), "path to the trace file")
 
             ("memTable_capacity", po::value<uint>(&config.MemTable_capacity), "MemTable_capacity/2 is the dumping threshold")
+            ("CTF_count", po::value<uint>(&config.CTF_count), "number of CTF")
+
+            ("G_bytes", po::value<uint>(&config.G_bytes), "G_bytes of kv_restriction")
+
             ;
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -254,7 +283,6 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
         exit(0);
     }
     po::notify(vm);
-
 
     if(vm.count("gpu")){
         config.gpu = true;
@@ -267,6 +295,9 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
     }
     if(vm.count("profile")){
         config.profile = true;
+    }
+    if(vm.count("load_data")){
+        config.load_data = true;
     }
 
     if(!vm.count("zone_capacity")||!vm.count("gpu")){
@@ -290,7 +321,10 @@ inline generator_configuration get_generator_parameters(int argc, char **argv){
     }
 
     assert(config.walk_rate+config.drive_rate<=1);
+    config.update();
     config.print();
+    config.configuration::print();
+
     return config;
 }
 

@@ -23,6 +23,10 @@
 #include <algorithm>
 #include <fstream>
 #include <set>
+#include <atomic>
+#include <execution>
+#include "unordered_map"
+#include "unordered_set"
 
 using namespace std;
 typedef unsigned int uint;
@@ -33,11 +37,22 @@ namespace{
 #define OSM_SRID 4326
 #define PI 3.14159265
 #define ULL_MAX (unsigned long long)1<<62
+#define BLOCK_DIM 1024
 // some utility function
 
 #define __BLOOMFILTER_VERSION__ "1.1"
 #define __MGAIC_CODE__          (0x01464C42)
 #define MIX_UINT64(v)       ((uint32_t)((v>>32)^(v)))
+
+#define DEFAULT_bitmap_edge 256
+#define SID_BIT 12
+#define OID_BIT 26
+#define MBR_BIT 36
+#define DURATION_BIT 32
+#define END_BIT 32
+//26 + 26 + 12 = 64
+#define EDGE_REISTICTION 0.008
+
 
 const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
 
@@ -50,7 +65,6 @@ const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
         return 360.0/(sin((90-absla)*PI/180)*40076.0*1000.0);
     }
 
-
     inline size_t cantorPairing(uint pid1, uint pid2){
         return (size_t)(pid1+pid2)*(pid1+pid2+1)/2+pid2;
     }
@@ -62,7 +76,6 @@ const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
         uint x = (uint)(w - y);
         return pair<uint,uint>(x,y);
     }
-
 
     inline int double_to_int(double val){
         int vi = (int)val;
@@ -458,25 +471,23 @@ const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
         return h;
     }
 
-    //BloomFilter 文件头部定义
     typedef struct{
-        uint32_t dwMagicCode;                           // 文件头部标识，填充 __MGAIC_CODE__
+        uint32_t dwMagicCode;
         uint32_t dwSeed;
         uint32_t dwCount;
 
-        uint32_t dwMaxItems;                            // n - BloomFilter中最大元素个数 (输入量)
-        double dProbFalse;                              // p - 假阳概率 (输入量，比如万分之一：0.00001)
-        uint32_t dwFilterBits;                          // m = ceil((n * log(p)) / log(1.0 / (pow(2.0, log(2.0))))); - BloomFilter的比特数
-        uint32_t dwHashFuncs;                           // k = round(log(2.0) * m / n); - 哈希函数个数
+        uint32_t dwMaxItems;
+        double dProbFalse;
+        uint32_t dwFilterBits;
+        uint32_t dwHashFuncs;
 
         uint32_t dwResv[6];
-        uint32_t dwFileCrc;                             // (未使用)整个文件的校验和
-        uint32_t dwFilterSize;                          // 后面Filter的Buffer长度
+        uint32_t dwFileCrc;
+        uint32_t dwFilterSize;
     }BloomFileHead;
 
     //#pragma pack()
 
-    // 计算BloomFilter的参数m,k
     static inline void CalcBloomFilterParam(uint32_t n, double p, uint32_t *pm, uint32_t *pk){
         /**
       *  n - Number of items in the filter
@@ -491,10 +502,10 @@ const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
      **/
         uint32_t m, k;
         m =(uint32_t) ceil(-1.0 * n * std::log(p) / 0.480453);
-        m = (m - m % 64) + 64;                              // 8字节对齐
+        m = (m - m % 64) + 64;                              // 8B glignment
         double double_k = (0.69314 *m /n);
 
-        k = round(double_k);                //round 四舍五入
+        k = round(double_k);
 
         *pm = m;
         *pk = k;
@@ -506,11 +517,41 @@ const double degree_per_meter_latitude = 360.0/(40076.0*1000.0);
         }
     }
 
-    inline float uint_to_float(uint f) {
-        float ret = (float)f/100000;
-        ret -= 180;
-        return ret;
+    void clear_cache(){
+        string cmd = "echo 'xiangrongkai' | sudo -S sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'";
+        if(system(cmd.c_str()) != 0){
+            fprintf(stderr, "Error when disabling buffer cache\n");
+        }
     }
+
+    template <typename T>
+    constexpr uint min_bits_to_store(T max_value) {
+        static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value,
+                      "Input must be an unsigned integer type.");
+        if (max_value == 0) return 1;
+        return static_cast<uint>(std::log2(max_value)) + 1; // ⌊log2(value)⌋ + 1
+    }
+
+    uint get_key_sid(__uint128_t key){
+        return (uint)((key >> (OID_BIT * 2 + DURATION_BIT + END_BIT)) & ((1ULL << SID_BIT) - 1));
+    }
+
+    uint get_key_oid(__uint128_t key){
+        return (uint)((key >> (OID_BIT + DURATION_BIT + END_BIT)) & ((1ULL << OID_BIT) - 1));
+    }
+
+    uint get_key_target(__uint128_t key){
+        return (uint)((key >> ( DURATION_BIT + END_BIT)) & ((1ULL << OID_BIT) - 1));
+    }
+
+    uint get_key_duration(__uint128_t key){
+        return (uint)((key >> END_BIT) & ((1ULL << DURATION_BIT) - 1));
+    }
+
+    uint get_key_end(__uint128_t key){
+        return (uint)(key & ((1ULL << END_BIT) - 1));
+    }
+
 }
 #endif
 

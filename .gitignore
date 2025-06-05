@@ -31,7 +31,7 @@
 *.out
 *.app
 *.csv
-#data/
+
 *.wkt
 *.tr
 build/
@@ -50,10 +50,7 @@ meetings
 cmake-build-debug
 oldsrc
 store
-core*
 right_store
 .vs
-2G3600/
-2Gright_meta/
-script/experiment.sh
-script/script.py
+old_what
+data/

@@ -24,7 +24,7 @@ using namespace std;
 class tracer{
 	// the statistic for the data set
 	Point *trace = NULL;
-	bool owned_trace = false;
+	//bool owned_trace = false;
 	// for query
 	configuration *config = NULL;
 	partitioner *part = NULL;
@@ -40,7 +40,8 @@ public:
 	tracer(configuration *conf);
 	~tracer();
 	void dumpTo(const char *path);
-	void loadMeta(const char *path);
+	//void loadMeta(const char *path);
+    void loadData(const char *path, int st);
 	void loadData(const char *path, int start_time, int duration);
 	void print();
 	void print_trace(int oid);

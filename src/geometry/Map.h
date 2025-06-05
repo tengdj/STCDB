@@ -20,7 +20,7 @@ using namespace std;
 
 class Node: public Point{
 public:
-    int id = 0;
+    unsigned int id = 0;
     Node(){}
     Node(double xx, double yy){
         x = xx;
@@ -116,6 +116,7 @@ public:
     TripType type;
     Point loc;
     //int last_time;
+    uint time_remaining = 0;
 
     int core = -2;
     Point end;
@@ -148,6 +149,30 @@ public:
     vector<Street *> getStreets(){
         return streets;
     }
+
+    void check_Streets(){
+        for(int i = 0; i < streets.size(); i++){
+            if(streets[i]->id != i){       //stres[i]->id >= stres.size()
+                cout << "streets id" << streets[i]->id << " " << i << endl;
+                streets[i]->id = i;
+            }
+//            if(streets[i]->start->id >= nodes.size()){
+//                cout << "start id" << streets[i]->start->id << " " << i << endl;
+//                streets[i]->id = i;
+//
+//            }
+        }
+    }
+
+    void check_Nodes(){
+        for(int i = 0; i < nodes.size(); i++){
+            if(nodes[i]->id != i){       //stres[i]->id >= stres.size()
+                cout << "nodes id" << nodes[i]->id << " " << i << endl;
+                nodes[i]->id = i;
+            }
+        }
+    }
+
 
     ~Map();
     box *getMBR();

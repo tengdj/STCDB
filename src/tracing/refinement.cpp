@@ -64,16 +64,15 @@ void *reachability_unit(void *arg){
 }
 
 void workbench::reachability(){
-
 	query_context tctx;
 	tctx.config = config;
 	tctx.num_units = grid_check_counter;
 	tctx.target[0] = (void *)this;
-
 	// generate a new batch of reaches
 	struct timeval start = get_cur_time();
 	pthread_t threads[tctx.config->num_threads];
 
+    //reachability_unit(&tctx);
 	for(int i=0;i<tctx.config->num_threads;i++){
 		pthread_create(&threads[i], NULL, reachability_unit, (void *)&tctx);
 	}
