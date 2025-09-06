@@ -12,8 +12,6 @@
 #include "random"
 #include "stdint.h"
 #include "stdio.h"
-#include "unordered_map"
-#include "unordered_set"
 #include "vector"
 #include "chrono"
 #include "../cuda/hash.h"

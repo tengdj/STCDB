@@ -31,7 +31,7 @@
 *.out
 *.app
 *.csv
-#data/
+
 *.wkt
 *.tr
 build/
@@ -43,3 +43,14 @@ target
 .project
 .settings/
 .idea/
+src/err.txt
+src/meeting.txt
+*.txt
+meetings
+cmake-build-debug
+oldsrc
+store
+right_store
+.vs
+old_what
+data/

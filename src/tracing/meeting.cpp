@@ -14,11 +14,11 @@ bool workbench::batch_meet(meeting_unit *buffer, uint num){
 	}
 	uint cur_counter = 0;
 	lock();
-	cur_counter = meeting_counter;
-	meeting_counter += num;
+	cur_counter = kv_count;
+	kv_count += num;
 	unlock();
-	if(meeting_counter<meeting_capacity){
-		memcpy(meetings+cur_counter,buffer,sizeof(meeting_unit)*num);
+	if(kv_count<config->num_objects * 10){
+		memcpy(h_meetings_ps+cur_counter,buffer,sizeof(meeting_unit)*num);
 	}
 	return true;
 }
@@ -56,7 +56,7 @@ void *update_meetings_unit(void *arg){
 			}
 
 			//log("%d %d",bench->cur_time,bench->meeting_buckets[bid].start);
-			if(bench->cur_time-bench->meeting_buckets[bid].start>=bench->config->min_meet_time){
+			if(bench->cur_time-bench->meeting_buckets[bid].start>=bench->config->min_meet_time+1){
 				meetings[meeting_index++] = bench->meeting_buckets[bid];
 				if(meeting_index==200){
 					bench->batch_meet(meetings, 200);
@@ -86,7 +86,7 @@ void workbench::update_meetings(){
 
 	num_active_meetings = 0;
 	num_taken_buckets = 0;
-	meeting_counter = 0;
+	kv_count = 0;
 
 	for(int i=0;i<tctx.config->num_threads;i++){
 		pthread_create(&threads[i], NULL, update_meetings_unit, (void *)&tctx);
@@ -97,6 +97,6 @@ void workbench::update_meetings(){
 	}
 
 	logt("update meeting: %d taken, %d active, %d identified",start,
-			num_taken_buckets,num_active_meetings,meeting_counter);
+			num_taken_buckets,num_active_meetings,kv_count);
 }
 

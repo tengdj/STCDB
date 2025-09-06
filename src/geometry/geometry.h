@@ -17,6 +17,7 @@
 #include <queue>
 #include <iostream>
 #include "../util/util.h"
+//#include "../cuda/cuda_util.cuh"
 
 using namespace std;
 class Point{
@@ -73,6 +74,14 @@ public:
 		high[1] = b->high[1];
 	}
 
+//    box(__uint128_t value){                   //add
+//        low[0] = uint_to_float((uint)((value >> 66) & ((1ULL << 22) - 1)));
+//        low[1] = uint_to_float((uint)((value >> 44) & ((1ULL << 22) - 1)));
+//        high[0] = uint_to_float((uint)((value >> 22) & ((1ULL << 22) - 1)));
+//        high[1] = uint_to_float((uint)(value & ((1ULL << 22) - 1)));
+//        //cout<<low[0]<<" "<<low[1]<<" "<<high[0]<<" "<<high[1]<<endl;
+//    }
+
 	void update(Point p){
 		if(low[0]>p.x){
 			low[0] = p.x;
@@ -90,17 +99,37 @@ public:
 	}
 
 	void update(box &b){
-		update(Point(b.low[0],b.low[1]));
-		update(Point(b.low[0],b.high[1]));
-		update(Point(b.high[0],b.low[1]));
-		update(Point(b.high[0],b.high[1]));
+//		update(Point(b.low[0],b.low[1]));
+//		update(Point(b.low[0],b.high[1]));
+//		update(Point(b.high[0],b.low[1]));
+//		update(Point(b.high[0],b.high[1]));
+        if(low[0] > b.low[0]){
+            low[0] = b.low[0];
+        }
+        if(high[0] < b.high[0]){
+            high[0] = b.high[0];
+        }
+
+        if(low[1] > b.low[1]){
+            low[1] = b.low[1];
+        }
+        if(high[1] < b.high[1]){
+            high[1] = b.high[1];
+        }
 	}
 
+//    void init(){
+//        low[0] = 100000.0;
+//        low[1] = 100000.0;
+//        high[0] = -100000.0;
+//        high[1] = -100000.0;
+//    }
+
 	bool intersect(box &target){
-		return !(target.low[0]>high[0]||
-				 target.high[0]<low[0]||
-				 target.low[1]>high[1]||
-				 target.high[1]<low[1]);
+		return !(target.low[0]>high[0]||            //target is at the right of this
+				 target.high[0]<low[0]||            //... left...
+				 target.low[1]>high[1]||            //high
+				 target.high[1]<low[1]);            //low
 	}
 	bool contain(box &target){
 		return target.low[0]>=low[0]&&
@@ -114,8 +143,6 @@ public:
 			   p.y>=low[1]&&
 			   p.y<=high[1];
 	}
-
-
 
 	double area(bool geography = false){
 		if(!geography){
@@ -144,8 +171,6 @@ public:
 		}
 	}
 
-
-
 	double distance(Point &p, bool geography = false){
 		if(this->contain(p)){
 			return 0;
@@ -158,7 +183,6 @@ public:
 		}
 		return sqrt(dx * dx + dy * dy);
 	}
-
 
 	double max_distance(Point &p){
 		double md = 0;
@@ -215,8 +239,89 @@ public:
 		low[!bigger_one] = low[!bigger_one]-difference/2;
 		high[!bigger_one] = high[!bigger_one]+difference/2;
 	}
+
 };
 
+class f_box{
+public:
+    float low[2] = {100000.0,100000.0};
+    float high[2] = {-100000.0,-100000.0};
+
+    f_box(){}
+
+    f_box(box * b){
+        low[0] = b->low[0];
+        low[1] = b->low[1];
+        high[0] = b->high[0];
+        high[1] = b->high[1];
+    }
+
+    void get_fb(box * b){
+        low[0] = b->low[0];
+        low[1] = b->low[1];
+        high[0] = b->high[0];
+        high[1] = b->high[1];
+        assert(low[0] < high[0]);
+        assert(low[1] < high[1]);
+    }
+
+    void print_vertices(){
+        fprintf(stderr,"%f %f, %f %f, %f %f, %f %f, %f %f",
+                low[0],low[1],
+                high[0],low[1],
+                high[0],high[1],
+                low[0],high[1],
+                low[0],low[1]);
+    }
+    bool is_contained(box &target){
+        return target.low[0]<=low[0]&&
+               target.high[0]>=high[0]&&
+               target.low[1]<=low[1]&&
+               target.high[1]>=high[1];
+    }
+    bool contain(f_box &target){
+        return target.low[0]>=low[0]&&
+               target.high[0]<=high[0]&&
+               target.low[1]>=low[1]&&
+               target.high[1]<=high[1];
+    }
+    bool intersect(box &target){
+        return !(target.low[0]>high[0]||            //target is at the right of this
+                 target.high[0]<low[0]||            //... left...
+                 target.low[1]>high[1]||            //high
+                 target.high[1]<low[1]);            //low
+    }
+    void print(){
+        fprintf(stderr,"POLYGON((");
+        print_vertices();
+        fprintf(stderr,"))\n");
+    }
+    void update(f_box &b){
+        if(low[0] > b.low[0]){
+            low[0] = b.low[0];
+        }
+        if(high[0] < b.high[0]){
+            high[0] = b.high[0];
+        }
+
+        if(low[1] > b.low[1]){
+            low[1] = b.low[1];
+        }
+        if(high[1] < b.high[1]){
+            high[1] = b.high[1];
+        }
+    }
+	float area() const {
+        assert(high[0] >= low[0] && high[1] >= low[1]);
+        return (high[0] - low[0]) * (high[1] - low[1]);
+    }
+};
+
+class uint_box{
+public:
+    uint low[2] = {100000000,100000000};
+    uint high[2] = {0,0};
+};
 
 class Grid{
 
@@ -442,7 +547,5 @@ inline void print_points(Point *trajectory, size_t num_objects, uint max_num = I
 
 	fprintf(stderr,")\n");
 }
-
-
 
 #endif /* DATAGEN_GEOMETRY_H_ */
