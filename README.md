@@ -1,2 +1,2 @@
-# GLINT
-GLINT, a GPU-based Real-time Contact Tracing system that can achieve sub-second response for contact tracing data processing for a population at tens of millions scale. GLINT provides a fully GPU compatible pipeline, including GPU compatible elastic dynamic data partitioning, GPU-optimized contacted objects refining, and GPU based Spatial-temporal evaluation of contacts, which fully takes advantage of the massive parallelism of GPGPU with high throughput and low cost.
+# STCDB
+A SpatioTemporal Co-Occurrence Database system.
